@@ -12,8 +12,6 @@ class SandBox : public Venus::Application
 		{
 
 		}
-
-
 };
 
 Venus::Application* Venus::CreateApplication()

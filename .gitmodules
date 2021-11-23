@@ -1,0 +1,3 @@
+[submodule "Venus/vendor/spdlog"]
+	path = Venus/vendor/spdlog
+	url = https://github.com/gabime/spdlog
