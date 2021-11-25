@@ -1,14 +1,28 @@
+#include "pch.h"
 #include "Application.h"
 
-Venus::Application::Application()
-{
-}
+namespace Venus {
 
-Venus::Application::~Application()
-{
-}
+	Application* Application::s_Instance = nullptr;
 
-void Venus::Application::Run()
-{
-	while (true);
+	Application::Application()
+	{
+
+	}
+
+	Application::~Application()
+	{
+	}
+
+	void Application::Run()
+	{
+		while (m_Running)
+		{
+		}
+	}
+
+	void Application::Close()
+	{
+		m_Running = false;
+	}
 }

@@ -1,14 +1,14 @@
 #include <Venus.h>
 
-class SandBox : public Venus::Application
+class Sandbox : public Venus::Application
 {
 	public:
-		SandBox()
+		Sandbox()
 		{
 
 		}
 
-		~SandBox()
+		~Sandbox()
 		{
 
 		}
@@ -16,5 +16,5 @@ class SandBox : public Venus::Application
 
 Venus::Application* Venus::CreateApplication()
 {
-	return new SandBox();
+	return new Sandbox();
 }

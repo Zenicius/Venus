@@ -1,3 +1,6 @@
 [submodule "Venus/vendor/spdlog"]
 	path = Venus/vendor/spdlog
 	url = https://github.com/gabime/spdlog
+[submodule "Venus/vendor/GLFW"]
+	path = Venus/vendor/GLFW
+	url = https://github.com/TheCherno/glfw.git
