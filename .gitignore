@@ -37,4 +37,5 @@ bin/
 bin-int/
 
 # User files
+*.sln
 *.user

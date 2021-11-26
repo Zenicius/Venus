@@ -1,7 +1,5 @@
 #pragma once
 
-#ifdef VS_PLATFORM_WINDOWS
-
 extern Venus::Application* Venus::CreateApplication();
 
 int main(int argc, char** argv)
@@ -11,7 +9,7 @@ int main(int argc, char** argv)
 
 	auto app = Venus::CreateApplication();
 	app->Run();
+	CORE_LOG_WARN("Shutting down...");
 	delete app;
 }
 
-#endif

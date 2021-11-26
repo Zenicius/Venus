@@ -8,21 +8,19 @@ workspace "Venus"
 		"Release",
 		"Dist"
 	}
-	
-	flags
-	{
-		"MultiProcessorCompile"
-	}
 
 outputdir = "%{cfg.buildcfg}-%{cfg.system}-%{cfg.architecture}"
 
 -- Include directories relative to root folder (solution directory)
 IncludeDir = {}
 IncludeDir["GLFW"] = "Venus/vendor/GLFW/include"
-
+IncludeDir["Glad"] = "Venus/vendor/Glad/include"
+IncludeDir["glm"] = "Venus/vendor/glm"
+IncludeDir["stb_image"] = "Venus/vendor/stb_image"
 
 group "Dependencies"
 	include "Venus/vendor/GLFW"
+	include "Venus/vendor/Glad"
 
 group ""
 
@@ -31,7 +29,7 @@ project "Venus"
 	kind "StaticLib"
 	language "C++"
 	cppdialect "C++17"
-	staticruntime "on"
+	staticruntime "off"
 
 	targetdir ("bin/" .. outputdir .. "/%{prj.name}")
 	objdir ("bin-int/" .. outputdir .. "/%{prj.name}")
@@ -42,36 +40,38 @@ project "Venus"
 	files
 	{
 		"%{prj.name}/src/**.h",
-		"%{prj.name}/src/**.cpp"
+		"%{prj.name}/src/**.cpp",
+		"%{prj.name}/vendor/glm/glm/**.hpp",
+		"%{prj.name}/vendor/glm/glm/**.inl",
+		"%{prj.name}/vendor/stb_image/**.h",
+		"%{prj.name}/vendor/stb_image/**.cpp"
 	}
 
 	defines
 	{
-		"_CRT_SECURE_NO_WARNINGS"
+		"_CRT_SECURE_NO_WARNINGS",
+		"GLFW_INCLUDE_NONE"
 	}
 
 	includedirs
 	{
 		"%{prj.name}/src",
 		"%{prj.name}/vendor/spdlog/include",
-		"%{IncludeDir.GLFW}"
+		"%{IncludeDir.GLFW}",
+		"%{IncludeDir.Glad}",
+		"%{IncludeDir.glm}",
+		"%{IncludeDir.stb_image}"
 	}
 
 	links 
 	{ 
 		"GLFW",
+		"Glad",
 		"opengl32.lib"
 	}
 
 	filter "system:windows"
 		systemversion "latest"
-
-		defines
-		{
-			"VS_PLATFORM_WINDOWS",
-			"VS_BUILD_DLL",
-			"GLFW_INCLUDE_NONE"
-		}
 
 	filter "configurations:Debug"
 		defines "VS_DEBUG"
@@ -93,7 +93,7 @@ project "Sandbox"
 	kind "ConsoleApp"
 	language "C++"
 	cppdialect "C++17"
-	staticruntime "on"
+	staticruntime "off"
 
 	targetdir ("bin/" .. outputdir .. "/%{prj.name}")
 	objdir ("bin-int/" .. outputdir .. "/%{prj.name}")
@@ -108,7 +108,11 @@ project "Sandbox"
 	{
 		"Venus/vendor/spdlog/include",
 		"Venus/src",
-		"Venus/vendor"
+		"Venus/vendor",
+		"%{IncludeDir.GLFW}",
+		"%{IncludeDir.Glad}",
+		"%{IncludeDir.glm}",
+		"%{IncludeDir.stb_image}"
 	}
 
 	links
@@ -118,11 +122,6 @@ project "Sandbox"
 
 	filter "system:windows"
 		systemversion "latest"
-
-		defines
-		{
-			"VS_PLATFORM_WINDOWS"
-		}
 
 	filter "configurations:Debug"
 		defines "VS_DEBUG"

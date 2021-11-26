@@ -5,14 +5,12 @@
 #include <functional>
 
 #include <string>
+#include <fstream>
 #include <sstream>
+#include <cerrno>
 #include <array>
 #include <vector>
 #include <unordered_map>
 #include <unordered_set>
 
 #include "Engine/Log.h"
-
-#ifdef VS_PLATFORM_WINDOWS
-#include <Windows.h>
-#endif
