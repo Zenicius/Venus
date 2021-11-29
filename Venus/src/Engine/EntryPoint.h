@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Application.h"
+
 extern Venus::Application* Venus::CreateApplication();
 
 int main(int argc, char** argv)

@@ -14,8 +14,9 @@ namespace Venus {
 			virtual void OnAttach() {}
 			virtual void OnDetach() {}
 			virtual void OnUpdate(Timestep ts) {}
+			virtual void OnImGuiRender() {}
 
-			const std::string& GetName() const { return m_DebugName; }
+			inline const std::string& GetName() const { return m_DebugName; }
 
 		private:
 			std::string m_DebugName;

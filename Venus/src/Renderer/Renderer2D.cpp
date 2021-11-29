@@ -2,21 +2,51 @@
 #include "Renderer2D.h"
 
 namespace Venus {
+    
+    Shader m_Shader, m_TextShader;
+    VAO m_VAO, m_TextVAO;
+    VBO m_TextVBO;
+    glm::vec3 m_ClearColor = COLOR_BLACK;
 
-    Renderer2D::Renderer2D(Shader& shader, Shader& textShader)
+    void Renderer2D::Init(Shader& shader, Shader& textShader)
     {
         m_Shader = shader;
         m_TextShader = textShader;
 
-        InitRender();
-        InitRenderText();
+        m_VAO = VAO(1);
+        m_TextVAO = VAO(1);
+
+        Init2D();
+        InitText();
     }
 
-    Renderer2D::~Renderer2D()
+    void Renderer2D::Shutdown()
     {
         m_VAO.Delete();
         m_TextVAO.Delete();
         m_TextVBO.Delete();
+    }
+
+    void Renderer2D::SetClearColor(glm::vec3 color)
+    {
+        m_ClearColor = color;
+        glClearColor(color.r, color.b, color.g, 1.0f);
+    }
+
+    void Renderer2D::Clear()
+    {
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    }
+
+    void Renderer2D::StartScene(OrthographicCamera& camera)
+    {
+        m_Shader.Activate();
+        m_Shader.SetUniformMat4("projection", camera.GetViewProjectionMatrix());
+        
+        // TODO: FIX THIS CODE
+        glm::mat4 projection = glm::ortho(0.0f, (float)1280, (float)720, 0.0f, -1.0f, 1.0f);
+        m_TextShader.Activate();
+        m_TextShader.SetUniformMat4("projection", projection);
     }
 
     void Renderer2D::DrawSprite(Texture& texture, glm::vec2 position, glm::vec2 size, float rotate, glm::vec3 color)
@@ -48,7 +78,6 @@ namespace Venus {
 
     void Renderer2D::DrawText(const std::string& text, float x, float y, float scale, glm::vec3 color)
     {
-        /*
         m_TextShader.Activate();
         m_TextShader.SetUniform3f("textColor", color);
 
@@ -89,10 +118,9 @@ namespace Venus {
 
         m_TextVAO.Unbind();
         glBindTexture(GL_TEXTURE_2D, 0);
-        */
     }
 
-    void Renderer2D::InitRender()
+    void Renderer2D::Init2D()
     {
         float vertices[] = {
             // pos      // tex
@@ -113,7 +141,7 @@ namespace Venus {
         m_VAO.Unbind();
     }
 
-    void Renderer2D::InitRenderText()
+    void Renderer2D::InitText()
     {
         m_TextShader.SetUniform1i("text", 0);
 

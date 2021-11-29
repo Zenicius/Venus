@@ -47,8 +47,6 @@ namespace Venus {
 		int monitorX, monitorY;
 		glfwGetMonitorPos(monitors[0], &monitorX, &monitorY);
 
-
-
 		/*
 		*
 		* Creates our window with parameters given (size, name) and centered.

@@ -15,6 +15,7 @@ namespace Venus {
 
 	Application::~Application()
 	{
+		Renderer2D::Shutdown();
 		delete m_Window;
 	}
 
@@ -32,6 +33,9 @@ namespace Venus {
 
 		CORE_LOG_INFO("OpenGL Info:\n		Vendor: {0}\n		Version: {1}\n		Graphics: {2}",
 			vendor, version, renderer);
+
+		m_ImGuiLayer = new ImGuiLayer();
+		PushOverlay(m_ImGuiLayer);
 	}
 
 	void Application::PushLayer(Layer* layer)
@@ -56,6 +60,11 @@ namespace Venus {
 
 			for (Layer* layer : m_LayerStack)
 				layer->OnUpdate(timestep);
+
+			m_ImGuiLayer->Begin();
+			for (Layer* layer : m_LayerStack)
+				layer->OnImGuiRender();
+			m_ImGuiLayer->End();
 
 			m_Window->OnUpdate();
 		}

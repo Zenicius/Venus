@@ -7,3 +7,6 @@
 [submodule "Venus/vendor/glm"]
 	path = Venus/vendor/glm
 	url = https://github.com/g-truc/glm.git
+[submodule "Venus/vendor/imgui"]
+	path = Venus/vendor/imgui
+	url = https://github.com/TheCherno/imgui.git

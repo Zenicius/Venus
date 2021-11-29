@@ -8,7 +8,8 @@ namespace Venus {
 	class VAO
 	{
 		public:
-			VAO();
+			VAO() {}
+			VAO(GLsizei size);
 
 			void LinkAttrib(VBO& VBO, GLuint layout, GLuint numComponents, GLenum type, GLsizeiptr stride, void* offset);
 			void Bind() const;

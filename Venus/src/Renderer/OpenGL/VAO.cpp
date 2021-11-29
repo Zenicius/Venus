@@ -3,9 +3,9 @@
 
 namespace Venus {
 
-	VAO::VAO()
+	VAO::VAO(GLsizei size)
 	{
-		glGenVertexArrays(1, &ID);
+		glGenVertexArrays(size, &ID);
 	}
 
 	void VAO::LinkAttrib(VBO& VBO, GLuint layout, GLuint numComponents, GLenum type, GLsizeiptr stride, void* offset)

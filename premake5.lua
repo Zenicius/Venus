@@ -15,12 +15,16 @@ outputdir = "%{cfg.buildcfg}-%{cfg.system}-%{cfg.architecture}"
 IncludeDir = {}
 IncludeDir["GLFW"] = "Venus/vendor/GLFW/include"
 IncludeDir["Glad"] = "Venus/vendor/Glad/include"
+IncludeDir["ImGui"] = "Venus/vendor/imgui"
 IncludeDir["glm"] = "Venus/vendor/glm"
 IncludeDir["stb_image"] = "Venus/vendor/stb_image"
+IncludeDir["freetype"] = "Venus/vendor/freetype/include"
 
 group "Dependencies"
 	include "Venus/vendor/GLFW"
 	include "Venus/vendor/Glad"
+	include "Venus/vendor/imgui"
+	include "Venus/vendor/freetype"
 
 group ""
 
@@ -44,7 +48,7 @@ project "Venus"
 		"%{prj.name}/vendor/glm/glm/**.hpp",
 		"%{prj.name}/vendor/glm/glm/**.inl",
 		"%{prj.name}/vendor/stb_image/**.h",
-		"%{prj.name}/vendor/stb_image/**.cpp"
+		"%{prj.name}/vendor/stb_image/**.cpp",
 	}
 
 	defines
@@ -59,14 +63,18 @@ project "Venus"
 		"%{prj.name}/vendor/spdlog/include",
 		"%{IncludeDir.GLFW}",
 		"%{IncludeDir.Glad}",
+		"%{IncludeDir.ImGui}",
 		"%{IncludeDir.glm}",
-		"%{IncludeDir.stb_image}"
+		"%{IncludeDir.stb_image}",
+		"%{IncludeDir.freetype}"
 	}
 
 	links 
 	{ 
 		"GLFW",
 		"Glad",
+		"ImGui",
+		"freetype",
 		"opengl32.lib"
 	}
 
@@ -112,7 +120,8 @@ project "Sandbox"
 		"%{IncludeDir.GLFW}",
 		"%{IncludeDir.Glad}",
 		"%{IncludeDir.glm}",
-		"%{IncludeDir.stb_image}"
+		"%{IncludeDir.stb_image}",
+		"%{IncludeDir.freetype}"
 	}
 
 	links

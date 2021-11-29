@@ -7,6 +7,12 @@
 #include "Engine/LayerStack.h"
 #include "Engine/Timestep.h"
 
+#include "ImGui/ImGuiLayer.h"
+
+#include "Renderer/Renderer2D.h"
+
+int main(int argc, char** argv);
+
 namespace Venus
 {
 	class Application
@@ -22,7 +28,7 @@ namespace Venus
 			void Run();
 			void Close();
 
-
+			Window& GetWindow() { return *m_Window; }
 			static Application& Get() { return *s_Instance; }
 
 		private:
@@ -30,9 +36,13 @@ namespace Venus
 
 			Window* m_Window;
 			LayerStack m_LayerStack;
+
+			ImGuiLayer* m_ImGuiLayer;
 			
 			bool m_Running = true;
 			float m_LastFrameTime = 0.0f;
+
+			friend int ::main(int argc, char** argv);
 	};
 
 	// Client
