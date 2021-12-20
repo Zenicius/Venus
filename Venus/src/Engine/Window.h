@@ -1,37 +1,47 @@
 #pragma once
 
-#include "pch.h"
-#include <GLFW/glfw3.h>
+#include <sstream>
+
+#include "Engine/Base.h"
+#include "Events/Event.h"
 
 namespace Venus {
 
+	struct WindowProps
+	{
+		std::string Title;
+		uint32_t Width;
+		uint32_t Height;
+
+		WindowProps(const std::string& title = "Venus Engine",
+			uint32_t width = 1600,
+			uint32_t height = 900)
+			: Title(title), Width(width), Height(height)
+		{
+		}
+	};
+
+	// Interface representing a desktop system based Window
 	class Window
 	{
 		public:
-			Window(unsigned int widht, unsigned int height, const std::string& title = "Venus Engine", bool VSync = true);
-			~Window();
+			using EventCallbackFn = std::function<void(Event&)>;
 
-			void OnUpdate();
+			virtual ~Window() = default;
 
-			GLFWwindow* GetWindow() const { return m_Window; }
-			const std::string GetTitle() const { return m_Data.title; }
-			const unsigned int GetWidth() const { return m_Data.Width; }
-			const unsigned int GetHeight() const { return m_Data.Height; }
-			void SetVSync(bool enabled);
-			const bool IsVSync() const { return m_Data.VSync; }
+			virtual void OnUpdate() = 0;
 
-		private:
-			GLFWwindow* m_Window;
+			virtual uint32_t GetWidth() const = 0;
+			virtual uint32_t GetHeight() const = 0;
 
-			void Init();
+			// Window attributes
+			virtual void SetEventCallback(const EventCallbackFn& callback) = 0;
+			virtual void SetVSync(bool enabled) = 0;
+			virtual bool IsVSync() const = 0;
 
-			struct WindowData
-			{
-				unsigned int Width, Height;
-				std::string title;
-				bool VSync;
-			};
+			virtual void* GetNativeWindow() const = 0;
 
-			WindowData m_Data;
-		};
+			static Scope<Window> Create(const WindowProps& props = WindowProps());
+	};
+
 }

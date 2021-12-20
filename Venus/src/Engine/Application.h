@@ -1,50 +1,69 @@
 #pragma once
 
-#include <glad/glad.h>
-#include <GLFW/glfw3.h>
-
+#include "Engine/Base.h"
 #include "Engine/Window.h"
 #include "Engine/LayerStack.h"
 #include "Engine/Timestep.h"
 
-#include "ImGui/ImGuiLayer.h"
+#include "Events/Event.h"
+#include "Events/ApplicationEvent.h"
 
-#include "Renderer/Renderer2D.h"
+#include "ImGui/ImGuiLayer.h"
 
 int main(int argc, char** argv);
 
-namespace Venus
-{
+namespace Venus {
+
+	struct ApplicationCommandLineArgs
+	{
+		int Count = 0;
+		char** Args = nullptr;
+
+		const char* operator[](int index) const
+		{
+			VS_CORE_ASSERT(index < Count);
+			return Args[index];
+		}
+	};
+
 	class Application
 	{
 		public:
-			Application();
+			Application(const std::string& name = "Venus App", ApplicationCommandLineArgs args = ApplicationCommandLineArgs());
 			virtual ~Application();
 
-			void Init();
-			void PushLayer(Layer* layer);
-			void PushOverlay(Layer* overlay);
+			void OnEvent(Event& e);
 
-			void Run();
-			void Close();
+			void PushLayer(Layer* layer);
+			void PushOverlay(Layer* layer);
 
 			Window& GetWindow() { return *m_Window; }
+
+			void Close();
+
+			ImGuiLayer* GetImGuiLayer() { return m_ImGuiLayer; }
+
 			static Application& Get() { return *s_Instance; }
 
+			ApplicationCommandLineArgs GetCommandLineArgs() const { return m_CommandLineArgs; }
 		private:
-			static Application* s_Instance;
-
-			Window* m_Window;
+			void Run();
+			bool OnWindowClose(WindowCloseEvent& e);
+			bool OnWindowResize(WindowResizeEvent& e);
+		private:
+			ApplicationCommandLineArgs m_CommandLineArgs;
+			Scope<Window> m_Window;
+			ImGuiLayer* m_ImGuiLayer;
+			bool m_Running = true;
+			bool m_Minimized = false;
 			LayerStack m_LayerStack;
 
-			ImGuiLayer* m_ImGuiLayer;
-			
-			bool m_Running = true;
 			float m_LastFrameTime = 0.0f;
-
+		private:
+			static Application* s_Instance;
 			friend int ::main(int argc, char** argv);
 	};
 
-	// Client
-	Application* CreateApplication();
+	// CLIENT APP
+	Application* CreateApplication(ApplicationCommandLineArgs args);
 }

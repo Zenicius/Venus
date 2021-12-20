@@ -1,42 +1,71 @@
 #pragma once
 
-#include "glm/glm.hpp"
-#include "glm/gtc/matrix_transform.hpp"
+#include "Renderer/OrthographicCamera.h"
 
-#include "Engine/ResourceManager.h"
-#include "OrthographicCamera.h"
-#include "OpenGL/Shader.h"
-#include "OpenGL/Texture.h"
-#include "OpenGL/VAO.h"
-#include "OpenGL/VBO.h"
+#include "Renderer/Texture.h"
+
+#include "Renderer/Camera.h"
+#include "Renderer/EditorCamera.h"
+
+//#include "Scene/Components.h"
 
 namespace Venus {
 
 	class Renderer2D
 	{
 		public:
-			static void Init(Shader& shader, Shader& textShader);
+			static void Init();
 			static void Shutdown();
 
-			static void SetClearColor(glm::vec3 color);
-			static void Clear();
+			static void BeginScene(const Camera& camera, const glm::mat4& transform);
+			static void BeginScene(const EditorCamera& camera);
+			static void BeginScene(const OrthographicCamera& camera); // TODO: Remove
+			static void EndScene();
+			static void Flush();
 
-			static void StartScene(OrthographicCamera& camera);
-			static void DrawSprite(Texture& texture, glm::vec2 position, glm::vec2 size = glm::vec2(10.0f, 10.0f),
-				float rotate = 0.0f, glm::vec3 color = glm::vec3(1.0f));
-			static void DrawText(const std::string& text, float x, float y, float scale, glm::vec3 color);
+			// Primitives
+			static void DrawQuad(const glm::vec2& position, const glm::vec2& size, const glm::vec4& color);
+			static void DrawQuad(const glm::vec3& position, const glm::vec2& size, const glm::vec4& color);
+			static void DrawQuad(const glm::vec2& position, const glm::vec2& size, const Ref<Texture2D>& texture, float tilingFactor = 1.0f, const glm::vec4& tintColor = glm::vec4(1.0f));
+			static void DrawQuad(const glm::vec3& position, const glm::vec2& size, const Ref<Texture2D>& texture, float tilingFactor = 1.0f, const glm::vec4& tintColor = glm::vec4(1.0f));
+
+			static void DrawQuad(const glm::mat4& transform, const glm::vec4& color, int entityID = -1);
+			static void DrawQuad(const glm::mat4& transform, const Ref<Texture2D>& texture, float tilingFactor = 1.0f, const glm::vec4& tintColor = glm::vec4(1.0f), int entityID = -1);
+
+			static void DrawRotatedQuad(const glm::vec2& position, const glm::vec2& size, float rotation, const glm::vec4& color);
+			static void DrawRotatedQuad(const glm::vec3& position, const glm::vec2& size, float rotation, const glm::vec4& color);
+			static void DrawRotatedQuad(const glm::vec2& position, const glm::vec2& size, float rotation, const Ref<Texture2D>& texture, float tilingFactor = 1.0f, const glm::vec4& tintColor = glm::vec4(1.0f));
+			static void DrawRotatedQuad(const glm::vec3& position, const glm::vec2& size, float rotation, const Ref<Texture2D>& texture, float tilingFactor = 1.0f, const glm::vec4& tintColor = glm::vec4(1.0f));
+			
+			static void DrawCircle(const glm::mat4& transform, const glm::vec4 color, float thickness = 1.0f, float fade = 0.005f, int entityID = -1);
+			static void DrawCircle(const glm::vec2& position, const glm::vec2& scale, const glm::vec4 color, float thickness = 1.0f, float fade = 0.005f, int entityID = -1);
+
+			static void DrawLine(const glm::vec3& p0, const glm::vec3& p1, const glm::vec4& color, int entityID = -1);
+
+			static void DrawRect(const glm::vec3& position, const glm::vec2& size, const glm::vec4 color, int entityID = -1);
+			static void DrawRect(const glm::mat4& transform, const glm::vec4 color, int entityID = -1);
+
+			//static void DrawSprite(const glm::mat4& transform, SpriteRendererComponent& src, int entityID);
+
+
+			static float GetLineWidth();
+			static void SetLineWitdh(float width);
+
+			// Stats
+			struct Statistics
+			{
+				uint32_t DrawCalls = 0;
+				uint32_t QuadCount = 0;
+
+				uint32_t GetTotalVertexCount() const { return QuadCount * 4; }
+				uint32_t GetTotalIndexCount() const { return QuadCount * 6; }
+			};
+			static void ResetStats();
+			static Statistics GetStats();
 
 		private:
-			static void Init2D();
-			static void InitText();
-	};
+			static void StartBatch();
+			static void NextBatch();
+		};
+
 }
-
-// COLORS
-#define COLOR_WHITE glm::vec3(1.0f, 1.0f, 1.0f)
-#define COLOR_BLACK glm::vec3(0.0f, 0.0f, 0.0f)
-#define COLOR_RED glm::vec3(1.0f, 0.0f, 0.0f)
-#define COLOR_BLUE glm::vec3(0.0f, 0.0f, 1.0f)
-#define COLOR_GREEN glm::vec3(0.0, 1.0f, 0.0f)
-
-

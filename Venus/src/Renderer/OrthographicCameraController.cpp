@@ -1,61 +1,98 @@
 #include "pch.h"
 #include "OrthographicCameraController.h"
 
-#include "Engine/Application.h"
-#include "GLFW/glfw3.h"
+#include "Engine/Input.h"
+#include "Engine/KeyCodes.h"
 
 namespace Venus {
 
 	OrthographicCameraController::OrthographicCameraController(float aspectRatio, bool rotation)
-		:m_AspectRatio(aspectRatio), m_Camera(-m_AspectRatio * m_ZoomLevel, m_AspectRatio* m_ZoomLevel, -m_ZoomLevel, m_ZoomLevel), m_Rotation(rotation)
+		: m_AspectRatio(aspectRatio), 
+		  m_Camera(-m_AspectRatio * m_ZoomLevel, m_AspectRatio * m_ZoomLevel, -m_ZoomLevel, m_ZoomLevel), 
+		  m_Bounds({ -m_AspectRatio * m_ZoomLevel, m_AspectRatio * m_ZoomLevel, -m_ZoomLevel, m_ZoomLevel }),
+		  m_Rotation(rotation)
 	{
 	}
 
 	void OrthographicCameraController::OnUpdate(Timestep ts)
 	{
-		// CHANGE TO VENUS INPUT
+		VS_PROFILE_FUNCTION();
 
-		if (glfwGetKey(Application::Get().GetWindow().GetWindow(), GLFW_KEY_A) == GLFW_PRESS)
+		if (Input::IsKeyPressed(Key::A))
 		{
-			//CORE_LOG_TRACE("A");
-			m_CameraPosition.x -= m_CameraTranslationSpeed * ts;
+			m_CameraPosition.x -= cos(glm::radians(m_CameraRotation)) * m_CameraTranslationSpeed * ts;
+			m_CameraPosition.y -= sin(glm::radians(m_CameraRotation)) * m_CameraTranslationSpeed * ts;
 		}
-		else if (glfwGetKey(Application::Get().GetWindow().GetWindow(), GLFW_KEY_D) == GLFW_PRESS)
+		else if (Input::IsKeyPressed(Key::D))
 		{
-			//CORE_LOG_TRACE("D");
-			m_CameraPosition.x += m_CameraTranslationSpeed * ts;
+			m_CameraPosition.x += cos(glm::radians(m_CameraRotation)) * m_CameraTranslationSpeed * ts;
+			m_CameraPosition.y += sin(glm::radians(m_CameraRotation)) * m_CameraTranslationSpeed * ts;
 		}
 
-		if (glfwGetKey(Application::Get().GetWindow().GetWindow(), GLFW_KEY_W) == GLFW_PRESS)
+		if (Input::IsKeyPressed(Key::W))
 		{
-			//CORE_LOG_TRACE("W");
-			m_CameraPosition.y += m_CameraTranslationSpeed * ts;
+			m_CameraPosition.x += -sin(glm::radians(m_CameraRotation)) * m_CameraTranslationSpeed * ts;
+			m_CameraPosition.y += cos(glm::radians(m_CameraRotation)) * m_CameraTranslationSpeed * ts;
 		}
-		else if (glfwGetKey(Application::Get().GetWindow().GetWindow(), GLFW_KEY_S) == GLFW_PRESS)
+		else if (Input::IsKeyPressed(Key::S))
 		{
-			//CORE_LOG_TRACE("S");
-			m_CameraPosition.y -= m_CameraTranslationSpeed * ts;
+			m_CameraPosition.x -= -sin(glm::radians(m_CameraRotation)) * m_CameraTranslationSpeed * ts;
+			m_CameraPosition.y -= cos(glm::radians(m_CameraRotation)) * m_CameraTranslationSpeed * ts;
 		}
 
 		if (m_Rotation)
 		{
-			if (glfwGetKey(Application::Get().GetWindow().GetWindow(), GLFW_KEY_Q) == GLFW_PRESS)
-			{
-				//CORE_LOG_TRACE("Q");
+			if (Input::IsKeyPressed(Key::Q))
 				m_CameraRotation += m_CameraRotationSpeed * ts;
-			}
-
-			if (glfwGetKey(Application::Get().GetWindow().GetWindow(), GLFW_KEY_E) == GLFW_PRESS)
-			{
-				//CORE_LOG_TRACE("E");
+			if (Input::IsKeyPressed(Key::E))
 				m_CameraRotation -= m_CameraRotationSpeed * ts;
-			}
+
+			if (m_CameraRotation > 180.0f)
+				m_CameraRotation -= 360.0f;
+			else if (m_CameraRotation <= -180.0f)
+				m_CameraRotation += 360.0f;
 
 			m_Camera.SetRotation(m_CameraRotation);
 		}
 
 		m_Camera.SetPosition(m_CameraPosition);
+
 		m_CameraTranslationSpeed = m_ZoomLevel;
+	}
+
+	void OrthographicCameraController::OnEvent(Event& e)
+	{
+		VS_PROFILE_FUNCTION();
+
+		EventDispatcher dispatcher(e);
+		dispatcher.Dispatch<MouseScrolledEvent>(VS_BIND_EVENT_FN(OrthographicCameraController::OnMouseScrolled));
+		dispatcher.Dispatch<WindowResizeEvent>(VS_BIND_EVENT_FN(OrthographicCameraController::OnWindowResized));
+	}
+
+	void OrthographicCameraController::OnResize(float width, float height)
+	{
+		m_AspectRatio = width / height;
+		m_Bounds = { -m_AspectRatio * m_ZoomLevel, m_AspectRatio * m_ZoomLevel, -m_ZoomLevel, m_ZoomLevel };
+		m_Camera.SetProjection(-m_AspectRatio * m_ZoomLevel, m_AspectRatio * m_ZoomLevel, -m_ZoomLevel, m_ZoomLevel);
+	}
+
+	bool OrthographicCameraController::OnMouseScrolled(MouseScrolledEvent& e)
+	{
+		VS_PROFILE_FUNCTION();
+
+		m_ZoomLevel -= e.GetYOffset() * 0.25f;
+		m_ZoomLevel = std::max(m_ZoomLevel, 0.25f);
+		m_Bounds = { -m_AspectRatio * m_ZoomLevel, m_AspectRatio * m_ZoomLevel, -m_ZoomLevel, m_ZoomLevel };
+		m_Camera.SetProjection(-m_AspectRatio * m_ZoomLevel, m_AspectRatio * m_ZoomLevel, -m_ZoomLevel, m_ZoomLevel);
+		return false;
+	}
+
+	bool OrthographicCameraController::OnWindowResized(WindowResizeEvent& e)
+	{
+		VS_PROFILE_FUNCTION();
+
+		OnResize((float)e.GetWidth(), (float)e.GetHeight());
+		return false;
 	}
 
 }
