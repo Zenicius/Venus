@@ -42,4 +42,5 @@
 .vs/
 bin/
 bin-int/
+Venus/vendor/VulkanSDK
 
