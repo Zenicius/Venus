@@ -12,10 +12,17 @@
 #include "Engine/Input.h"
 #include "ImGui/ImGuiLayer.h"
 
+// Events
+#include "Events/Event.h"
+#include "Events/ApplicationEvent.h"
+#include "Events/KeyEvent.h"
+#include "Events/MouseEvent.h"
+
 // Scene
 #include "Scene/Scene.h"
 #include "Scene/Entity.h"
 #include "Scene/Components.h"
+#include "Scene/SceneSerializer.h"
 
 // Renderer
 #include "Renderer/Renderer.h"
@@ -28,7 +35,13 @@
 #include "Renderer/VertexArray.h"
 #include "Renderer/OrthographicCamera.h"
 #include "Renderer/OrthographicCameraController.h"
+#include "Renderer/EditorCamera.h"
 #include "Renderer/Particle/ParticleSystem.h"
 
 // Particles
 #include "Renderer/Particle/Particle.h"
+
+// Utils
+#include "Utils/Random.h"
+#include "Utils/PlatformUtils.h"
+#include "Math/Math.h"

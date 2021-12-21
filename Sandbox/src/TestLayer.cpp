@@ -142,27 +142,6 @@ void TestLayer::OnUpdate(Venus::Timestep ts)
 
 void TestLayer::OnImGuiRender()
 {
-	ImGui::Begin("Stats");
-	auto stats = Venus::Renderer2D::GetStats();
-	ImGui::Text(Venus::RendererAPI::GetAPIName().c_str());
-	ImGui::Text("Renderer2D Stats:");
-	ImGui::Text("Draw Calls: %d", stats.DrawCalls);
-	ImGui::Text("Quads: %d", stats.QuadCount);
-	ImGui::Text("Vertices: %d", stats.GetTotalVertexCount());
-	ImGui::Text("Indices: %d", stats.GetTotalIndexCount());
-	ImGui::End();
-
-	ImGui::Begin("Settings");
-	ImGui::ColorEdit4("Clear Color", glm::value_ptr(m_ClearColor));
-	ImGui::DragFloat3("Transform", glm::value_ptr(m_QuadTransform), 0.1f, 0.0f, 0.0f, "%.2f");
-	ImGui::DragFloat2("Circle Scale", glm::value_ptr(m_CircleScale), 0.1f, 0.0f, 0.0f, "%.2f");
-	ImGui::DragFloat("Circle Thickness", &m_CircleThickness, 0.1f, 0.0f, 0.0f, "%.2f");
-	ImGui::Separator();
-	ImGui::DragInt("Quantity", &m_EmitQuantity, 0.1f, 0, 10000);
-	ImGui::ColorEdit4("Birth Color", glm::value_ptr(m_Particle.ColorBegin));
-	ImGui::ColorEdit4("Death Color", glm::value_ptr(m_Particle.ColorEnd));
-	ImGui::DragFloat("Life Time", &m_Particle.LifeTime, 0.1f, 0.0f, 1000.0f);
-	ImGui::End();
 }
 
 void TestLayer::OnEvent(Venus::Event& e)

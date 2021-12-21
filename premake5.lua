@@ -24,6 +24,8 @@ IncludeDir["shaderc"] = "Venus/vendor/shaderc/include"
 IncludeDir["SPIRV_Cross"] = "Venus/vendor/SPIRV-Cross"
 IncludeDir["VulkanSDK"] = "%{VULKAN_SDK}/Include"
 IncludeDir["entt"] = "Venus/vendor/entt/include"
+IncludeDir["yaml_cpp"] = "Venus/vendor/yaml-cpp/include"
+IncludeDir["ImGuizmo"] = "Venus/vendor/ImGuizmo"
 
 LibraryDir = {}
 
@@ -47,6 +49,7 @@ group "Dependencies"
 	include "Venus/vendor/GLFW"
 	include "Venus/vendor/Glad"
 	include "Venus/vendor/imgui"
+	include "Venus/vendor/yaml-cpp"
 group ""
 
 -- VENUS ENGINE PROJECT 
@@ -71,6 +74,8 @@ project "Venus"
 		"%{prj.name}/vendor/glm/glm/**.inl",
 		"%{prj.name}/vendor/stb_image/**.h",
 		"%{prj.name}/vendor/stb_image/**.cpp",
+		"%{prj.name}/vendor/ImGuizmo/ImGuizmo.h",
+		"%{prj.name}/vendor/ImGuizmo/ImGuizmo.cpp"
 	}
 
 	defines
@@ -89,7 +94,9 @@ project "Venus"
 		"%{IncludeDir.glm}",
 		"%{IncludeDir.stb_image}",
 		"%{IncludeDir.VulkanSDK}",
-		"%{IncludeDir.entt}"
+		"%{IncludeDir.entt}",
+		"%{IncludeDir.yaml_cpp}",
+		"%{IncludeDir.ImGuizmo}"
 	}
 
 	links 
@@ -97,8 +104,12 @@ project "Venus"
 		"GLFW",
 		"Glad",
 		"ImGui",
+		"yaml-cpp",
 		"opengl32.lib"
 	}
+
+	filter "files:%{prj.name}/vendor/ImGuizmo/ImGuizmo.cpp"
+	flags { "NoPCH" }
 
 	filter "system:windows"
 		systemversion "latest"
@@ -155,8 +166,6 @@ project "VenusEditor"
 	{
 		"%{prj.name}/src/**.h",
 		"%{prj.name}/src/**.cpp",
-		"%{wks.location}/Venus/src",
-		"%{wks.location}/Venus/vendor"
 	}
 
 	includedirs
@@ -215,8 +224,6 @@ project "Sandbox"
 	{
 		"%{prj.name}/src/**.h",
 		"%{prj.name}/src/**.cpp",
-		"%{wks.location}/Venus/src",
-		"%{wks.location}/Venus/vendor"
 	}
 
 	includedirs

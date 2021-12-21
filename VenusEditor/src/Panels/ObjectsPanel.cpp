@@ -14,6 +14,7 @@ namespace Venus {
 	void ObjectsPanel::SetContext(const Ref<Scene>& context)
 	{
 		m_Context = context;
+		m_SelectedEntity = {};
 	}
 
 	void ObjectsPanel::OnImGuiRender()
@@ -65,28 +66,6 @@ namespace Venus {
 		if (m_SelectedEntity)
 		{
 			RenderComponents(m_SelectedEntity);
-
-			if (ImGui::Button("+"))
-				ImGui::OpenPopup("AddComponent");
-
-			if (ImGui::BeginPopup("AddComponent"))
-			{
-				if (ImGui::MenuItem("Camera"))
-				{
-					m_SelectedEntity.AddComponent<CameraComponent>();
-					ImGui::CloseCurrentPopup();
-				}
-
-				if (ImGui::MenuItem("Sprite Renderer"))
-				{
-					m_SelectedEntity.AddComponent<SpriteRendererComponent>();
-					ImGui::CloseCurrentPopup();
-				}
-
-				ImGui::EndPopup();
-			}
-		
-
 		}
 		ImGui::End();
 
@@ -96,8 +75,9 @@ namespace Venus {
 	{
 		auto& tag = entity.GetComponent<TagComponent>();
 
-		ImGuiTreeNodeFlags flags = ((m_SelectedEntity == entity) ? ImGuiTreeNodeFlags_Selected : 0) | 
-																   ImGuiTreeNodeFlags_OpenOnArrow;
+		ImGuiTreeNodeFlags flags = ((m_SelectedEntity == entity) ? ImGuiTreeNodeFlags_Selected : 0) |
+			ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth;
+		
 		bool open = ImGui::TreeNodeEx((void*)(uint64_t)(uint32_t)entity, flags, tag.Name.c_str());
 
 		bool deleted = false;
@@ -129,6 +109,9 @@ namespace Venus {
 
 	void ObjectsPanel::RenderVec3Control(const std::string& label, glm::vec3& values, float resetValue, float columnWidth)
 	{
+		ImGuiIO& io = ImGui::GetIO();
+		auto boldFont = io.Fonts->Fonts[0];
+
 		ImGui::PushID(label.c_str());
 
 		ImGui::Columns(2);
@@ -144,10 +127,12 @@ namespace Venus {
 		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{ 0.5f, 0.1f, 0.15f, 1.0f });
 		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{ 0.9f, 0.2f, 0.25f, 1.0f });
 		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{ 0.5f, 0.1f, 0.15f, 1.0f });
+		ImGui::PushFont(boldFont);
 		if (ImGui::Button("X", buttonSize))
 			values.x = resetValue;
-		ImGui::PopStyleColor(3);
+		ImGui::PopFont();
 
+		ImGui::PopStyleColor(3);
 		ImGui::SameLine();
 		ImGui::DragFloat("##X", &values.x, 0.1f, 0.0f, 0.0f, "%.2f");
 		ImGui::PopItemWidth();
@@ -157,8 +142,10 @@ namespace Venus {
 		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{ 0.1f, 0.45f, 0.1f, 1.0f });
 		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{ 0.1f, 0.7f, 0.2f, 1.0f });
 		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{ 0.1f, 0.4f, 0.1f, 1.0f });
+		ImGui::PushFont(boldFont);
 		if (ImGui::Button("Y", buttonSize))
 			values.y = resetValue;
+		ImGui::PopFont();
 		ImGui::PopStyleColor(3);
 
 		ImGui::SameLine();
@@ -170,9 +157,11 @@ namespace Venus {
 		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{ 0.05f, 0.1f, 0.5f, 1.0f });
 		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{ 0.05f, 0.1f, 0.9f, 1.0f });
 		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{ 0.05f, 0.1f, 0.5f, 1.0f });
+		ImGui::PushFont(boldFont);
 		if (ImGui::Button("Z", buttonSize))
 			values.z = resetValue;
 		ImGui::PopStyleColor(3);
+		ImGui::PopFont();
 
 		ImGui::SameLine();
 		ImGui::DragFloat("##Z", &values.z, 0.1f, 0.0f, 0.0f, "%.2f");
@@ -185,10 +174,62 @@ namespace Venus {
 		ImGui::PopID();
 	}
 
+	template<typename T, typename UIFunction>
+	inline void ObjectsPanel::RenderComponent(const std::string& name, Entity entity, bool canDelete, UIFunction uiFunction)
+	{
+		if (entity.HasComponent<T>())
+		{
+			// Component
+			auto& component = entity.GetComponent<T>();
+			bool removeComponent = false;
+
+			// Style
+			const ImGuiTreeNodeFlags treeNodeFlags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Framed | 
+												ImGuiTreeNodeFlags_AllowItemOverlap | ImGuiTreeNodeFlags_SpanAvailWidth | 
+												ImGuiTreeNodeFlags_FramePadding;
+			ImVec2 contentRegionAvail = ImGui::GetContentRegionAvail();
+
+
+			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{ 4, 4 });
+			float lineHeight = GImGui->Font->FontSize + GImGui->Style.FramePadding.y * 2.0f;
+			ImGui::Separator();
+
+			// Tree Node
+			bool open = ImGui::TreeNodeEx((void*)typeid(T).hash_code(), treeNodeFlags, name.c_str());
+			ImGui::PopStyleVar();
+			
+			// Component Settings TEMP: Delete only
+			if (canDelete)
+			{
+				ImGui::SameLine(contentRegionAvail.x - lineHeight * 0.5f);
+				if (ImGui::Button("-", ImVec2{ lineHeight, lineHeight }))
+				{
+					ImGui::OpenPopup("ComponentSettings");
+				}
+				if (ImGui::BeginPopup("ComponentSettings"))
+				{
+					if (ImGui::MenuItem("Remove Component"))
+						removeComponent = true;
+
+					ImGui::EndPopup();
+				}
+			}
+
+			// UI Function per specific component
+			if (open)
+			{
+				uiFunction(component);
+				ImGui::TreePop();
+			}
+
+			// Remove component if selected
+			if (removeComponent && canDelete)
+				entity.RemoveComponent<T>();
+		}
+	}
+
 	void ObjectsPanel::RenderComponents(Entity entity)
 	{
-		const ImGuiTreeNodeFlags treeNodeFlags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowItemOverlap;
-
 		// Tag Component
 		if (entity.HasComponent<TagComponent>())
 		{
@@ -197,101 +238,71 @@ namespace Venus {
 			char nameBuffer[256];
 			memset(nameBuffer, 0, sizeof(nameBuffer));
 			strcpy_s(nameBuffer, sizeof(nameBuffer), tag.Name.c_str());
-			if (ImGui::InputText("Name", nameBuffer, sizeof(nameBuffer)))
+			if (ImGui::InputText("##Name", nameBuffer, sizeof(nameBuffer)))
 			{
 				tag = std::string(nameBuffer);
 			}
 		}
 
-		// Transform Component
-		if (entity.HasComponent<TransformComponent>())
+		// Add Components Button
+		float lineHeight = GImGui->Font->FontSize + GImGui->Style.FramePadding.y * 2.0f;
+		ImVec2 contentRegionAvail = ImGui::GetContentRegionAvail();
+		ImGui::SameLine(contentRegionAvail.x - lineHeight * 0.5f);
+
+		if (ImGui::Button("+", ImVec2{ lineHeight, lineHeight }))
+			ImGui::OpenPopup("AddComponent");
+
+		if (ImGui::BeginPopup("AddComponent"))
 		{
-			if (ImGui::TreeNodeEx((void*)typeid(TransformComponent).hash_code(), treeNodeFlags, "Transform"))
+			if (ImGui::MenuItem("Camera"))
 			{
-				auto& transformComponent = entity.GetComponent<TransformComponent>();
-
-				RenderVec3Control("Position", transformComponent.Position);
-
-				glm::vec3 rotation = glm::degrees(transformComponent.Rotation);
-				RenderVec3Control("Rotation", rotation);
-				transformComponent.Rotation = glm::radians(rotation);
-
-				RenderVec3Control("Scale", transformComponent.Scale, 1.0f);
-
-				ImGui::TreePop();
+				m_SelectedEntity.AddComponent<CameraComponent>();
+				ImGui::CloseCurrentPopup();
 			}
+
+			if (ImGui::MenuItem("Sprite Renderer"))
+			{
+				m_SelectedEntity.AddComponent<SpriteRendererComponent>();
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::EndPopup();
 		}
+
+		// Transform Component
+		RenderComponent<TransformComponent>("Transform", entity, false, [](auto& component)
+		{
+			RenderVec3Control("Position", component.Position);
+
+			glm::vec3 rotation = glm::degrees(component.Rotation);
+			RenderVec3Control("Rotation", rotation);
+			component.Rotation = glm::radians(rotation);
+
+			RenderVec3Control("Scale", component.Scale, 1.0f);
+		});
+
 
 		// Sprite Renderer Component
-		if (entity.HasComponent<SpriteRendererComponent>())
+		RenderComponent<SpriteRendererComponent>("Sprite Renderer", entity, true, [](auto& component) 
 		{
-			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{ 4, 4 });
-			bool open = ImGui::TreeNodeEx((void*)typeid(SpriteRendererComponent).hash_code(), treeNodeFlags, "Sprite Renderer");
-			ImGui::SameLine(ImGui::GetWindowWidth() - 50.0f);
-			if (ImGui::Button("...", ImVec2{ 40, 20 }))
-			{
-				ImGui::OpenPopup("ComponentSettings");
-			}
-			ImGui::PopStyleVar();
+			ImGui::ColorEdit4("Color", glm::value_ptr(component.Color));
+		});
 
-			bool removeComponent = false;
-			if (ImGui::BeginPopup("ComponentSettings"))
-			{
-				if (ImGui::MenuItem("Remove Component"))
-					removeComponent = true;
-
-				ImGui::EndPopup();
-			}
-
-			if (open)
-			{
-				auto& color = entity.GetComponent<SpriteRendererComponent>().Color;
-
-				ImGui::ColorEdit4("Color", glm::value_ptr(color));
-
-				ImGui::TreePop();
-			}
-
-			if (removeComponent)
-				entity.RemoveComponent<SpriteRendererComponent>();
-		}
 
 		// Camera Component
-		if (entity.HasComponent<CameraComponent>())
+		RenderComponent<CameraComponent>("Camera", entity, true, [](auto& component)
 		{
-			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{ 4, 4 });
-			bool open = ImGui::TreeNodeEx((void*)typeid(CameraComponent).hash_code(), treeNodeFlags, "Camera");
-			ImGui::SameLine(ImGui::GetWindowWidth() - 50.0f);
-			if (ImGui::Button("...", ImVec2{ 40, 20 }))
-			{
-				ImGui::OpenPopup("ComponentSettings");
-			}
-			ImGui::PopStyleVar();
-
-			bool removeComponent = false;
-			if (ImGui::BeginPopup("ComponentSettings"))
-			{
-				if (ImGui::MenuItem("Remove Component"))
-					removeComponent = true;
-
-				ImGui::EndPopup();
-			}
-
-			if (open)
-			{
-				auto& cameraComponent = entity.GetComponent<CameraComponent>();
-				auto& camera = cameraComponent.Camera;
+				auto& camera = component.Camera;
 
 				// Checkboxes
-				ImGui::Checkbox("Primary Camera", &cameraComponent.Primary);
-				ImGui::Checkbox("Fixed Aspect Ratio", &cameraComponent.FixedAspectRatio);
+				ImGui::Checkbox("Primary Camera", &component.Primary);
+				ImGui::Checkbox("Fixed Aspect Ratio", &component.FixedAspectRatio);
 
 				// Projection Type ComboBox
 				const char* projectionType[] = { "Perspective", "Orthographic" };
 				const char* currentProjectionType =
 					projectionType[(int)camera.GetProjectionType()];
 
-				if(ImGui::BeginCombo("Projection Type", currentProjectionType))
+				if (ImGui::BeginCombo("Type", currentProjectionType))
 				{
 					for (int i = 0; i < 2; i++)
 					{
@@ -324,7 +335,7 @@ namespace Venus {
 					if (ImGui::DragFloat("Far Clip", &orthoFar))
 						camera.SetOrthographicFarClip(orthoFar);
 				}
-				
+
 				// Perspective Settings
 				if (camera.GetProjectionType() == SceneCamera::ProjectionType::Perspective)
 				{
@@ -340,12 +351,6 @@ namespace Venus {
 					if (ImGui::DragFloat("Far Clip", &perspectiveFar))
 						camera.SetPerspectiveFarClip(perspectiveFar);
 				}
-
-				ImGui::TreePop();
-			}
-
-			if (removeComponent)
-				entity.RemoveComponent<CameraComponent>();
-		}
+		});
 	}
 }

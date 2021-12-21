@@ -10,3 +10,9 @@
 [submodule "Venus/vendor/imgui"]
 	path = Venus/vendor/imgui
 	url = https://github.com/TheCherno/imgui.git
+[submodule "Venus/vendor/yaml-cpp"]
+	path = Venus/vendor/yaml-cpp
+	url = https://github.com/TheCherno/yaml-cpp.git
+[submodule "Venus/vendor/ImGuizmo"]
+	path = Venus/vendor/ImGuizmo
+	url = https://github.com/TheCherno/ImGuizmo.git

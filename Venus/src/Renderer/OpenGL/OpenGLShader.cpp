@@ -350,12 +350,14 @@ namespace Venus {
 	{
 		spirv_cross::Compiler compiler(shaderData);
 		spirv_cross::ShaderResources resources = compiler.get_shader_resources();
-
+		
+		/*
 		CORE_LOG_TRACE("OpenGLShader::Reflect - {0} {1}", Utils::GLShaderStageToString(stage), m_FilePath);
 		CORE_LOG_TRACE("    {0} uniform buffers", resources.uniform_buffers.size());
 		CORE_LOG_TRACE("    {0} resources", resources.sampled_images.size());
 
 		CORE_LOG_TRACE("Uniform buffers:");
+		*/
 		for (const auto& resource : resources.uniform_buffers)
 		{
 			const auto& bufferType = compiler.get_type(resource.base_type_id);
@@ -363,10 +365,12 @@ namespace Venus {
 			uint32_t binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
 			int memberCount = bufferType.member_types.size();
 
+			/*
 			CORE_LOG_TRACE("  {0}", resource.name);
 			CORE_LOG_TRACE("    Size = {0}", bufferSize);
 			CORE_LOG_TRACE("    Binding = {0}", binding);
 			CORE_LOG_TRACE("    Members = {0}", memberCount);
+			*/
 		}
 	}
 

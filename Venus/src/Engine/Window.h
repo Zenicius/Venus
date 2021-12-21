@@ -14,8 +14,8 @@ namespace Venus {
 		uint32_t Height;
 
 		WindowProps(const std::string& title = "Venus Engine",
-			uint32_t width = 1600,
-			uint32_t height = 900)
+			uint32_t width = 1920,
+			uint32_t height = 1080)
 			: Title(title), Width(width), Height(height)
 		{
 		}
@@ -38,6 +38,7 @@ namespace Venus {
 			virtual void SetEventCallback(const EventCallbackFn& callback) = 0;
 			virtual void SetVSync(bool enabled) = 0;
 			virtual bool IsVSync() const = 0;
+			virtual void SetWindowTitle(const std::string& title) = 0;
 
 			virtual void* GetNativeWindow() const = 0;
 

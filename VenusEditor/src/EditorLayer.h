@@ -18,6 +18,14 @@ namespace Venus {
 			void OnEvent(Event& e) override;
 
 		private:
+			void NewScene();
+			void OpenScene();
+			void SaveSceneAs();
+			void SaveScene();
+
+			bool OnKeyPressed(KeyPressedEvent& e);
+
+		private:
 			// Panels
 			ObjectsPanel m_ObjectsPanel;
 
@@ -25,8 +33,13 @@ namespace Venus {
 			Ref<Framebuffer> m_Framebuffer;
 
 			// Scene 
+			EditorCamera m_EditorCamera;
+			bool m_CameraLocked = false;
 			Ref<Scene> m_ActiveScene;
-			OrthographicCameraController m_CameraController;
+			std::string m_ScenePath = std::string();
+			
+			// Gizmos
+			int m_GizmoType = 0;
 
 			// Viewport
 			bool m_ViewportFocused = false, m_ViewportHovered = false;
