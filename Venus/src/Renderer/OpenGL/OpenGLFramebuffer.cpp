@@ -77,7 +77,7 @@ namespace Venus {
 			return false;
 		}
 
-		static GLenum HazelFBTextureFormatToGL(FramebufferTextureFormat format)
+		static GLenum VenusFBTextureFormatToGL(FramebufferTextureFormat format)
 		{
 			switch (format)
 			{
@@ -220,7 +220,7 @@ namespace Venus {
 
 		auto& spec = m_ColorAttachmentSpecifications[attachmentIndex];
 		glClearTexImage(m_ColorAttachments[attachmentIndex], 0,
-			Utils::HazelFBTextureFormatToGL(spec.TextureFormat), GL_INT, &value);
+			Utils::VenusFBTextureFormatToGL(spec.TextureFormat), GL_INT, &value);
 	}
 
 }

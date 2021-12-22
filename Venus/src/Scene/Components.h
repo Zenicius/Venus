@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Scene/SceneCamera.h"
+#include "Renderer/Texture.h"
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include "glm/glm.hpp"
@@ -41,6 +42,8 @@ namespace Venus {
 	struct SpriteRendererComponent
 	{
 		glm::vec4 Color = { 1.0f, 1.0f, 1.0f, 1.0f };
+		Ref<Texture2D> Texture;
+		float TilingFactor = 1.0f;
 
 		SpriteRendererComponent() = default;
 		SpriteRendererComponent(const SpriteRendererComponent&) = default;

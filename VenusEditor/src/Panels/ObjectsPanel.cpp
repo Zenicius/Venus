@@ -6,6 +6,13 @@
 
 namespace Venus {
 
+	extern const std::filesystem::path g_AssetPath;
+
+	ObjectsPanel::ObjectsPanel()
+	{
+		m_AddIcon = Texture2D::Create("Resources/Icons/Properties/Add.png");
+	}
+
 	ObjectsPanel::ObjectsPanel(const Ref<Scene>& context)
 	{
 		SetContext(context);
@@ -245,26 +252,32 @@ namespace Venus {
 		}
 
 		// Add Components Button
-		float lineHeight = GImGui->Font->FontSize + GImGui->Style.FramePadding.y * 2.0f;
 		ImVec2 contentRegionAvail = ImGui::GetContentRegionAvail();
-		ImGui::SameLine(contentRegionAvail.x - lineHeight * 0.5f);
+		ImGui::SameLine(contentRegionAvail.x - 24.0f);
 
-		if (ImGui::Button("+", ImVec2{ lineHeight, lineHeight }))
+		if (ImGui::ImageButton((ImTextureID)m_AddIcon->GetRendererID(), ImVec2{ 24.0f, 24.0f }))
 			ImGui::OpenPopup("AddComponent");
 
 		if (ImGui::BeginPopup("AddComponent"))
 		{
-			if (ImGui::MenuItem("Camera"))
+			if (!m_SelectedEntity.HasComponent<CameraComponent>())
 			{
-				m_SelectedEntity.AddComponent<CameraComponent>();
-				ImGui::CloseCurrentPopup();
+				if (ImGui::MenuItem("Camera"))
+				{
+					m_SelectedEntity.AddComponent<CameraComponent>();
+					ImGui::CloseCurrentPopup();
+				}
 			}
 
-			if (ImGui::MenuItem("Sprite Renderer"))
+			if (!m_SelectedEntity.HasComponent<SpriteRendererComponent>())
 			{
-				m_SelectedEntity.AddComponent<SpriteRendererComponent>();
-				ImGui::CloseCurrentPopup();
+				if (ImGui::MenuItem("Sprite Renderer"))
+				{
+					m_SelectedEntity.AddComponent<SpriteRendererComponent>();
+					ImGui::CloseCurrentPopup();
+				}
 			}
+
 			ImGui::EndPopup();
 		}
 
@@ -284,7 +297,25 @@ namespace Venus {
 		// Sprite Renderer Component
 		RenderComponent<SpriteRendererComponent>("Sprite Renderer", entity, true, [](auto& component) 
 		{
+			// Texture
+			ImGui::Columns(2);
+			ImGui::Text("Texture");
+			ImGui::NextColumn();
+			ImGui::Button("None", ImVec2(100.0f, 0.0f));
+			// Texture Drag and Drop
+			if (ImGui::BeginDragDropTarget())
+			{
+				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_TEXTURE"))
+				{
+					const wchar_t* path = (const wchar_t*)payload->Data;
+					std::filesystem::path texturePath = std::filesystem::path(g_AssetPath) / path;
+					component.Texture = Texture2D::Create(texturePath.string());
+				}
+			}
+			ImGui::Columns(1);
+
 			ImGui::ColorEdit4("Color", glm::value_ptr(component.Color));
+			ImGui::DragFloat("Tiling Factor", &component.TilingFactor, 0.1f, 1.0f, 100.0f);
 		});
 
 

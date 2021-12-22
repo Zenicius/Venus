@@ -534,7 +534,6 @@ namespace Venus {
 		s_Data.LineWidth = width;
 	}
 
-	/*
 	void Renderer2D::DrawSprite(const glm::mat4& transform, SpriteRendererComponent& src, int entityID)
 	{
 		if (src.Texture)
@@ -542,7 +541,6 @@ namespace Venus {
 		else
 			DrawQuad(transform, src.Color, entityID);
 	}
-	*/
 
 	void Renderer2D::ResetStats()
 	{

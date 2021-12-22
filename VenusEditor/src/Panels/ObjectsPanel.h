@@ -6,7 +6,7 @@ namespace Venus {
 	class ObjectsPanel
 	{
 		public:
-			ObjectsPanel() = default;
+			ObjectsPanel();
 			ObjectsPanel(const Ref<Scene>& context);
 
 			void SetContext(const Ref<Scene>& context);
@@ -14,6 +14,7 @@ namespace Venus {
 			void OnImGuiRender();
 
 			Entity GetSelectedEntity() const { return m_SelectedEntity; }
+			void SetSelectedEntity(Entity entity) { m_SelectedEntity = entity; }
 
 		private:
 			void RenderEntityNode(Entity entity);
@@ -25,6 +26,8 @@ namespace Venus {
 		private:
 			Ref<Scene> m_Context;
 			Entity m_SelectedEntity;
+
+			Ref<Texture2D> m_AddIcon;
 	};
 
 }

@@ -2,6 +2,8 @@
 
 #include "Venus.h"
 #include "Panels/ObjectsPanel.h"
+#include "Panels/AssetBrowserPanel.h"
+#include "Panels/RendererStatsPanel.h"
 
 namespace Venus {
 
@@ -20,20 +22,27 @@ namespace Venus {
 		private:
 			void NewScene();
 			void OpenScene();
+			void OpenScene(const std::filesystem::path& path);
 			void SaveSceneAs();
 			void SaveScene();
 
+			void UpdateHoveredEntity();
+
 			bool OnKeyPressed(KeyPressedEvent& e);
+			bool OnMouseButtonPressed(MouseButtonPressedEvent& e);
 
 		private:
 			// Panels
 			ObjectsPanel m_ObjectsPanel;
+			AssetBrowserPanel m_AssetBrowserPanel;
+			RendererStatsPanel m_RendererStatsPanel;
 
 			// Framebuffer
 			Ref<Framebuffer> m_Framebuffer;
 
 			// Scene 
 			EditorCamera m_EditorCamera;
+			Entity m_HoveredEntity;
 			bool m_CameraLocked = false;
 			Ref<Scene> m_ActiveScene;
 			std::string m_ScenePath = std::string();
@@ -42,8 +51,9 @@ namespace Venus {
 			int m_GizmoType = 0;
 
 			// Viewport
+			glm::vec4 m_ClearColor = { 0.1f, 0.1f, 0.1f, 1.0f };
 			bool m_ViewportFocused = false, m_ViewportHovered = false;
 			glm::vec2 m_ViewportSize = { 0.0f, 0.0f };
-			glm::vec4 m_ClearColor = { 0.1f, 0.1f, 0.1f, 1.0f };
+			glm::vec2 m_ViewportBounds[2];
 	};
 }

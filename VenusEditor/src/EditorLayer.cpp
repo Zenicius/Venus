@@ -7,6 +7,8 @@
 
 namespace Venus {
 
+	extern const std::filesystem::path g_AssetPath;
+
 	EditorLayer::EditorLayer()
 		: Layer("EditorLayer")
 	{
@@ -54,10 +56,14 @@ namespace Venus {
 		// Render
 		Renderer2D::ResetStats();
 		m_Framebuffer->Bind();
+
 		RenderCommand::SetClearColor(m_ClearColor);
 		RenderCommand::Clear();
+		m_Framebuffer->ClearAttachment(1, -1);
 
 		m_ActiveScene->OnUpdateEditor(ts, m_EditorCamera);
+
+		UpdateHoveredEntity();
 
 		m_Framebuffer->Unbind();
 	}
@@ -144,18 +150,8 @@ namespace Venus {
 
 		// Panels
 		m_ObjectsPanel.OnImGuiRender();
-
-		// Renderer Stats
-		ImGui::Begin("Renderer Stats");
-		auto stats = Renderer2D::GetStats();
-		auto apiName = RendererAPI::GetAPIName();
-		ImGui::Text("Renderer2D Stats:");
-		ImGui::Text("%s", apiName.c_str());
-		ImGui::Text("Draw Calls: %d", stats.DrawCalls);
-		ImGui::Text("Quads: %d", stats.QuadCount);
-		ImGui::Text("Vertices: %d", stats.GetTotalVertexCount());
-		ImGui::Text("Indices: %d", stats.GetTotalIndexCount());
-		ImGui::End();
+		m_AssetBrowserPanel.OnImGuiRender();
+		m_RendererStatsPanel.OnImGuiRender();
 
 		// Settings 
 		ImGui::Begin("Settings");
@@ -168,6 +164,12 @@ namespace Venus {
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{ 0, 0 });
 		ImGui::Begin("Viewport");
 
+		auto viewportMinRegion = ImGui::GetWindowContentRegionMin();
+		auto viewportMaxRegion = ImGui::GetWindowContentRegionMax();
+		auto viewportOffset = ImGui::GetWindowPos();
+		m_ViewportBounds[0] = { viewportMinRegion.x + viewportOffset.x, viewportMinRegion.y + viewportOffset.y };
+		m_ViewportBounds[1] = { viewportMaxRegion.x + viewportOffset.x, viewportMaxRegion.y + viewportOffset.y };
+
 		m_ViewportFocused = ImGui::IsWindowFocused();
 		m_ViewportHovered = ImGui::IsWindowHovered();
 
@@ -177,7 +179,28 @@ namespace Venus {
 		m_ViewportSize = viewportPanelSize;
 
 		uint32_t textureID = m_Framebuffer->GetColorAttachmentRendererID();
-		ImGui::Image((void*)textureID, ImVec2{ m_ViewportSize.x, m_ViewportSize.y }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
+		ImGui::Image(reinterpret_cast<void*>(textureID), ImVec2{ m_ViewportSize.x, m_ViewportSize.y }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
+		
+		// Viewport Drag and Drop
+		if (ImGui::BeginDragDropTarget())
+		{
+			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_SCENE"))
+			{
+				const wchar_t* path = (const wchar_t*)payload->Data;
+				OpenScene(std::filesystem::path(g_AssetPath) / path);
+			}
+
+			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_TEXTURE"))
+			{
+				const wchar_t* path = (const wchar_t*)payload->Data;
+				std::string name = std::filesystem::path(path).stem().string();
+				Entity entity = m_ActiveScene->CreateEntity(name);
+				auto& src = entity.AddComponent<SpriteRendererComponent>();
+				
+				std::filesystem::path texturePath = std::filesystem::path(g_AssetPath) / path;
+				src.Texture = Texture2D::Create(texturePath.string());	
+			}
+		}
 
 		// Gizmos TEMP
 		Entity selectedEntity = m_ObjectsPanel.GetSelectedEntity();
@@ -187,7 +210,7 @@ namespace Venus {
 			ImGuizmo::SetDrawlist();
 			float windowWidth = (float)ImGui::GetWindowWidth();
 			float windowHeight = (float)ImGui::GetWindowHeight();
-			ImGuizmo::SetRect(ImGui::GetWindowPos().x, ImGui::GetWindowPos().y, windowWidth, windowHeight);
+			ImGuizmo::SetRect(m_ViewportBounds[0].x, m_ViewportBounds[0].y, m_ViewportBounds[1].x - m_ViewportBounds[0].x, m_ViewportBounds[1].y - m_ViewportBounds[0].y);
 
 			// Run time Camera
 			/*
@@ -242,6 +265,7 @@ namespace Venus {
 
 		EventDispatcher dispatcher(e);
 		dispatcher.Dispatch<KeyPressedEvent>(VS_BIND_EVENT_FN(EditorLayer::OnKeyPressed));
+		dispatcher.Dispatch<MouseButtonPressedEvent>(VS_BIND_EVENT_FN(EditorLayer::OnMouseButtonPressed));
 	}
 
 	void EditorLayer::NewScene()
@@ -263,19 +287,24 @@ namespace Venus {
 
 		if (!filePath.empty())
 		{
-			m_ActiveScene = CreateRef<Scene>();
-			m_ActiveScene->OnViewportResize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);
-			m_ObjectsPanel.SetContext(m_ActiveScene);
-
-			SceneSerializer serializer(m_ActiveScene);
-			serializer.Deserialize(filePath);
-
-			m_ScenePath = filePath;
-
-			auto sceneName = m_ActiveScene->m_SceneName;
-			auto apiName = RendererAPI::GetAPIName();
-			Application::Get().GetWindow().SetWindowTitle(sceneName + ".venus - Venus Editor - " + apiName);
+			OpenScene(filePath);
 		}
+	}
+
+	void EditorLayer::OpenScene(const std::filesystem::path& path)
+	{
+		m_ActiveScene = CreateRef<Scene>();
+		m_ActiveScene->OnViewportResize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);
+		m_ObjectsPanel.SetContext(m_ActiveScene);
+
+		SceneSerializer serializer(m_ActiveScene);
+		serializer.Deserialize(path.string());
+
+		m_ScenePath = path.string();
+
+		auto sceneName = m_ActiveScene->m_SceneName;
+		auto apiName = RendererAPI::GetAPIName();
+		Application::Get().GetWindow().SetWindowTitle(sceneName + ".venus - Venus Editor - " + apiName);
 	}
 
 	void EditorLayer::SaveSceneAs()
@@ -307,6 +336,23 @@ namespace Venus {
 		}
 		else
 			SaveSceneAs();
+	}
+
+	void EditorLayer::UpdateHoveredEntity()
+	{
+		auto [mx, my] = ImGui::GetMousePos();
+		mx -= m_ViewportBounds[0].x;
+		my -= m_ViewportBounds[0].y;
+		glm::vec2 viewportSize = m_ViewportBounds[1] - m_ViewportBounds[0];
+		my = viewportSize.y - my;
+		int mouseX = (int)mx;
+		int mouseY = (int)my;
+
+		if (mouseX >= 0 && mouseY >= 0 && mouseX < (int)viewportSize.x && mouseY < (int)viewportSize.y)
+		{
+			int pixelData = m_Framebuffer->ReadPixel(1, mouseX, mouseY);
+			m_HoveredEntity = pixelData == -1 ? Entity() : Entity((entt::entity)pixelData, m_ActiveScene.get());
+		}
 	}
 
 	bool EditorLayer::OnKeyPressed(KeyPressedEvent& e)
@@ -373,5 +419,18 @@ namespace Venus {
 				break;
 		
 		}
+	}
+
+	bool EditorLayer::OnMouseButtonPressed(MouseButtonPressedEvent& e)
+	{
+		if (e.GetMouseButton() == Mouse::ButtonLeft)
+		{
+			if (m_ViewportHovered && !ImGuizmo::IsOver() && !Input::IsKeyPressed(Key::LeftShift))
+			{
+				m_ObjectsPanel.SetSelectedEntity(m_HoveredEntity);
+			}
+		}
+
+		return false;
 	}
 }

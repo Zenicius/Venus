@@ -7,7 +7,7 @@
 #include "Renderer/Camera.h"
 #include "Renderer/EditorCamera.h"
 
-//#include "Scene/Components.h"
+#include "Scene/Components.h"
 
 namespace Venus {
 
@@ -45,8 +45,7 @@ namespace Venus {
 			static void DrawRect(const glm::vec3& position, const glm::vec2& size, const glm::vec4 color, int entityID = -1);
 			static void DrawRect(const glm::mat4& transform, const glm::vec4 color, int entityID = -1);
 
-			//static void DrawSprite(const glm::mat4& transform, SpriteRendererComponent& src, int entityID);
-
+			static void DrawSprite(const glm::mat4& transform, SpriteRendererComponent& src, int entityID);
 
 			static float GetLineWidth();
 			static void SetLineWitdh(float width);
