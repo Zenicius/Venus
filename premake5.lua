@@ -26,6 +26,7 @@ IncludeDir["VulkanSDK"] = "%{VULKAN_SDK}/Include"
 IncludeDir["entt"] = "Venus/vendor/entt/include"
 IncludeDir["yaml_cpp"] = "Venus/vendor/yaml-cpp/include"
 IncludeDir["ImGuizmo"] = "Venus/vendor/ImGuizmo"
+IncludeDir["Box2D"] = "Venus/vendor/Box2D/include"
 
 LibraryDir = {}
 
@@ -50,6 +51,7 @@ group "Dependencies"
 	include "Venus/vendor/Glad"
 	include "Venus/vendor/imgui"
 	include "Venus/vendor/yaml-cpp"
+	include "Venus/vendor/Box2D"
 group ""
 
 -- VENUS ENGINE PROJECT 
@@ -96,7 +98,8 @@ project "Venus"
 		"%{IncludeDir.VulkanSDK}",
 		"%{IncludeDir.entt}",
 		"%{IncludeDir.yaml_cpp}",
-		"%{IncludeDir.ImGuizmo}"
+		"%{IncludeDir.ImGuizmo}",
+		"%{IncludeDir.Box2D}"
 	}
 
 	links 
@@ -105,10 +108,11 @@ project "Venus"
 		"Glad",
 		"ImGui",
 		"yaml-cpp",
+		"Box2D",
 		"opengl32.lib"
 	}
 
-	filter "files:%{prj.name}/vendor/ImGuizmo/ImGuizmo.cpp"
+	filter "files:%{prj.name}Venus/vendor/ImGuizmo/ImGuizmo.cpp"
 	flags { "NoPCH" }
 
 	filter "system:windows"

@@ -1,0 +1,64 @@
+Scene: Circle
+Entities:
+  - Entity: 10910788118805939995
+    TagComponent:
+      Name: Circle
+    TransformComponent:
+      Position: [-2.41263723, 1.54262853, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    CircleRendererComponent:
+      Color: [0.888030887, 0.0240008198, 0.0240008198, 1]
+      Thickness: 1
+      Fade: 0.00499999989
+  - Entity: 8859691113984521580
+    TagComponent:
+      Name: Circle
+    TransformComponent:
+      Position: [-1.33791697, 0.453284144, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    CircleRendererComponent:
+      Color: [0.444015443, 0.111432441, 0.111432441, 1]
+      Thickness: 0.319999993
+      Fade: 0.00499999989
+  - Entity: 7311486207603143381
+    TagComponent:
+      Name: Circle
+    TransformComponent:
+      Position: [-0.0877324939, 1.01623392, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    CircleRendererComponent:
+      Color: [1, 1, 1, 1]
+      Thickness: 1
+      Fade: 0.980000019
+  - Entity: 7817777038759575191
+    TagComponent:
+      Name: Circle
+    TransformComponent:
+      Position: [1.9227984, 1.68884933, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    CircleRendererComponent:
+      Color: [9.99999997e-07, 6.48648609e-07, 6.48648609e-07, 1]
+      Thickness: 0.100000001
+      Fade: 0.00499999989
+  - Entity: 15454912294895127295
+    TagComponent:
+      Name: Camera
+    TransformComponent:
+      Position: [-0.210799456, 1.07570767, 5.10738659]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    CameraComponent:
+      Camera:
+        ProjectionType: 0
+        PerspectiveFOV: 0.785398185
+        PerspectiveNear: 0.00999999978
+        PerspectiveFar: 1000
+        OrthographicSize: 10
+        OrthographicNear: -1
+        OrthographicFar: 1
+      Primary: true
+      FixedAspectRatio: false

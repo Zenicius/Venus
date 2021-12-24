@@ -1,6 +1,7 @@
 #include "EditorLayer.h"
 
 #include <imgui/imgui.h>
+#include "imgui/imgui_internal.h"
 #include <ImGuizmo/ImGuizmo.h>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -16,9 +17,6 @@ namespace Venus {
 
 	void EditorLayer::OnAttach()
 	{
-		auto apiName = RendererAPI::GetAPIName();
-		Application::Get().GetWindow().SetWindowTitle("Untitled Scene - Venus Editor - " + apiName);
-
 		// Framebuffer
 		FramebufferSpecification fbSpec;
 		fbSpec.Attachments = { FramebufferTextureFormat::RGBA8, FramebufferTextureFormat::RED_INTEGER, FramebufferTextureFormat::Depth };
@@ -27,16 +25,24 @@ namespace Venus {
 		m_Framebuffer = Framebuffer::Create(fbSpec);
 
 		// Scene
-		m_ActiveScene = CreateRef<Scene>();
+		m_EditorScene = CreateRef<Scene>();		
+		m_ActiveScene = m_EditorScene;
 		m_EditorCamera = EditorCamera(30.0f, 1280.0f / 720.0f, 0.1f, 1000.0f);
 
 		// Panels
 		m_ObjectsPanel.SetContext(m_ActiveScene);
+
+		m_PlayIcon = Texture2D::Create("Resources/Icons/Toolbar/play.png");
+		m_StopIcon = Texture2D::Create("Resources/Icons/Toolbar/stop.png");
+		m_GizmosPositionIcon = Texture2D::Create("Resources/Icons/Toolbar/position.png");
+		m_GizmosRotationIcon = Texture2D::Create("Resources/Icons/Toolbar/rotation.png");
+		m_GizmosScaleIcon = Texture2D::Create("Resources/Icons/Toolbar/scale.png");
+		m_SceneCameraIcon = Texture2D::Create("Resources/Icons/Scene/camera.png");
+
+		UpdateWindowTitle(m_EditorScene->m_SceneName);
 	}
 
-	void EditorLayer::OnDetach()
-	{
-	}
+	void EditorLayer::OnDetach() {}
 
 	void EditorLayer::OnUpdate(Timestep ts)
 	{
@@ -50,9 +56,6 @@ namespace Venus {
 			m_ActiveScene->OnViewportResize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);
 		}
 
-		// Update
-		m_EditorCamera.OnUpdate(ts);
-
 		// Render
 		Renderer2D::ResetStats();
 		m_Framebuffer->Bind();
@@ -61,8 +64,22 @@ namespace Venus {
 		RenderCommand::Clear();
 		m_Framebuffer->ClearAttachment(1, -1);
 
-		m_ActiveScene->OnUpdateEditor(ts, m_EditorCamera);
+		switch (m_SceneState)
+		{
+			case SceneState::Edit:
+			{
+				m_EditorCamera.OnUpdate(ts);
+				m_ActiveScene->OnUpdateEditor(ts, m_EditorCamera);
+				break;
+			}
+			case SceneState::Play:
+			{
+				m_ActiveScene->OnUpdateRuntime(ts);
+				break;
+			}
+		}
 
+		OnOverlayRender();
 		UpdateHoveredEntity();
 
 		m_Framebuffer->Unbind();
@@ -96,11 +113,6 @@ namespace Venus {
 		if (dockspace_flags & ImGuiDockNodeFlags_PassthruCentralNode)
 			window_flags |= ImGuiWindowFlags_NoBackground;
 
-		// Important: note that we proceed even if Begin() returns false (aka window is collapsed).
-		// This is because we want to keep our DockSpace() active. If a DockSpace() is inactive, 
-		// all active windows docked into it will lose their parent and become undocked.
-		// We cannot preserve the docking relationship between an active window and an inactive docking, otherwise 
-		// any change of dockspace/settings would lead to windows being stuck in limbo and never being visible.
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
 		ImGui::Begin("DockSpace Demo", &dockspaceOpen, window_flags);
 		ImGui::PopStyleVar();
@@ -120,7 +132,41 @@ namespace Venus {
 		}
 		style.WindowMinSize.x = 64.0f;
 
-		// Menu bar
+		// UI
+		UI_ModalWelcome();
+		UI_MenuBar();
+		UI_ToolBar();
+		UI_Viewport();
+		UI_Settings();
+
+		if(m_ShowWelcomeMessage)
+			ImGui::OpenPopup("Welcome");
+
+		// Panels
+		m_ObjectsPanel.OnImGuiRender();
+		m_AssetBrowserPanel.OnImGuiRender();
+		m_RendererStatsPanel.OnImGuiRender();
+
+		ImGui::End();
+	}
+
+	void EditorLayer::UI_ModalWelcome()
+	{
+		if (ImGui::BeginPopupModal("Welcome", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+		{
+			ImGui::Text("Welcome to Venus Engine!");
+			ImGui::Text("This engine is currently in its initial stage of development.");
+			ImGui::Text("It may contain bugs and led to loss of work.");
+			ImGui::Text("But thank you for your interest in Venus!");
+			ImGui::Separator();
+			if (ImGui::Button("Close", ImVec2(120, 0))) { ImGui::CloseCurrentPopup(); }
+			ImGui::EndPopup();
+			m_ShowWelcomeMessage = false;
+		}
+	}
+
+	void EditorLayer::UI_MenuBar()
+	{
 		if (ImGui::BeginMenuBar())
 		{
 			if (ImGui::BeginMenu("File"))
@@ -130,12 +176,12 @@ namespace Venus {
 
 				if (ImGui::MenuItem("Open...", "Ctrl+O"))
 					OpenScene();;
+				
+				if (ImGui::MenuItem("Save", "Ctrl+S"))
+					SaveScene();
 
 				if (ImGui::MenuItem("Save as...", "Ctrl+Shift+S"))
 					SaveSceneAs();
-
-				if (ImGui::MenuItem("Save", "Ctrl+S"))
-					SaveScene();
 
 				ImGui::Separator();
 
@@ -147,20 +193,95 @@ namespace Venus {
 			}
 			ImGui::EndMenuBar();
 		}
+	}
 
-		// Panels
-		m_ObjectsPanel.OnImGuiRender();
-		m_AssetBrowserPanel.OnImGuiRender();
-		m_RendererStatsPanel.OnImGuiRender();
+	void EditorLayer::UI_ToolBar()
+	{
+		// Toolbar settings
+		auto& colors = ImGui::GetStyle().Colors;
 
-		// Settings 
-		ImGui::Begin("Settings");
-		ImGui::ColorEdit4("Clear Color", glm::value_ptr(m_ClearColor));
-		if (ImGui::Checkbox("Lock Camera Rotation", &m_CameraLocked))
-			m_EditorCamera.SetCameraLocked(m_CameraLocked);
+		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(colors[ImGuiCol_Button].x, colors[ImGuiCol_Button].y, 
+							  colors[ImGuiCol_Button].z, 0.0f));
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(colors[ImGuiCol_ButtonHovered].x, colors[ImGuiCol_ButtonHovered].y,
+			colors[ImGuiCol_ButtonHovered].z, 0.3f));
+
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 5));
+		ImGui::PushStyleVar(ImGuiStyleVar_ItemInnerSpacing, ImVec2(0, 0));
+
+		ImGui::Begin("##Toolbar", nullptr, ImGuiWindowFlags_NoDecoration |
+		ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoTitleBar);
+
+		// Play // Stop
+		float size = ImGui::GetWindowHeight() - 10.0f;
+		ImGui::SetCursorPosX((ImGui::GetWindowContentRegionMax().x * 0.5f) - (size * 0.5f));
+		Ref<Texture2D> icon = m_SceneState == SceneState::Edit ? m_PlayIcon : m_StopIcon;
+		if (ImGui::ImageButton((ImTextureID)icon->GetRendererID(), ImVec2{ size, size }, ImVec2(0, 0), ImVec2(1, 1), 0))
+		{
+			if (m_SceneState == SceneState::Edit)
+				OnScenePlay();
+			else if (m_SceneState == SceneState::Play)
+				OnSceneStop();
+		}
+		ImGui::PopStyleColor(2);
+
+		float startPos = 0.19f;
+
+		// Gizmos Position TODO: Better way to handle button activation
+		ImGui::SameLine();
+		ImVec4 selectedColor = { 0.85f, 0.8505f, 0.851f, 1.0f };
+		ImVec4 unselectedColor = { 0.0f, 0.0f, 0.0f, 0.0f };
+		ImVec4 color = { 0.0f, 0.0f, 0.0f, 0.0f };
+		ImGui::SetCursorPosX((ImGui::GetWindowContentRegionMax().x * startPos));
+		if (m_GizmoType == ImGuizmo::OPERATION::TRANSLATE)
+			color = selectedColor;
+		else
+			color = unselectedColor;
+		if (ImGui::ImageButton((ImTextureID)m_GizmosPositionIcon->GetRendererID(), ImVec2{ size, size }, ImVec2(0, 0), ImVec2(1, 1), 0, color))
+		{
+			m_GizmoType = ImGuizmo::OPERATION::TRANSLATE;
+		}
+
+		// Gizmos Rotation
+		ImGui::SameLine();
+		if (m_GizmoType == ImGuizmo::OPERATION::ROTATE)
+			color = selectedColor;
+		else
+			color = unselectedColor;
+		ImGui::SetCursorPosX((ImGui::GetWindowContentRegionMax().x * startPos) + size * 1.5);
+		if (ImGui::ImageButton((ImTextureID)m_GizmosRotationIcon->GetRendererID(), ImVec2{ size, size }, ImVec2(0, 0), ImVec2(1, 1), 0, color))
+		{
+			m_GizmoType = ImGuizmo::OPERATION::ROTATE;
+		}
+
+		// Gizmos Scale
+		ImGui::SameLine();
+		if (m_GizmoType == ImGuizmo::OPERATION::SCALE)
+			color = selectedColor;
+		else
+			color = unselectedColor;
+		ImGui::SetCursorPosX((ImGui::GetWindowContentRegionMax().x * startPos) + (size * 1.5) * 2);
+		if (ImGui::ImageButton((ImTextureID)m_GizmosScaleIcon->GetRendererID(), ImVec2{ size, size }, ImVec2(0, 0), ImVec2(1, 1), 0, color))
+		{
+			m_GizmoType = ImGuizmo::OPERATION::SCALE;
+		}
+
+		// Scene Name Temp
+		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(colors[ImGuiCol_Button].x, colors[ImGuiCol_Button].y,
+			colors[ImGuiCol_Button].z, 1.0f));
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(colors[ImGuiCol_Button].x, colors[ImGuiCol_Button].y,
+			colors[ImGuiCol_Button].z, 1.0f));
+		ImGui::SameLine();
+		ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x * 0.9);
+		ImGui::SetCursorPosY(0.0f);
+		ImGui::Button(m_ActiveScene->m_SceneName.c_str());
+		ImGui::PopStyleColor(2);
+
+		ImGui::PopStyleVar(2);
 		ImGui::End();
+	}
 
-		// Viewport
+	void EditorLayer::UI_Viewport()
+	{
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{ 0, 0 });
 		ImGui::Begin("Viewport");
 
@@ -180,7 +301,7 @@ namespace Venus {
 
 		uint32_t textureID = m_Framebuffer->GetColorAttachmentRendererID();
 		ImGui::Image(reinterpret_cast<void*>(textureID), ImVec2{ m_ViewportSize.x, m_ViewportSize.y }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
-		
+
 		// Viewport Drag and Drop
 		if (ImGui::BeginDragDropTarget())
 		{
@@ -196,15 +317,19 @@ namespace Venus {
 				std::string name = std::filesystem::path(path).stem().string();
 				Entity entity = m_ActiveScene->CreateEntity(name);
 				auto& src = entity.AddComponent<SpriteRendererComponent>();
-				
+
 				std::filesystem::path texturePath = std::filesystem::path(g_AssetPath) / path;
-				src.Texture = Texture2D::Create(texturePath.string());	
+				src.Texture = Texture2D::Create(texturePath.string());
+				src.TextureName = texturePath.stem().string();
+				src.TexturePath = texturePath.string();
+
+				m_ObjectsPanel.SetSelectedEntity(entity);
 			}
 		}
 
 		// Gizmos TEMP
 		Entity selectedEntity = m_ObjectsPanel.GetSelectedEntity();
-		if (selectedEntity && m_GizmoType != -1)
+		if (m_SceneState == SceneState::Edit && selectedEntity && m_GizmoType != -1)
 		{
 			ImGuizmo::SetOrthographic(false);
 			ImGuizmo::SetDrawlist();
@@ -255,6 +380,35 @@ namespace Venus {
 
 		ImGui::End();
 		ImGui::PopStyleVar();
+	}
+
+	void EditorLayer::UI_Settings()
+	{
+		ImGui::Begin("Settings");
+
+		ImGui::Text("Render");
+		ImGui::ColorEdit4("Clear Color", glm::value_ptr(m_ClearColor));
+		ImGui::Separator();
+
+		ImGui::Text("Editor");
+		ImGui::Checkbox("Show Camera Icon", &m_ShowCameraIcon);
+		if (ImGui::Checkbox("Lock Camera Rotation", &m_CameraLocked))
+			m_EditorCamera.SetCameraLocked(m_CameraLocked);
+		ImGui::Checkbox("Show Physics Colliders in Editor", &m_ShowPhysicsColliderEditor);
+		ImGui::Checkbox("Show Physics Colliders in Runtime", &m_ShowPhysicsColliderRuntime);
+		ImGui::Separator();
+
+		ImGui::Text("Physics Iterations");
+		ImGui::DragInt("Velocity", (int*)&m_ActiveScene->m_VelocityIterations, 1.0f, 1.0f, 1000.0f);
+		ImGui::DragInt("Position", (int*)&m_ActiveScene->m_PositionIterations, 1.0f, 1.0f, 1000.0f);
+		
+		if (Entity entity = m_ObjectsPanel.GetSelectedEntity())
+		{
+			uint64_t uuid = entity.GetComponent<IDComponent>().ID;
+			ImGui::Separator();
+			ImGui::Text("Entity UUID:");
+			ImGui::Text(std::to_string(uuid).c_str());
+		}
 
 		ImGui::End();
 	}
@@ -270,15 +424,19 @@ namespace Venus {
 
 	void EditorLayer::NewScene()
 	{
-		m_ActiveScene = CreateRef<Scene>();
-		m_ActiveScene->OnViewportResize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);
-		m_ObjectsPanel.SetContext(m_ActiveScene);
+		if (m_SceneState == SceneState::Play)
+			OnSceneStop();
 
-		auto sceneName = m_ActiveScene->m_SceneName;
-		auto apiName = RendererAPI::GetAPIName();
-		Application::Get().GetWindow().SetWindowTitle(sceneName + " - Venus Editor - " + apiName);
+		m_EditorScene = CreateRef<Scene>();
+		m_EditorScene->OnViewportResize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);
+
+		m_ObjectsPanel.SetContext(m_EditorScene);
+
+		UpdateWindowTitle(m_EditorScene->m_SceneName);
 
 		m_ScenePath = std::string();
+
+		m_ActiveScene = m_EditorScene;
 	}
 
 	void EditorLayer::OpenScene()
@@ -293,18 +451,22 @@ namespace Venus {
 
 	void EditorLayer::OpenScene(const std::filesystem::path& path)
 	{
-		m_ActiveScene = CreateRef<Scene>();
-		m_ActiveScene->OnViewportResize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);
-		m_ObjectsPanel.SetContext(m_ActiveScene);
+		if (m_SceneState == SceneState::Play)
+			OnSceneStop();
 
-		SceneSerializer serializer(m_ActiveScene);
+		m_EditorScene = CreateRef<Scene>();
+		m_EditorScene->OnViewportResize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);
+
+		SceneSerializer serializer(m_EditorScene);
 		serializer.Deserialize(path.string());
 
 		m_ScenePath = path.string();
 
-		auto sceneName = m_ActiveScene->m_SceneName;
-		auto apiName = RendererAPI::GetAPIName();
-		Application::Get().GetWindow().SetWindowTitle(sceneName + ".venus - Venus Editor - " + apiName);
+		UpdateWindowTitle(m_EditorScene->m_SceneName);
+
+		m_ObjectsPanel.SetContext(m_EditorScene);
+
+		m_ActiveScene = m_EditorScene;	
 	}
 
 	void EditorLayer::SaveSceneAs()
@@ -314,14 +476,12 @@ namespace Venus {
 		if (!filePath.empty())
 		{
 			int nameStart = filePath.find_last_of("\\") + 1;
-			m_ActiveScene->m_SceneName = filePath.substr(nameStart, filePath.size() - nameStart - 6);
+			m_EditorScene->m_SceneName = filePath.substr(nameStart, filePath.size() - nameStart - 6);
 
-			SceneSerializer serializer(m_ActiveScene);
+			SceneSerializer serializer(m_EditorScene);
 			serializer.Serialize(filePath);
 
-			auto sceneName = m_ActiveScene->m_SceneName;
-			auto apiName = RendererAPI::GetAPIName();
-			Application::Get().GetWindow().SetWindowTitle(sceneName + ".venus - Venus Editor - " + apiName);
+			UpdateWindowTitle(m_EditorScene->m_SceneName);
 
 			m_ScenePath = filePath;
 		}
@@ -331,11 +491,122 @@ namespace Venus {
 	{
 		if (!m_ScenePath.empty())
 		{
-			SceneSerializer serializer(m_ActiveScene);
+			SceneSerializer serializer(m_EditorScene);
 			serializer.Serialize(m_ScenePath);
 		}
 		else
 			SaveSceneAs();
+	}
+
+	void EditorLayer::OnScenePlay()
+	{
+		m_RuntimeScene = Scene::Copy(m_EditorScene);
+		m_RuntimeScene->OnRuntimeStart();
+		m_ObjectsPanel.SetContext(m_RuntimeScene);
+
+		m_ActiveScene = m_RuntimeScene;
+
+		m_SceneState = SceneState::Play;
+	}
+
+	void EditorLayer::OnSceneStop()
+	{
+		m_RuntimeScene->OnRuntimeStop();
+		m_RuntimeScene = nullptr; 
+		m_ObjectsPanel.SetContext(m_EditorScene);
+
+		m_ActiveScene = m_EditorScene;
+
+		m_SceneState = SceneState::Edit;
+	}
+
+	void EditorLayer::OnOverlayRender()
+	{
+		switch (m_SceneState)
+		{
+			case SceneState::Edit:
+			{
+				Renderer2D::BeginScene(m_EditorCamera);
+				break;
+			}
+
+			case SceneState::Play:
+			{
+				Entity cameraEntity = m_ActiveScene->GetPrimaryCamera();
+				if (cameraEntity)
+				{
+					auto camera = cameraEntity.GetComponent<CameraComponent>().Camera;
+					auto transform = cameraEntity.GetComponent<TransformComponent>().GetTransform();
+					Renderer2D::BeginScene(camera, transform);
+				}
+				break;
+			}
+		}
+
+		// Physics Colliders
+		if ((m_SceneState == SceneState::Edit && m_ShowPhysicsColliderEditor) ||
+			(m_SceneState == SceneState::Play && m_ShowPhysicsColliderRuntime))
+		{
+			// Box Colliders
+			{
+				auto view = m_ActiveScene->GetAllEntitiesWith<TransformComponent, BoxCollider2DComponent>();
+					for (auto entity : view)
+					{
+						auto [tc, collider] = view.get<TransformComponent, BoxCollider2DComponent>(entity);
+
+							glm::vec3 translation = tc.Position + glm::vec3(collider.Offset, 0.001f);
+							glm::vec3 scale = tc.Scale * glm::vec3(collider.Size * 2.0f, 1.0f);
+
+						glm::mat4 transform = glm::translate(glm::mat4(1.0f), translation)
+							* glm::rotate(glm::mat4(1.0f), tc.Rotation.z, glm::vec3(0.0f, 0.0f, 1.0f))
+							* glm::scale(glm::mat4(1.0f), scale);
+
+						Renderer2D::DrawRect(transform, { 0.0f, 1.0f, 0.0f, 1.0f });
+					}
+			}
+
+			// Circles Colliders
+			{
+				auto view = m_ActiveScene->GetAllEntitiesWith<TransformComponent, CircleCollider2DComponent>();
+
+				float zIndex = 0.001f;
+				glm::vec3 cameraForwardDirection = m_EditorCamera.GetForwardDirection();
+				glm::vec3 projectionCollider = cameraForwardDirection * glm::vec3(zIndex);
+
+				for (auto entity : view)
+				{
+					auto [tc, collider] = view.get<TransformComponent, CircleCollider2DComponent>(entity);
+
+					glm::vec3 translation = tc.Position + glm::vec3(collider.Offset, -projectionCollider.z);
+					glm::vec3 scale = tc.Scale * glm::vec3(collider.Radius * 2.0f);
+
+					glm::mat4 transform = glm::translate(glm::mat4(1.0f), translation)
+						* glm::scale(glm::mat4(1.0f), scale);
+
+					Renderer2D::DrawCircle(transform, { 0.0f, 1.0f, 0.0f, 1.0f }, 0.05f);
+				}
+			}
+		}
+
+		// Camera Icon in Editor
+		if (m_SceneState != SceneState::Play && m_ShowCameraIcon)
+		{
+			auto view = m_ActiveScene->GetAllEntitiesWith<TransformComponent, CameraComponent>();
+			for (auto entity : view)
+			{
+				const auto& tc = view.get<TransformComponent>(entity);
+
+				Renderer2D::DrawQuad(tc.GetTransform(), m_SceneCameraIcon, 1.0f, glm::vec4(1.0f), (int)entity);
+			}
+		}
+
+		Renderer2D::EndScene();
+	}
+
+	void EditorLayer::UpdateWindowTitle(const std::string& sceneName)
+	{
+		std::string rendererApi = RendererAPI::GetAPIName();
+		Application::Get().GetWindow().SetWindowTitle(sceneName + ".venus - Venus Editor - " + rendererApi);
 	}
 
 	void EditorLayer::UpdateHoveredEntity()
@@ -358,7 +629,7 @@ namespace Venus {
 	bool EditorLayer::OnKeyPressed(KeyPressedEvent& e)
 	{
 		// Shortcuts
-		if (e.GetRepeatCount() > 0)
+		if (e.GetRepeatCount() > 0 || m_SceneState == SceneState::Play)
 			return false;
 
 		bool control = Input::IsKeyPressed(Key::LeftControl) || Input::IsKeyPressed(Key::RightControl);
@@ -417,7 +688,18 @@ namespace Venus {
 			case Key::R :
 				m_GizmoType = ImGuizmo::OPERATION::SCALE;
 				break;
-		
+			
+
+			// Entity 
+			case Key::D :
+			{
+				if (control && m_ObjectsPanel.GetSelectedEntity())
+				{
+					Entity duplicated = m_ActiveScene->DuplicateEntity(m_ObjectsPanel.GetSelectedEntity());
+					m_ObjectsPanel.SetSelectedEntity(duplicated);
+					break;
+				}
+			}
 		}
 	}
 
@@ -425,9 +707,12 @@ namespace Venus {
 	{
 		if (e.GetMouseButton() == Mouse::ButtonLeft)
 		{
-			if (m_ViewportHovered && !ImGuizmo::IsOver() && !Input::IsKeyPressed(Key::LeftShift))
+			if (m_SceneState == SceneState::Edit)
 			{
-				m_ObjectsPanel.SetSelectedEntity(m_HoveredEntity);
+				if (m_ViewportHovered && !ImGuizmo::IsOver() && !Input::IsKeyPressed(Key::LeftShift))
+				{
+					m_ObjectsPanel.SetSelectedEntity(m_HoveredEntity);
+				}
 			}
 		}
 

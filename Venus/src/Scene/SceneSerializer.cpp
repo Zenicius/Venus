@@ -117,8 +117,10 @@ namespace Venus {
 
 	static void SerializeEntity(YAML::Emitter& out, Entity entity)
 	{
+		VS_CORE_ASSERT(entity.HasComponent<IDComponent>());
+
 		out << YAML::BeginMap; // Entity
-		out << YAML::Key << "Entity" << YAML::Value << "123123124122138907"; // TODO: unique id
+		out << YAML::Key << "Entity" << YAML::Value << entity.GetUUID();
 
 		// TagComponent
 		if (entity.HasComponent<TagComponent>())
@@ -180,7 +182,68 @@ namespace Venus {
 
 			auto& spriteRendererComponent = entity.GetComponent<SpriteRendererComponent>();
 			out << YAML::Key << "Color" << YAML::Value << spriteRendererComponent.Color;
+			out << YAML::Key << "TextureName" << YAML::Value << spriteRendererComponent.TextureName;
+			out << YAML::Key << "Texture" << YAML::Value << spriteRendererComponent.TexturePath;
+			out << YAML::Key << "TilingFactor" << YAML::Value << spriteRendererComponent.TilingFactor;
 
+			out << YAML::EndMap;
+		}
+
+		// CircleRendererComponent
+		if (entity.HasComponent<CircleRendererComponent>())
+		{
+			out << YAML::Key << "CircleRendererComponent";
+			out << YAML::BeginMap;
+
+			auto& circleRendererComponent = entity.GetComponent<CircleRendererComponent>();
+			out << YAML::Key << "Color" << YAML::Value << circleRendererComponent.Color;
+			out << YAML::Key << "Thickness" << YAML::Value << circleRendererComponent.Thickness;
+			out << YAML::Key << "Fade" << YAML::Value << circleRendererComponent.Fade;
+
+			out << YAML::EndMap;
+		}
+
+		// Rigidbody2D Component
+		if (entity.HasComponent<Rigidbody2DComponent>())
+		{
+			out << YAML::Key << "Rigidbody2DComponent";
+			out << YAML::BeginMap;
+
+			auto& rbCompenent = entity.GetComponent<Rigidbody2DComponent>();
+			out << YAML::Key << "Type" << YAML::Value << (int)rbCompenent.Type;
+			out << YAML::Key << "FixedRotation" << YAML::Value << rbCompenent.FixedRotation;
+			out << YAML::EndMap;
+		}
+
+		// BoxCollider2D Component
+		if (entity.HasComponent<BoxCollider2DComponent>())
+		{
+			out << YAML::Key << "BoxCollider2DComponent";
+			out << YAML::BeginMap;
+
+			auto& bcComponent = entity.GetComponent<BoxCollider2DComponent>();
+			out << YAML::Key << "Offset" << YAML::Value << bcComponent.Offset;
+			out << YAML::Key << "Size" << YAML::Value << bcComponent.Size;
+			out << YAML::Key << "Density" << YAML::Value << bcComponent.Density;
+			out << YAML::Key << "Friction" << YAML::Value << bcComponent.Friction;
+			out << YAML::Key << "Restitution" << YAML::Value << bcComponent.Restitution;
+			out << YAML::Key << "RestitutionThreshold" << YAML::Value << bcComponent.RestitutionThreshold;
+			out << YAML::EndMap;
+		}
+
+		// CircleCollider2D Component
+		if (entity.HasComponent<CircleCollider2DComponent>())
+		{
+			out << YAML::Key << "CircleCollider2DComponent";
+			out << YAML::BeginMap;
+
+			auto& ccComponent = entity.GetComponent<CircleCollider2DComponent>();
+			out << YAML::Key << "Offset" << YAML::Value << ccComponent.Offset;
+			out << YAML::Key << "Radius" << YAML::Value << ccComponent.Radius;
+			out << YAML::Key << "Density" << YAML::Value << ccComponent.Density;
+			out << YAML::Key << "Friction" << YAML::Value << ccComponent.Friction;
+			out << YAML::Key << "Restitution" << YAML::Value << ccComponent.Restitution;
+			out << YAML::Key << "RestitutionThreshold" << YAML::Value << ccComponent.RestitutionThreshold;
 			out << YAML::EndMap;
 		}
 
@@ -241,7 +304,7 @@ namespace Venus {
 			for (auto entity : entities)
 			{
 				// UUID
-				uint64_t uuid = entity["Entity"].as<uint64_t>(); // TODO
+				uint64_t uuid = entity["Entity"].as<uint64_t>();
 
 				// TagComponent
 				std::string name;
@@ -250,7 +313,7 @@ namespace Venus {
 					name = tagComponent["Name"].as<std::string>();
 
 				// Entity Creation
-				Entity deserializedEntity = m_Scene->CreateEntity(name);
+				Entity deserializedEntity = m_Scene->CreateEntityWithUUID(uuid, name);
 
 				// TransformComponent
 				auto transformComponent = entity["TransformComponent"];
@@ -289,6 +352,60 @@ namespace Venus {
 				{
 					auto& src = deserializedEntity.AddComponent<SpriteRendererComponent>();
 					src.Color = srComponent["Color"].as<glm::vec4>();
+					std::string texturePath = srComponent["Texture"].as<std::string>();
+					src.TilingFactor = srComponent["TilingFactor"].as<float>();
+
+					if (!texturePath.empty())
+					{
+						src.TextureName = srComponent["TextureName"].as<std::string>();
+						src.TexturePath = texturePath;
+						src.Texture = Texture2D::Create(texturePath);
+					}
+				}
+
+				// CircleRendererComponent
+				auto circleComponent = entity["CircleRendererComponent"];
+				if (circleComponent)
+				{
+					auto& cc = deserializedEntity.AddComponent<CircleRendererComponent>();
+					cc.Color = circleComponent["Color"].as<glm::vec4>();
+					cc.Thickness = circleComponent["Thickness"].as<float>();
+					cc.Fade = circleComponent["Fade"].as<float>();
+				}
+
+				// Rigidbody2DComponent 
+				auto rbComponent = entity["Rigidbody2DComponent"];
+				if (rbComponent)
+				{
+					auto& rb = deserializedEntity.AddComponent<Rigidbody2DComponent>();
+					rb.Type = (Rigidbody2DComponent::BodyType)rbComponent["Type"].as<int>();
+					rb.FixedRotation = rbComponent["FixedRotation"].as<bool>();
+				}
+
+				// BoxCollider2DComponent 
+				auto bcComponent = entity["BoxCollider2DComponent"];
+				if (bcComponent)
+				{
+					auto& bc = deserializedEntity.AddComponent<BoxCollider2DComponent>();
+					bc.Offset = bcComponent["Offset"].as<glm::vec2>();
+					bc.Size = bcComponent["Size"].as<glm::vec2>();
+					bc.Density = bcComponent["Density"].as<float>();
+					bc.Friction = bcComponent["Friction"].as<float>();
+					bc.Restitution = bcComponent["Restitution"].as<float>();
+					bc.RestitutionThreshold = bcComponent["RestitutionThreshold"].as<float>();
+				}
+
+				// CircleCollider2DComponent 
+				auto ccComponent = entity["CircleCollider2DComponent"];
+				if (ccComponent)
+				{
+					auto& cc = deserializedEntity.AddComponent<CircleCollider2DComponent>();
+					cc.Offset = ccComponent["Offset"].as<glm::vec2>();
+					cc.Radius = ccComponent["Radius"].as<float>();
+					cc.Density = ccComponent["Density"].as<float>();
+					cc.Friction = ccComponent["Friction"].as<float>();
+					cc.Restitution = ccComponent["Restitution"].as<float>();
+					cc.RestitutionThreshold = ccComponent["RestitutionThreshold"].as<float>();
 				}
 			}
 		}

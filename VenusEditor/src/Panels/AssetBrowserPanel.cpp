@@ -24,6 +24,15 @@ namespace Venus {
 	{
 		ImGui::Begin("Assets");
 		
+		// Options by right clicking
+		if (ImGui::BeginPopupContextWindow(0, 1, false))
+		{
+			if (ImGui::MenuItem("Open in Explorer"))
+				FileDialogs::OpenInExplorer(m_CurrentPath.string().c_str());
+
+			ImGui::EndPopup();
+		}
+
 		// Return button
 		if (ImGui::ImageButton((ImTextureID)m_ReturnIcon->GetRendererID(), { 24, 24 }))
 		{

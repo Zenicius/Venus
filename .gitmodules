@@ -16,3 +16,6 @@
 [submodule "Venus/vendor/ImGuizmo"]
 	path = Venus/vendor/ImGuizmo
 	url = https://github.com/TheCherno/ImGuizmo.git
+[submodule "Venus/vendor/Box2D"]
+	path = Venus/vendor/Box2D
+	url = https://github.com/TheCherno/box2d.git

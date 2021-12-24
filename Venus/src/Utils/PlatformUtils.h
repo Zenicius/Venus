@@ -9,6 +9,7 @@ namespace Venus {
 		public:
 			static std::string OpenFile(const char* filter);
 			static std::string SaveFile(const char* filter);
+			static void OpenInExplorer(const char* path);
 	};
 
 }

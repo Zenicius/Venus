@@ -2,6 +2,7 @@
 #include "Utils/PlatformUtils.h"
 
 #include <commdlg.h>
+#include <shellapi.h>
 #include <GLFW/glfw3.h>
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
@@ -56,6 +57,11 @@ namespace Venus {
 			return ofn.lpstrFile;
 		}
 		return std::string();
+	}
+
+	void FileDialogs::OpenInExplorer(const char* path)
+	{
+		ShellExecuteA(NULL, "open", path, NULL, NULL, SW_SHOWDEFAULT);
 	}
 
 }
