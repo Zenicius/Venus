@@ -550,7 +550,7 @@ Entities:
     TagComponent:
       Name: Sprite Copied Copied
     TransformComponent:
-      Position: [4.29858589, 17.0875492, 0.286501259]
+      Position: [4.68031979, 17.0875492, 0]
       Rotation: [0.0282868557, 0, 0]
       Scale: [2.93251467, 1, 1]
     SpriteRendererComponent:

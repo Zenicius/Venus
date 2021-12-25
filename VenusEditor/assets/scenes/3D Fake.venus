@@ -1,0 +1,104 @@
+Scene: 3D Fake
+Entities:
+  - Entity: 14367339204958156070
+    TagComponent:
+      Name: Camera
+    TransformComponent:
+      Position: [-7.04488945, 3.67421484, 8.9927702]
+      Rotation: [-0.268823624, -0.698977411, 0.0129684536]
+      Scale: [0.999998569, 0.999999106, 0.999999881]
+    CameraComponent:
+      Camera:
+        ProjectionType: 0
+        PerspectiveFOV: 0.87266463
+        PerspectiveNear: 0.00999999978
+        PerspectiveFar: 1000
+        OrthographicSize: 10
+        OrthographicNear: -1
+        OrthographicFar: 1
+      Primary: true
+      FixedAspectRatio: false
+  - Entity: 4099382443163808821
+    TagComponent:
+      Name: brick Copied
+    TransformComponent:
+      Position: [0.504110694, 0, 0.507021248]
+      Rotation: [0, -1.55668235, 0]
+      Scale: [0.999938428, 1, 0.999938428]
+    SpriteRendererComponent:
+      Color: [1, 1, 1, 1]
+      TextureName: brick
+      Texture: assets\textures\brick.jpg
+      TilingFactor: 1
+  - Entity: 11340901901903093930
+    TagComponent:
+      Name: brick
+    TransformComponent:
+      Position: [-0.498746485, 0, 0.494158804]
+      Rotation: [0, -1.55665708, 0]
+      Scale: [0.999972939, 1, 0.999972939]
+    SpriteRendererComponent:
+      Color: [1, 1, 1, 1]
+      TextureName: brick
+      Texture: assets\textures\brick.jpg
+      TilingFactor: 1
+  - Entity: 4128061516169237080
+    TagComponent:
+      Name: brick Copied
+    TransformComponent:
+      Position: [0, 0.492916346, 0.495975822]
+      Rotation: [1.55665302, 0, 0]
+      Scale: [1, 1, 1]
+    SpriteRendererComponent:
+      Color: [1, 1, 1, 1]
+      TextureName: brick
+      Texture: assets\textures\brick.jpg
+      TilingFactor: 1
+  - Entity: 15315445194120353430
+    TagComponent:
+      Name: brick Copied
+    TransformComponent:
+      Position: [0, -9.31322575e-09, 0.995236099]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    SpriteRendererComponent:
+      Color: [1, 1, 1, 1]
+      TextureName: brick
+      Texture: assets\textures\brick.jpg
+      TilingFactor: 1
+  - Entity: 9358757803375059105
+    TagComponent:
+      Name: brick
+    TransformComponent:
+      Position: [0, -0.49963209, 0.496999174]
+      Rotation: [1.55665302, 0, 0]
+      Scale: [1, 1, 1]
+    SpriteRendererComponent:
+      Color: [1, 1, 1, 1]
+      TextureName: brick
+      Texture: assets\textures\brick.jpg
+      TilingFactor: 1
+  - Entity: 11792926390284966607
+    TagComponent:
+      Name: brick
+    TransformComponent:
+      Position: [0, 0, 0.00652864575]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    SpriteRendererComponent:
+      Color: [1, 1, 1, 1]
+      TextureName: brick
+      Texture: assets\textures\brick.jpg
+      TilingFactor: 1
+  - Entity: 9476971506819073104
+    TagComponent:
+      Name: Floor
+    TransformComponent:
+      Position: [1.49011612e-08, -5.43070745, -0.0768134817]
+      Rotation: [1.58493972, 0, 0]
+      Scale: [30, 30, 0.999999881]
+    SpriteRendererComponent:
+      Color: [1, 1, 1, 1]
+      TextureName: Checkerboard
+      Texture: assets\textures\Checkerboard.png
+      TilingFactor: 15.1000004

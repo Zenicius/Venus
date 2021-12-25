@@ -337,14 +337,6 @@ namespace Venus {
 			float windowHeight = (float)ImGui::GetWindowHeight();
 			ImGuizmo::SetRect(m_ViewportBounds[0].x, m_ViewportBounds[0].y, m_ViewportBounds[1].x - m_ViewportBounds[0].x, m_ViewportBounds[1].y - m_ViewportBounds[0].y);
 
-			// Run time Camera
-			/*
-			auto cameraEntity = m_ActiveScene->GetPrimaryCamera();
-			const auto& camera = cameraEntity.GetComponent<CameraComponent>().Camera;
-			const glm::mat4& cameraProjection = camera.GetProjection();
-			glm::mat4 cameraView = glm::inverse(cameraEntity.GetComponent<TransformComponent>().GetTransform());
-			*/
-
 			// Editor Camera
 			const glm::mat4& cameraProjection = m_EditorCamera.GetProjection();
 			glm::mat4 cameraView = m_EditorCamera.GetViewMatrix();
@@ -598,6 +590,22 @@ namespace Venus {
 
 				Renderer2D::DrawQuad(tc.GetTransform(), m_SceneCameraIcon, 1.0f, glm::vec4(1.0f), (int)entity);
 			}
+		}
+
+		// Selected Entity in Editor
+		if (m_SceneState != SceneState::Play && m_ObjectsPanel.GetSelectedEntity())
+		{
+			Entity entity = m_ObjectsPanel.GetSelectedEntity();
+			const auto& tc = entity.GetComponent<TransformComponent>();
+
+			glm::vec3 translation = tc.Position;
+			glm::vec3 scale = { tc.Scale.x + 0.1f, tc.Scale.y + 0.1f, tc.Scale.z };
+
+			glm::mat4 transform = glm::translate(glm::mat4(1.0f), translation)
+				* glm::toMat4(glm::quat(tc.Rotation))
+				* glm::scale(glm::mat4(1.0f), scale);
+
+			Renderer2D::DrawRect(transform, { 0.2f, 0.3f, 0.9f, 1.0f });
 		}
 
 		Renderer2D::EndScene();
