@@ -27,7 +27,7 @@ namespace Venus {
 	void ObjectsPanel::OnImGuiRender()
 	{
 		// Game Objcts Panel
-		ImGui::Begin("Game Objects");
+		ImGui::Begin(ICON_FA_LIST  "  Game Objects");
 		m_Context->m_Registry.each([&](auto entityID)
 		{
 			Entity entity{ entityID , m_Context.get() };
@@ -88,13 +88,21 @@ namespace Venus {
 
 		// Properties Panel
 		// TODO: Move to its own class
-		ImGui::Begin("Properties");
+		ImGui::Begin(ICON_FA_INFO " Details");
 		if (m_SelectedEntity)
 		{
 			RenderComponents(m_SelectedEntity);
 		}
+		else
+		{
+			std::string msg = "Select a Game Object to see details.";
+			ImGui::PushStyleColor(ImGuiCol_Text, {0.30f, 0.30f, 0.30f, 0.95f});
+			ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 10);
+			ImGui::SetCursorPosX((ImGui::GetWindowSize().x - ImGui::CalcTextSize(msg.c_str()).x) * 0.5f);
+			ImGui::Text(msg.c_str());
+			ImGui::PopStyleColor();
+		}
 		ImGui::End();
-
 	}
 
 	void ObjectsPanel::RenderEntityNode(Entity entity)
@@ -102,11 +110,14 @@ namespace Venus {
 		auto& tag = entity.GetComponent<TagComponent>();
 
 		ImGuiTreeNodeFlags flags = ((m_SelectedEntity == entity) ? ImGuiTreeNodeFlags_Selected : 0) |
-			ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth;
+			ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_SpanAvailWidth;
+		//	ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth;
 		
 		bool open = ImGui::TreeNodeEx((void*)(uint64_t)(uint32_t)entity, flags, tag.Name.c_str());
 
 		bool deleted = false;
+
+		// Right Click Entity Options
 		if (ImGui::BeginPopupContextItem())
 		{
 			if (ImGui::MenuItem("Duplicate Entity"))
@@ -118,6 +129,14 @@ namespace Venus {
 				deleted = true;
 
 			ImGui::EndPopup();
+		}
+
+		// Drag and Drop Source
+		if (ImGui::BeginDragDropSource())
+		{
+			uint64_t ID = entity.GetUUID();
+			ImGui::SetDragDropPayload("OBJECT_PREFAB", &ID, sizeof(uint64_t));
+			ImGui::EndDragDropSource();
 		}
 
 		if (ImGui::IsItemClicked())
@@ -223,6 +242,8 @@ namespace Venus {
 
 			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{ 4, 4 });
 			float lineHeight = GImGui->Font->FontSize + GImGui->Style.FramePadding.y * 2.0f;
+			
+			ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 20);
 			ImGui::Separator();
 
 			// Tree Node
@@ -230,25 +251,31 @@ namespace Venus {
 			ImGui::PopStyleVar();
 			
 			// Component Settings TEMP: Delete only
-			if (canDelete)
+
+			ImGui::SameLine(contentRegionAvail.x - lineHeight * 0.5f);
+			if (ImGui::Button(ICON_FA_COG, { lineHeight, lineHeight }))
 			{
-				ImGui::SameLine(contentRegionAvail.x - lineHeight * 0.5f);
-				if (ImGui::Button("-", ImVec2{ lineHeight, lineHeight }))
-				{
-					ImGui::OpenPopup("ComponentSettings");
-				}
-				if (ImGui::BeginPopup("ComponentSettings"))
+				ImGui::OpenPopup("ComponentSettings");
+			}
+			if (ImGui::BeginPopup("ComponentSettings"))
+			{
+				if (ImGui::MenuItem("Reset Component"))
+					entity.AddOrReplaceComponent<T>();
+			
+				if (canDelete)
 				{
 					if (ImGui::MenuItem("Remove Component"))
 						removeComponent = true;
-
-					ImGui::EndPopup();
 				}
+
+				ImGui::EndPopup();
 			}
+
 
 			// UI Function per specific component
 			if (open)
 			{
+				ImGui::SetCursorPosY(ImGui::GetCursorPos().y + 10.0f);
 				uiFunction(component);
 				ImGui::TreePop();
 			}
@@ -275,11 +302,22 @@ namespace Venus {
 			}
 		}
 
-		// Add Components Button
-		ImVec2 contentRegionAvail = ImGui::GetContentRegionAvail();
-		ImGui::SameLine(contentRegionAvail.x - 24.0f);
+		// UUID 
+		ImGui::SameLine();
+		ImGui::TextDisabled(ICON_FA_INFO_CIRCLE);
+		if (ImGui::IsItemHovered())
+		{
+			ImGui::BeginTooltip();
+			ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
+			ImGui::TextUnformatted(std::to_string((uint64_t)m_SelectedEntity.GetUUID()).c_str());
+			ImGui::PopTextWrapPos();
+			ImGui::EndTooltip();
+		}
 
-		if (ImGui::ImageButton((ImTextureID)m_AddIcon->GetRendererID(), ImVec2{ 24.0f, 24.0f }))
+		// Add Components Button
+		ImGui::SameLine();
+		ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - 60.0f);
+		if (ImGui::Button(" ADD " ICON_FA_PLUS))
 			ImGui::OpenPopup("AddComponent");
 
 		if (ImGui::BeginPopup("AddComponent"))
@@ -338,12 +376,21 @@ namespace Venus {
 				}
 			}
 
+			if (!m_SelectedEntity.HasComponent<NativeScriptComponent>())
+			{
+				if (ImGui::MenuItem("Native Script"))
+				{
+					m_SelectedEntity.AddComponent<NativeScriptComponent>();
+					ImGui::CloseCurrentPopup();
+				}
+			}
+
 
 			ImGui::EndPopup();
 		}
 
 		// Transform Component
-		RenderComponent<TransformComponent>("Transform", entity, false, [](auto& component)
+		RenderComponent<TransformComponent>(ICON_FA_ARROWS   "  Transform", entity, false, [](auto& component)
 		{
 			RenderVec3Control("Position", component.Position);
 
@@ -356,7 +403,7 @@ namespace Venus {
 
 
 		// Sprite Renderer Component
-		RenderComponent<SpriteRendererComponent>("Sprite Renderer", entity, true, [](auto& component) 
+		RenderComponent<SpriteRendererComponent>(ICON_FA_FILE_IMAGE_O "  Sprite Renderer", entity, true, [](auto& component)
 		{
 			// Texture
 			ImGui::Columns(2);
@@ -383,7 +430,16 @@ namespace Venus {
 				{
 					const wchar_t* path = (const wchar_t*)payload->Data;
 					std::filesystem::path texturePath = std::filesystem::path(g_AssetPath) / path;
-					component.Texture = Texture2D::Create(texturePath.string());
+
+					AssetSerializer serializer;
+					auto texParameters = serializer.Deserialize(texturePath.string());
+
+					if (std::get<0>(texParameters) != -1 && std::get<1>(texParameters) != -1)
+						component.Texture = Texture2D::Create(texturePath.string(), (TextureFilterMode)std::get<0>(texParameters), (TextureWrapMode)std::get<1>(texParameters));
+
+					else
+						component.Texture = Texture2D::Create(texturePath.string());
+					
 					component.TextureName = texturePath.stem().string();
 					component.TexturePath = texturePath.string();
 				}
@@ -394,8 +450,9 @@ namespace Venus {
 			ImGui::DragFloat("Tiling Factor", &component.TilingFactor, 0.1f, 1.0f, 100.0f);
 		});
 
+
 		// CircleRendererComponent
-		RenderComponent<CircleRendererComponent>("Circle Renderer", entity, true, [](auto& component)
+		RenderComponent<CircleRendererComponent>(ICON_FA_CIRCLE_O  "  Circle Renderer", entity, true, [](auto& component)
 		{
 			ImGui::ColorEdit4("Color", glm::value_ptr(component.Color));
 			ImGui::DragFloat("Thickness", &component.Thickness, 0.01f, 0.1f, 1.0f);
@@ -404,13 +461,14 @@ namespace Venus {
 
 
 		// Camera Component
-		RenderComponent<CameraComponent>("Camera", entity, true, [](auto& component)
+		RenderComponent<CameraComponent>(ICON_FA_VIDEO_CAMERA "  Camera", entity, true, [](auto& component)
 		{
 			auto& camera = component.Camera;
 
 			// Checkboxes
 			ImGui::Checkbox("Primary Camera", &component.Primary);
 			ImGui::Checkbox("Fixed Aspect Ratio", &component.FixedAspectRatio);
+			ImGui::Columns(1);
 
 			// Projection Type ComboBox
 			const char* projectionType[] = { "Perspective", "Orthographic" };
@@ -469,7 +527,7 @@ namespace Venus {
 		});
 
 		// Rididbody2D Component
-		RenderComponent<Rigidbody2DComponent>("Rigidbody 2D", entity, true, [](auto& component)
+		RenderComponent<Rigidbody2DComponent>(ICON_FA_ARROW_DOWN "  Rigidbody 2D", entity, true, [](auto& component)
 		{
 			// Projection Type ComboBox
 			const char* bodyType[] = { "Static", "Dynamic", "Kinematic"};
@@ -499,7 +557,7 @@ namespace Venus {
 		});
 
 		// BoxCollider2D Component
-		RenderComponent<BoxCollider2DComponent>("Box Collider 2D", entity, true, [](auto& component)
+		RenderComponent<BoxCollider2DComponent>(ICON_FA_DROPBOX  " Box Collider 2D", entity, true, [](auto& component)
 		{
 			ImGui::DragFloat2("Offset", glm::value_ptr(component.Offset));
 			ImGui::DragFloat2("Size", glm::value_ptr(component.Size));
@@ -510,7 +568,7 @@ namespace Venus {
 		});
 		
 		// CircleCollider2D Component
-		RenderComponent<CircleCollider2DComponent>("Circle Collider 2D", entity, true, [](auto& component)
+		RenderComponent<CircleCollider2DComponent>(ICON_FA_ARROW_CIRCLE_O_DOWN  "  Circle Collider 2D", entity, true, [](auto& component)
 		{
 			ImGui::DragFloat2("Offset", glm::value_ptr(component.Offset));
 			ImGui::DragFloat("Radius", &component.Radius);
@@ -518,6 +576,12 @@ namespace Venus {
 			ImGui::DragFloat("Friction", &component.Friction, 0.01f, 0.0f, 1.0f);
 			ImGui::DragFloat("Restitution", &component.Restitution, 0.01f, 0.0f, 1.0f);
 			ImGui::DragFloat("RestitutionThreshold", &component.RestitutionThreshold, 0.1f, 0.0f);
+		});
+
+		// Native Script Component
+		RenderComponent<NativeScriptComponent>(ICON_FA_CODE    "  Native Script", entity, true, [](auto& component)
+		{
+			ImGui::Text("Test");
 		});
 	}
 }

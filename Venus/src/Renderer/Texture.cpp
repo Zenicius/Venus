@@ -30,4 +30,16 @@ namespace Venus {
 		return nullptr;
 	}
 
+	Ref<Texture2D> Texture2D::Create(const std::string& path, TextureFilterMode filterMode, TextureWrapMode wrapMode)
+	{
+		switch (Renderer::GetAPI())
+		{
+			case RendererAPI::API::None:    VS_CORE_ASSERT(false, "RendererAPI::None is currently not supported!"); return nullptr;
+			case RendererAPI::API::OpenGL:  return CreateRef<OpenGLTexture2D>(path, filterMode, wrapMode);
+		}
+
+		VS_CORE_ASSERT(false, "Unknown RendererAPI!");
+		return nullptr;
+	}
+
 }

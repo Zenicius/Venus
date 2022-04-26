@@ -1,7 +1,5 @@
 #include "AssetBrowserPanel.h"
 
-#include "imgui/imgui.h"
-
 namespace Venus {
 
 	// TODO Move to projects system
@@ -15,30 +13,427 @@ namespace Venus {
 		m_FolderIcon = Texture2D::Create(s_IconsPath + "/folder.png");
 		m_FileIcon = Texture2D::Create(s_IconsPath + "/file.png");
 		m_ReturnIcon = Texture2D::Create(s_IconsPath + "/return.png");
-		m_TextureIcon = Texture2D::Create(s_IconsPath + "/texture.png");
-		m_SceneIcon = Texture2D::Create(s_IconsPath + "/venus.png");
-		m_FontIcon = Texture2D::Create(s_IconsPath + "/font.png");
+		m_FowardIcon = Texture2D::Create(s_IconsPath + "/foward.png");
+		m_SearchIcon = Texture2D::Create(s_IconsPath + "/search.png");
+		m_SettingsIcon = Texture2D::Create(s_IconsPath + "/settings.png");
+		m_TextureIcon = Texture2D::Create(s_IconsPath + "/file.png");
+		m_SceneIcon = Texture2D::Create(s_IconsPath + "/file.png");
+		m_FontIcon = Texture2D::Create(s_IconsPath + "/file.png");
+		m_PrefabIcon = Texture2D::Create(s_IconsPath + "/file.png");
 	}
 
-	void AssetBrowserPanel::OnImGuiRender()
+	void AssetBrowserPanel::SetContext(const Ref<Scene>& context)
 	{
-		ImGui::Begin("Assets");
-		
+		m_Context = context;
+	}
+
+	void AssetBrowserPanel::SetSelectedAsset(std::filesystem::path asset)
+	{
+		m_SelectedAsset = asset;
+	}
+
+	void AssetBrowserPanel::OnAssetTreeRender(std::filesystem::path path)
+	{	
+		for (auto& entry : std::filesystem::directory_iterator(path))
+		{
+			if (entry.is_directory())
+			{
+				// Uniqued ID for every tree
+				int TreeID;
+				if (!ExistsInAssetMap(entry))
+				{
+					m_AssetsMap[entry.path().string()] = m_LastID + 1;
+					TreeID = m_LastID + 1;
+					m_LastID++;
+				}
+				else
+					TreeID = m_AssetsMap[entry.path().string()];
+
+				// Select tree if is Current path
+				if (m_CurrentPath == entry)
+					m_SelectedInTree = TreeID;
+				else if (m_CurrentPath == g_AssetPath)
+					m_SelectedInTree = -1;
+
+				// Tree configurations
+				ImGuiTreeNodeFlags base_flags;
+				std::string folderIcon = ICON_FA_FOLDER;
+
+				bool entryHasFolders = CheckDirectoryHasFolders(entry);
+
+				if (entryHasFolders)
+					base_flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick;
+				else
+					base_flags = ImGuiTreeNodeFlags_Leaf;
+
+				if (m_SelectedInTree == TreeID)
+				{
+					base_flags |= ImGuiTreeNodeFlags_Selected;
+					folderIcon = ICON_FA_FOLDER_OPEN;
+				}
+
+				// Tree
+				const auto& path = entry.path();
+				auto relativePath = std::filesystem::relative(path, g_AssetPath);
+				std::string fileNameString = relativePath.stem().string();
+
+				std::string finalName = folderIcon + " " + fileNameString;
+				bool node_open = ImGui::TreeNodeEx((void*)(intptr_t)TreeID, base_flags, finalName.c_str());
+
+				// Clicked
+				if (ImGui::IsItemClicked())
+				{
+					m_SelectedInTree = TreeID;
+					m_CurrentPath = path;
+				}
+
+				if (ImGui::BeginDragDropTarget())
+				{
+					if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_TEXTURE"))
+						MoveFileFromPayload(payload, entry.path());
+
+					else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_SCENE"))
+						MoveFileFromPayload(payload, entry.path());
+
+					else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PREFAB"))
+						MoveFileFromPayload(payload, entry.path());
+
+					else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_FONT"))
+						MoveFileFromPayload(payload, entry.path());
+
+					else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_OTHER"))
+						MoveFileFromPayload(payload, entry.path());
+				}
+
+				// Open or closed
+				if (node_open && entryHasFolders)
+				{
+					OnAssetTreeRender(path);
+					ImGui::TreePop();
+				}
+				else if (node_open)
+					ImGui::TreePop();
+			}
+		}
+	}
+
+	void AssetBrowserPanel::OnAssetRender(std::filesystem::directory_entry asset, float size)
+	{
+		const auto& path = asset.path();
+		auto relativePath = std::filesystem::relative(path, g_AssetPath);
+		std::string fileNameString = relativePath.stem().string();
+
+		// Unique ID
+		ImGui::PushID(fileNameString.c_str());
+
+		ImVec4 color;
+
+		if (m_SelectedAsset == path)
+			color = { 0.25f, 0.25f, 0.25f, 1.0f };
+		else
+			color = { 0.0f, 0.0f, 0.0f, 0.0f };
+
+		ImGui::PushStyleColor(ImGuiCol_Button, color);
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color);
+
+		// File type
+		AssetType fileType = GetFileType(asset);
+
+		// Switch icon by file type
+		Ref<Texture2D> icon;
+		if (!asset.is_directory())
+		{
+			switch (fileType)
+			{
+				case AssetType::Texture:
+					icon = m_TextureIcon;
+					break;
+				case AssetType::Font:
+					icon = m_FontIcon;
+					break;
+				case AssetType::Scene:
+					icon = m_SceneIcon;
+					break;
+				case AssetType::Prefab:
+					icon = m_PrefabIcon;
+					break;
+				case AssetType::Other:
+					icon = m_FileIcon;
+					break;
+			}
+		}
+		else
+			icon = m_FolderIcon;
+
+		// File/Folder button
+		ImGui::ImageButton((ImTextureID)icon->GetRendererID(), { size, size }, { 0, 1 }, { 1, 0 });
+
+		// Options
+		bool deleteAsset = false;
+		if (ImGui::BeginPopupContextItem(fileNameString.c_str()))
+		{
+			m_SelectedAsset = path;
+
+			if (ImGui::BeginMenu("Create"))
+			{
+				if (ImGui::MenuItem("Folder"))
+				{
+					std::string currentPath = asset.is_directory() ? path.string() : m_CurrentPath.string();
+					std::string finalPath = currentPath + "\\New Folder";
+					std::filesystem::create_directory(finalPath);
+
+					if(asset.is_directory())
+						m_CurrentPath /= path.filename();
+
+					m_RenamingAsset = finalPath; // Rename Asset after Creation
+				}
+
+				ImGui::EndMenu();
+			}
+
+			ImGui::Separator();
+
+			if (ImGui::MenuItem("Open"))
+			{
+				if (asset.is_directory())
+					m_CurrentPath /= path.filename();
+				else
+					FileDialogs::Open(asset.path().string().c_str());
+			}
+
+			if (ImGui::MenuItem("Show in Explorer"))
+				FileDialogs::Open(asset.path().parent_path().string().c_str());
+
+			if (ImGui::MenuItem("Rename"))
+				m_RenamingAsset = path;
+
+			if (ImGui::MenuItem("Delete"))
+				deleteAsset = true;
+
+			ImGui::EndPopup();
+		}
+
+		// Delete Asset Modal
+		if (deleteAsset)
+		{
+			ImGui::OpenPopup("Delete?");
+			// Always center this window when appearing
+			ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+			ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+		}
+		if (ImGui::BeginPopupModal("Delete?", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+		{
+			ImGui::Text("The file will be deleted.\nThis operation cannot be undone!\n\n");
+			ImGui::Separator();
+
+			if (ImGui::Button("OK", ImVec2(120, 0))) 
+			{
+				if (!asset.is_directory() && std::filesystem::remove(path))
+					CORE_LOG_WARN("Deleting {0}", path.string());
+				else if (asset.is_directory() && std::filesystem::remove_all(path))
+					CORE_LOG_WARN("Deleting all in {0}", path.string());
+
+				ImGui::CloseCurrentPopup(); 
+			}
+
+			ImGui::SetItemDefaultFocus();
+			ImGui::SameLine();
+			
+			if (ImGui::Button("Cancel", ImVec2(120, 0))) { ImGui::CloseCurrentPopup(); }
+			ImGui::EndPopup();
+		}
+
+		// Drag and Drop 
+		// Source
+		if (ImGui::BeginDragDropSource())
+		{
+			switch (fileType)
+			{
+				case AssetType::Scene:
+				{
+					const wchar_t* filePath = relativePath.c_str();
+					ImGui::SetDragDropPayload("ASSET_SCENE", filePath, (wcslen(filePath) + 1) * sizeof(wchar_t));
+					break;
+				}
+
+				case AssetType::Texture:
+				{
+					const wchar_t* filePath = relativePath.c_str();
+					ImGui::SetDragDropPayload("ASSET_TEXTURE", filePath, (wcslen(filePath) + 1) * sizeof(wchar_t));
+					break;
+				}
+
+				case AssetType::Prefab:
+				{
+					const wchar_t* filePath = relativePath.c_str();
+					ImGui::SetDragDropPayload("ASSET_PREFAB", filePath, (wcslen(filePath) + 1) * sizeof(wchar_t));
+					break;
+				}
+
+				case AssetType::Font:
+				{
+					const wchar_t* filePath = relativePath.c_str();
+					ImGui::SetDragDropPayload("ASSET_FONT", filePath, (wcslen(filePath) + 1) * sizeof(wchar_t));
+					break;
+				}
+
+				case AssetType::Other:
+				{
+					const wchar_t* filePath = relativePath.c_str();
+					ImGui::SetDragDropPayload("ASSET_OTHER", filePath, (wcslen(filePath) + 1) * sizeof(wchar_t));
+					break;
+				}
+			}
+
+			ImGui::EndDragDropSource();
+		}
+		// Target Folder
+		if (asset.is_directory())
+		{
+			if (ImGui::BeginDragDropTarget())
+			{
+				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_TEXTURE"))
+					MoveFileFromPayload(payload, asset.path());
+
+				else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_SCENE"))
+					MoveFileFromPayload(payload, asset.path());
+
+				else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PREFAB"))
+					MoveFileFromPayload(payload, asset.path());
+
+				else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_FONT"))
+					MoveFileFromPayload(payload, asset.path());
+
+				else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_OTHER"))
+					MoveFileFromPayload(payload, asset.path());
+			}
+		}
+
+		// Clicking
+		if (ImGui::IsItemHovered())
+		{
+			// Select or Open Folder
+			if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+			{
+				if (asset.is_directory())
+				{
+					m_FowardPath = "";
+					m_CurrentPath /= path.filename();
+				}
+			}
+			else if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+			{
+				m_SelectedAsset = path;
+			}
+		}
+
+		// Renaming or FileName
+		if (m_RenamingAsset == path)
+		{
+			char nameBuffer[256];
+			memset(nameBuffer, 0, sizeof(nameBuffer));
+			strcpy_s(nameBuffer, sizeof(nameBuffer), path.filename().string().c_str());
+			if (ImGui::InputText("##FileName", nameBuffer, sizeof(nameBuffer), ImGuiInputTextFlags_EnterReturnsTrue))
+			{
+				std::string fileName = nameBuffer;
+				if (!fileName.empty())
+				{
+					std::string parentPath = asset.path().parent_path().string();
+					std::string renamed = parentPath + "\\" + fileName;
+					
+					if (!CheckDirectoryHasFileNamed(parentPath, fileName))
+						std::filesystem::rename(path, renamed);
+					else
+						CORE_LOG_ERROR("Tryed to rename {0} to {1} when name is in use!", m_RenamingAsset.string(), renamed);
+				}
+
+				m_RenamingAsset = "";
+			}
+			ImGui::SetKeyboardFocusHere(1);
+		}
+		else
+			ImGui::TextWrapped(fileNameString.c_str());
+
+		ImGui::PopStyleColor(2);
+		ImGui::NextColumn();
+		ImGui::PopID();
+	}
+
+	void AssetBrowserPanel::OnAssetsExplorerRender()
+	{
+		ImGui::BeginChild("AssetsExplorer");
+
+		// Deselect entity by clicking blank spaces
+		if (ImGui::IsMouseDown(0) && ImGui::IsWindowHovered())
+		{
+			m_SelectedAsset = "";
+		}
+
 		// Options by right clicking
 		if (ImGui::BeginPopupContextWindow(0, 1, false))
 		{
-			if (ImGui::MenuItem("Open in Explorer"))
-				FileDialogs::OpenInExplorer(m_CurrentPath.string().c_str());
+			if (ImGui::BeginMenu("Create"))
+			{
+				if (ImGui::MenuItem("Folder"))
+				{
+					std::string finalPath = m_CurrentPath.string() + "\\New Folder";
+					std::filesystem::create_directory(finalPath);
+
+					m_RenamingAsset = finalPath;
+				}
+
+				ImGui::EndMenu();
+			}
+
+			ImGui::Separator();
+
+			if (ImGui::MenuItem("Show in Explorer"))
+				FileDialogs::Open(m_CurrentPath.string().c_str());
 
 			ImGui::EndPopup();
 		}
 
 		// Return button
-		if (ImGui::ImageButton((ImTextureID)m_ReturnIcon->GetRendererID(), { 24, 24 }))
+		if (ImGui::ImageButton((ImTextureID)m_ReturnIcon->GetRendererID(), { 16, 16 }))
 		{
 			if (m_CurrentPath != std::filesystem::path(g_AssetPath))
+			{
+				m_FowardPath = m_CurrentPath;
 				m_CurrentPath = m_CurrentPath.parent_path();
+			}
 		}
+		ImGui::SameLine();
+		// Foward Button
+		if (ImGui::ImageButton((ImTextureID)m_FowardIcon->GetRendererID(), { 16, 16 }))
+		{
+			if (!m_FowardPath.empty())
+				m_CurrentPath = m_FowardPath;
+		}
+		// Current Path
+		ImGui::SameLine();
+		ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 10.0f);
+		ImGui::Text(m_CurrentPath.string().c_str());
+		// Search
+		ImGui::SameLine();
+		ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - 366.0f); //286
+		ImVec4 color = { 0.0f, 0.0f, 0.0f, 0.0f };
+		ImGui::PushStyleColor(ImGuiCol_Button, color);
+		ImGui::PushStyleColor(ImGuiCol_ButtonActive, color);
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color);
+		ImGui::ImageButton((ImTextureID)m_SearchIcon->GetRendererID(), { 12, 12 });
+		ImGui::PopStyleColor(3);
+		ImGui::SameLine();
+		static ImGuiTextFilter filter;
+		filter.Draw("##Search", 270.0f);
+		// Settings
+		ImGui::SameLine();
+		ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - 34.0f);
+		ImGui::ImageButton((ImTextureID)m_SettingsIcon->GetRendererID(), { 16, 16 });
+
+
+		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 5);
+		ImGui::Separator();
+		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 10);
 
 		// Columns Configuration
 		float padding = 40.0f;
@@ -48,90 +443,135 @@ namespace Venus {
 		float panelWidth = ImGui::GetContentRegionAvail().x;
 		int columnCount = (int)panelWidth / cellSize;
 
-		ImGui::Columns(columnCount, 0, false);
+		if (columnCount == 0)
+			columnCount = 1;
+		
+		ImGui::Columns(columnCount, "AssetsExplorer", false);
 
 		for (auto& entry : std::filesystem::directory_iterator(m_CurrentPath))
 		{
-			const auto& path = entry.path();
-			auto relativePath = std::filesystem::relative(path, g_AssetPath);
-			std::string fileNameString = relativePath.stem().string();
+			if (entry.path().extension().string() != ".meta" && filter.PassFilter(entry.path().string().c_str()))
+				OnAssetRender(entry, thumbnailSize);
 
-			// Unique ID
-			ImGui::PushID(fileNameString.c_str());
-
-			ImGui::PushStyleColor(ImGuiCol_Button, { 0.0f, 0.0f, 0.0f, 0.0f });
-
-			// File type
-			AssetType fileType = GetFileType(entry);
-
-			// Switch icon by file type
-			Ref<Texture2D> icon;
-			if (!entry.is_directory())
-			{
-				switch (fileType)
-				{
-					case AssetType::Texture:
-						icon = m_TextureIcon;
-						break;
-					case AssetType::Font:
-						icon = m_FontIcon;
-						break;
-					case AssetType::Scene:
-						icon = m_SceneIcon;
-						break;
-					case AssetType::Other:
-						icon = m_FileIcon;
-						break;
-				}
-			}
-			else
-				icon = m_FolderIcon;
-
-			// File/Folder button
-			ImGui::ImageButton((ImTextureID)icon->GetRendererID(), { thumbnailSize, thumbnailSize }, { 0, 1 }, { 1, 0 });
-
-			// Drag and Drop
-			if (ImGui::BeginDragDropSource())
-			{
-				switch (fileType)
-				{
-					case AssetType::Scene:
-					{
-						const wchar_t* filePath = relativePath.c_str();
-						ImGui::SetDragDropPayload("ASSET_SCENE", filePath, (wcslen(filePath) + 1) * sizeof(wchar_t));
-						break;
-					}
-
-					case AssetType::Texture:
-					{
-						const wchar_t* filePath = relativePath.c_str();
-						ImGui::SetDragDropPayload("ASSET_TEXTURE", filePath, (wcslen(filePath) + 1) * sizeof(wchar_t));
-						break;
-					}
-					
-				}
-
-				ImGui::EndDragDropSource();
-			}
-
-			// Double Click
-			if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
-			{
-				if (entry.is_directory())
-				{
-					m_CurrentPath /= path.filename();
-				}
-			}
-			ImGui::TextWrapped(fileNameString.c_str());
-
-			ImGui::PopStyleColor();
-			ImGui::NextColumn();
-			ImGui::PopID();
+			ImGui::TableNextColumn();
 		}
 
 		ImGui::Columns(1);
 
+		ImGui::EndChild();
+	}
+
+	void AssetBrowserPanel::OnAssetEditorRender()
+	{
+		ImGui::Begin(ICON_FA_TINT " Asset Editor");
+		
+		if (!m_SelectedAsset.empty() && GetFileType(m_SelectedAsset) == AssetType::Texture)
+		{
+			// Texture 2D
+			ImGuiIO& io = ImGui::GetIO();
+			auto boldFont = io.Fonts->Fonts[0];
+			ImGui::PushFont(boldFont);
+			std::string assetName = m_SelectedAsset.filename().string();
+			std::string text = assetName + " (Texture 2D)";
+			ImGui::Text(text.c_str());
+			ImGui::PopFont();
+			ImGui::Separator();
+			ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 15.0f);
+
+			// Filter Mode ComboBox
+			const char* filterModes[] = { "Point", "Bilinear" };
+			static int currentFilter = 1;
+			ImGui::Combo("Filter Mode", &currentFilter, filterModes, IM_ARRAYSIZE(filterModes));
+
+			// Wrap Mode Combobox
+			const char* wrapModes[] = { "Repeat", "Mirrored", "Clamp to Edge", "Clamp to Border"};
+			static int currentWrap = 0;
+			ImGui::Combo("Wrap Mode", &currentWrap, wrapModes, IM_ARRAYSIZE(wrapModes));
+
+			if (ImGui::Button("Save"))
+			{
+				AssetSerializer serializer;
+				serializer.Serialize(m_SelectedAsset.string(), currentFilter, currentWrap);
+			}
+
+			ImGui::SameLine();
+
+			if (ImGui::Button("Reset"))
+			{
+				currentFilter = 1;
+				currentWrap = 0;
+				AssetSerializer serializer;
+				serializer.Serialize(m_SelectedAsset.string(), currentFilter, currentWrap);
+			}
+
+		}
+		else
+		{
+			std::string msg = "Select a Asset to Edit.";
+			ImGui::PushStyleColor(ImGuiCol_Text, { 0.30f, 0.30f, 0.30f, 0.95f });
+			ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 10);
+			ImGui::SetCursorPosX((ImGui::GetWindowSize().x - ImGui::CalcTextSize(msg.c_str()).x) * 0.5f);
+			ImGui::Text(msg.c_str());
+			ImGui::PopStyleColor();
+		}
+
 		ImGui::End();
+	}
+
+	void AssetBrowserPanel::OnImGuiRender()
+	{
+		ImGui::Begin(ICON_FA_STAR " Asset Browser");
+
+		ImGui::Columns(2, "outer", true);
+
+		// Assets Tree
+		ImGuiTreeNodeFlags base_flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick;
+
+		if (m_SelectedInTree == -1)
+			base_flags |= ImGuiTreeNodeFlags_Selected;
+
+		ImGui::SetNextItemOpen(m_RootTreeOpen);
+		m_RootTreeOpen = ImGui::TreeNodeEx((void*)(intptr_t)-1, base_flags, ICON_FA_FOLDER_O " Assets");
+		if (ImGui::BeginDragDropTarget())
+		{
+			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_TEXTURE"))
+				MoveFileFromPayload(payload, g_AssetPath);
+
+			else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_SCENE"))
+				MoveFileFromPayload(payload, g_AssetPath);
+
+			else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PREFAB"))
+				MoveFileFromPayload(payload, g_AssetPath);
+
+			else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_FONT"))
+				MoveFileFromPayload(payload, g_AssetPath);
+
+			else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_OTHER"))
+				MoveFileFromPayload(payload, g_AssetPath);
+		}
+		if (m_RootTreeOpen)
+		{
+			if (ImGui::IsItemClicked())
+			{
+				m_SelectedInTree = -1;
+				m_CurrentPath = g_AssetPath;
+			}
+			
+			OnAssetTreeRender(g_AssetPath);
+			ImGui::TreePop();
+		}
+
+		ImGui::NextColumn();
+		ImGui::SetColumnOffset(ImGui::GetColumnIndex(), 325);
+
+		// Assets Explorer
+		OnAssetsExplorerRender();
+
+		ImGui::Columns(1);
+	
+		ImGui::End();
+
+		OnAssetEditorRender();
 	}
 
 	AssetType AssetBrowserPanel::GetFileType(std::filesystem::path file)
@@ -145,8 +585,48 @@ namespace Venus {
 		else if (file.extension().string() == ".venus")
 			return AssetType::Scene;
 
+		else if (file.extension().string() == ".vspfab")
+			return AssetType::Prefab;
+
 		else
 			return AssetType::Other;
+	}
+
+	bool AssetBrowserPanel::CheckDirectoryHasFolders(std::filesystem::path path)
+	{
+		for (auto& entry : std::filesystem::directory_iterator(path))
+		{
+			if (entry.is_directory())
+				return true;
+		}
+
+		return false;
+	}
+
+	bool AssetBrowserPanel::CheckDirectoryHasFileNamed(std::filesystem::path path, std::string name)
+	{
+		for (auto& entry : std::filesystem::directory_iterator(path))
+		{
+			auto relativePath = std::filesystem::relative(entry, g_AssetPath);
+			std::string fileNameString = relativePath.string();
+
+			if (fileNameString == name)
+				return true;
+		}
+
+		return false;
+	}
+
+	void AssetBrowserPanel::MoveFileFromPayload(const ImGuiPayload* payload, std::filesystem::path path)
+	{
+		const wchar_t* payloadPath = (const wchar_t*)payload->Data;
+		std::string name = std::filesystem::path(payloadPath).filename().string();
+
+		std::filesystem::path from = std::filesystem::path(g_AssetPath / std::filesystem::path(payloadPath));
+		std::filesystem::path dest = std::filesystem::path(path / std::filesystem::path(name));
+
+		if(dest.parent_path() != from)
+			std::filesystem::rename(from, dest);
 	}
 
 }

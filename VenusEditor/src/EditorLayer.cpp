@@ -31,6 +31,7 @@ namespace Venus {
 
 		// Panels
 		m_ObjectsPanel.SetContext(m_ActiveScene);
+		m_AssetBrowserPanel.SetContext(m_ActiveScene);
 
 		m_PlayIcon = Texture2D::Create("Resources/Icons/Toolbar/play.png");
 		m_StopIcon = Texture2D::Create("Resources/Icons/Toolbar/stop.png");
@@ -169,18 +170,19 @@ namespace Venus {
 	{
 		if (ImGui::BeginMenuBar())
 		{
+			// File
 			if (ImGui::BeginMenu("File"))
 			{
-				if (ImGui::MenuItem("New", "Ctrl+N"))
+				if (ImGui::MenuItem(ICON_FA_FILE_O "  New", "Ctrl+N"))
 					NewScene();
 
-				if (ImGui::MenuItem("Open...", "Ctrl+O"))
+				if (ImGui::MenuItem(ICON_FA_FILE  "  Open...", "Ctrl+O"))
 					OpenScene();;
 				
-				if (ImGui::MenuItem("Save", "Ctrl+S"))
+				if (ImGui::MenuItem(ICON_FA_FLOPPY_O  "  Save", "Ctrl+S"))
 					SaveScene();
 
-				if (ImGui::MenuItem("Save as...", "Ctrl+Shift+S"))
+				if (ImGui::MenuItem(ICON_FA_FLOPPY_O "  Save as...", "Ctrl+Shift+S"))
 					SaveSceneAs();
 
 				ImGui::Separator();
@@ -191,6 +193,65 @@ namespace Venus {
 
 				ImGui::EndMenu();
 			}
+
+			// Edit
+			if (ImGui::BeginMenu("Edit", false))
+			{
+
+				ImGui::EndMenu();
+			}
+
+			// Create 
+			if (ImGui::BeginMenu("Create"))
+			{
+				if (ImGui::MenuItem("Empty Object"))
+				{
+					auto entity = m_ActiveScene->CreateEntity();
+					m_ObjectsPanel.SetSelectedEntity(entity);
+				}
+
+				ImGui::Separator();
+
+				if (ImGui::MenuItem("Sprite"))
+				{
+					auto entity = m_ActiveScene->CreateEntity("Sprite");
+					entity.AddComponent<SpriteRendererComponent>(glm::vec4{ 1.0f, 1.0f, 1.0f, 1.0f });
+					m_ObjectsPanel.SetSelectedEntity(entity);
+				}
+
+				ImGui::Separator();
+
+				if (ImGui::MenuItem("Circle"))
+				{
+					auto entity = m_ActiveScene->CreateEntity("Circle");
+					entity.AddComponent<CircleRendererComponent>(glm::vec4{ 1.0f, 1.0f, 1.0f, 1.0f });
+					m_ObjectsPanel.SetSelectedEntity(entity);
+				}
+
+				ImGui::Separator();
+
+				if (ImGui::MenuItem("Camera"))
+				{
+					auto entity = m_ActiveScene->CreateEntity("Camera");
+					entity.AddComponent<CameraComponent>();
+					m_ObjectsPanel.SetSelectedEntity(entity);
+				}
+
+				ImGui::EndMenu();
+			}
+			
+			// View
+			if (ImGui::BeginMenu("View", false))
+			{
+				ImGui::EndMenu();
+			}
+
+			// Help
+			if (ImGui::BeginMenu("Help", false))
+			{
+				ImGui::EndMenu();
+			}
+
 			ImGui::EndMenuBar();
 		}
 	}
@@ -325,6 +386,15 @@ namespace Venus {
 
 				m_ObjectsPanel.SetSelectedEntity(entity);
 			}
+
+			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_FREFAB"))
+			{
+				const wchar_t* path = (const wchar_t*)payload->Data;
+				// TODO Maybe move to function
+				SceneSerializer serializer(m_ActiveScene);
+				Entity entity = serializer.DeserializePrefab((std::filesystem::path(g_AssetPath) / path).string());
+				m_ObjectsPanel.SetSelectedEntity(entity);
+			}
 		}
 
 		// Gizmos TEMP
@@ -376,31 +446,43 @@ namespace Venus {
 
 	void EditorLayer::UI_Settings()
 	{
-		ImGui::Begin("Settings");
+		ImGuiIO& io = ImGui::GetIO();
+		auto boldFont = io.Fonts->Fonts[0];
 
+		ImGui::Begin(ICON_FA_COGS " Settings");
+
+		// Render
+		ImGui::PushFont(boldFont);
 		ImGui::Text("Render");
-		ImGui::ColorEdit4("Clear Color", glm::value_ptr(m_ClearColor));
+		ImGui::PopFont();
 		ImGui::Separator();
+		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 5.0f);
+		ImGui::ColorEdit4("Clear Color", glm::value_ptr(m_ClearColor));
 
+		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 20.0f);
+
+		// Editor
+		ImGui::PushFont(boldFont);
 		ImGui::Text("Editor");
+		ImGui::PopFont();
+		ImGui::Separator();
+		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 5.0f);
 		ImGui::Checkbox("Show Camera Icon", &m_ShowCameraIcon);
 		if (ImGui::Checkbox("Lock Camera Rotation", &m_CameraLocked))
 			m_EditorCamera.SetCameraLocked(m_CameraLocked);
 		ImGui::Checkbox("Show Physics Colliders in Editor", &m_ShowPhysicsColliderEditor);
 		ImGui::Checkbox("Show Physics Colliders in Runtime", &m_ShowPhysicsColliderRuntime);
-		ImGui::Separator();
 
+		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 20.0f);
+
+		// Physics
+		ImGui::PushFont(boldFont);
 		ImGui::Text("Physics Iterations");
+		ImGui::PopFont();
+		ImGui::Separator();
+		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 5.0f);
 		ImGui::DragInt("Velocity", (int*)&m_ActiveScene->m_VelocityIterations, 1.0f, 1.0f, 1000.0f);
 		ImGui::DragInt("Position", (int*)&m_ActiveScene->m_PositionIterations, 1.0f, 1.0f, 1000.0f);
-		
-		if (Entity entity = m_ObjectsPanel.GetSelectedEntity())
-		{
-			uint64_t uuid = entity.GetComponent<IDComponent>().ID;
-			ImGui::Separator();
-			ImGui::Text("Entity UUID:");
-			ImGui::Text(std::to_string(uuid).c_str());
-		}
 
 		ImGui::End();
 	}
@@ -423,6 +505,7 @@ namespace Venus {
 		m_EditorScene->OnViewportResize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);
 
 		m_ObjectsPanel.SetContext(m_EditorScene);
+		m_AssetBrowserPanel.SetContext(m_EditorScene);
 
 		UpdateWindowTitle(m_EditorScene->m_SceneName);
 
@@ -457,6 +540,7 @@ namespace Venus {
 		UpdateWindowTitle(m_EditorScene->m_SceneName);
 
 		m_ObjectsPanel.SetContext(m_EditorScene);
+		m_AssetBrowserPanel.SetContext(m_EditorScene);
 
 		m_ActiveScene = m_EditorScene;	
 	}
@@ -495,6 +579,7 @@ namespace Venus {
 		m_RuntimeScene = Scene::Copy(m_EditorScene);
 		m_RuntimeScene->OnRuntimeStart();
 		m_ObjectsPanel.SetContext(m_RuntimeScene);
+		m_AssetBrowserPanel.SetContext(m_RuntimeScene);
 
 		m_ActiveScene = m_RuntimeScene;
 
@@ -506,6 +591,7 @@ namespace Venus {
 		m_RuntimeScene->OnRuntimeStop();
 		m_RuntimeScene = nullptr; 
 		m_ObjectsPanel.SetContext(m_EditorScene);
+		m_AssetBrowserPanel.SetContext(m_EditorScene);
 
 		m_ActiveScene = m_EditorScene;
 
@@ -542,19 +628,19 @@ namespace Venus {
 			// Box Colliders
 			{
 				auto view = m_ActiveScene->GetAllEntitiesWith<TransformComponent, BoxCollider2DComponent>();
-					for (auto entity : view)
-					{
-						auto [tc, collider] = view.get<TransformComponent, BoxCollider2DComponent>(entity);
+				for (auto entity : view)
+				{
+					auto [tc, collider] = view.get<TransformComponent, BoxCollider2DComponent>(entity);
 
-							glm::vec3 translation = tc.Position + glm::vec3(collider.Offset, 0.001f);
-							glm::vec3 scale = tc.Scale * glm::vec3(collider.Size * 2.0f, 1.0f);
+					glm::vec3 translation = tc.Position + glm::vec3(collider.Offset, 0.001f);
+					glm::vec3 scale = tc.Scale * glm::vec3(collider.Size * 2.0f, 1.0f);
 
-						glm::mat4 transform = glm::translate(glm::mat4(1.0f), translation)
-							* glm::rotate(glm::mat4(1.0f), tc.Rotation.z, glm::vec3(0.0f, 0.0f, 1.0f))
-							* glm::scale(glm::mat4(1.0f), scale);
+					glm::mat4 transform = glm::translate(glm::mat4(1.0f), translation)
+						* glm::rotate(glm::mat4(1.0f), tc.Rotation.z, glm::vec3(0.0f, 0.0f, 1.0f))
+						* glm::scale(glm::mat4(1.0f), scale);
 
-						Renderer2D::DrawRect(transform, { 0.0f, 1.0f, 0.0f, 1.0f });
-					}
+					Renderer2D::DrawRect(transform, { 0.0f, 1.0f, 0.0f, 1.0f });
+				}
 			}
 
 			// Circles Colliders
@@ -593,7 +679,7 @@ namespace Venus {
 		}
 
 		// Selected Entity in Editor
-		if (m_SceneState != SceneState::Play && m_ObjectsPanel.GetSelectedEntity())
+		if (m_SceneState == SceneState::Edit && m_ObjectsPanel.GetSelectedEntity())
 		{
 			Entity entity = m_ObjectsPanel.GetSelectedEntity();
 			const auto& tc = entity.GetComponent<TransformComponent>();

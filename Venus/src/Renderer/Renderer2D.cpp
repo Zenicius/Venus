@@ -151,7 +151,7 @@ namespace Venus {
 			{ ShaderDataType::Float,  "a_Thickness"     },
 			{ ShaderDataType::Float,  "a_Fade"          },
 			{ ShaderDataType::Int,    "a_EntityID"      }
-			});
+		});
 
 		s_Data.CircleVertexArray->AddVertexBuffer(s_Data.CircleVertexBuffer);
 		s_Data.CircleVertexArray->SetIndexBuffer(quadIB); // Use quad IB
@@ -163,10 +163,10 @@ namespace Venus {
 		s_Data.LineVertexBuffer = VertexBuffer::Create(s_Data.MaxVertices * sizeof(LineVertex));
 
 		s_Data.LineVertexBuffer->SetLayout({
-			{ ShaderDataType::Float3, "a_Position" },
+			{ ShaderDataType::Float3, "a_Position"		},
 			{ ShaderDataType::Float4, "a_Color"         },
 			{ ShaderDataType::Int,    "a_EntityID"      }
-			});
+		});
 
 		s_Data.LineVertexArray->AddVertexBuffer(s_Data.LineVertexBuffer);
 		s_Data.LineVertexBufferBase = new LineVertex[s_Data.MaxVertices];

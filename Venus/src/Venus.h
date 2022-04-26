@@ -12,6 +12,9 @@
 #include "Engine/Input.h"
 #include "ImGui/ImGuiLayer.h"
 
+// Assets
+#include "Assets/AssetSerializer.h"
+
 // Events
 #include "Events/Event.h"
 #include "Events/ApplicationEvent.h"
@@ -23,6 +26,9 @@
 #include "Scene/Entity.h"
 #include "Scene/Components.h"
 #include "Scene/SceneSerializer.h"
+
+// Scripting
+#include "Scene/Scripting/ScriptableEntity.h"
 
 // Renderer
 #include "Renderer/Renderer.h"
@@ -45,3 +51,4 @@
 #include "Utils/Random.h"
 #include "Utils/PlatformUtils.h"
 #include "Math/Math.h"
+#include "ImGui/IconsFontAwesome.h"

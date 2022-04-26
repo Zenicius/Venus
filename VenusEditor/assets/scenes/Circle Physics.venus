@@ -65,9 +65,9 @@ Entities:
     TagComponent:
       Name: Sprite Copied
     TransformComponent:
-      Position: [3.7342062, -5.73421812, 2.02756739]
-      Rotation: [0.038105458, 0.0689574033, 0.455779701]
-      Scale: [13.0089664, 0.999999762, 1]
+      Position: [3.7342062, -5.73421812, 0]
+      Rotation: [0.038105458, 0, 0.455779701]
+      Scale: [13.0089664, 0.999999702, 1]
     SpriteRendererComponent:
       Color: [1, 1, 1, 1]
       TextureName: None
@@ -87,9 +87,9 @@ Entities:
     TagComponent:
       Name: Sprite Copied Copied
     TransformComponent:
-      Position: [-5.71873713, -11.1276731, 0.581489086]
-      Rotation: [-0.0509452187, 0.0601043925, -0.753425717]
-      Scale: [13.0089645, 0.999999642, 0.999998152]
+      Position: [-6.58274412, -10.7069044, 0]
+      Rotation: [-0.0457987525, -0.0223214161, -0.45319283]
+      Scale: [13.0089531, 0.999999642, 0.999998212]
     SpriteRendererComponent:
       Color: [1, 1, 1, 1]
       TextureName: None
@@ -110,8 +110,8 @@ Entities:
       Name: Sprite Copied Copied Copied
     TransformComponent:
       Position: [3.37686753, -12.9759483, -0.142813116]
-      Rotation: [-0.0508950464, -0.0601488464, -2.48820615]
-      Scale: [13.0084238, 0.99995935, 0.999998331]
+      Rotation: [0, 0, 0.511962712]
+      Scale: [13.0084229, 0.999959588, 0.999998331]
     SpriteRendererComponent:
       Color: [1, 1, 1, 1]
       TextureName: None

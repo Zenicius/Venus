@@ -59,7 +59,7 @@ namespace Venus {
 		return std::string();
 	}
 
-	void FileDialogs::OpenInExplorer(const char* path)
+	void FileDialogs::Open(const char* path)
 	{
 		ShellExecuteA(NULL, "open", path, NULL, NULL, SW_SHOWDEFAULT);
 	}

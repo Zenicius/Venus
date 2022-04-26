@@ -274,6 +274,21 @@ namespace Venus {
 		fout.close();
 	}
 
+	void SceneSerializer::SerializePrefab(UUID id, const std::string& filepath)
+	{
+		Entity entity = m_Scene->GetEntityByUUID(id);
+		if (entity)
+		{
+			std::string name = entity.GetComponent<TagComponent>().Name;
+			YAML::Emitter out;
+			SerializeEntity(out, entity);
+
+			std::ofstream fout(filepath + "/" + name + ".vspfab");
+			fout << out.c_str();
+			fout.close();
+		}
+	}
+
 	void SceneSerializer::SerializeRuntime(const std::string& filepath)
 	{
 		VS_CORE_ASSERT(false, "Not Implemented!");
@@ -411,6 +426,125 @@ namespace Venus {
 		}
 
 		return true;
+	}
+
+	Entity SceneSerializer::DeserializePrefab(const std::string& filepath)
+	{
+		YAML::Node data;
+		try
+		{
+			data = YAML::LoadFile(filepath);
+		}
+		catch (YAML::ParserException e)
+		{
+			return {};
+		}
+
+		if (!data["Entity"])
+			return {};
+
+		// TagComponent
+		std::string name;
+		auto tagComponent = data["TagComponent"];
+		if (tagComponent)
+			name = tagComponent["Name"].as<std::string>();
+
+		// Entity Creation
+		Entity deserializedEntity = m_Scene->CreateEntity(name);
+
+		// TransformComponent
+		auto transformComponent = data["TransformComponent"];
+		if (transformComponent)
+		{
+			auto& transform = deserializedEntity.GetComponent<TransformComponent>();
+			transform.Rotation = transformComponent["Rotation"].as<glm::vec3>();
+			transform.Scale = transformComponent["Scale"].as<glm::vec3>();
+		}
+
+		// CameraComponent
+		auto cameraComponent = data["CameraComponent"];
+		if (cameraComponent)
+		{
+			auto& cc = deserializedEntity.AddComponent<CameraComponent>();
+			auto& props = cameraComponent["Camera"];
+
+			cc.Camera.SetProjectionType((SceneCamera::ProjectionType)props["ProjectionType"].as<int>());
+
+			cc.Camera.SetPerspectiveVerticalFOV(props["PerspectiveFOV"].as<float>());
+			cc.Camera.SetPerspectiveNearClip(props["PerspectiveNear"].as<float>());
+			cc.Camera.SetPerspectiveFarClip(props["PerspectiveFar"].as<float>());
+
+			cc.Camera.SetOrthographicSize(props["OrthographicSize"].as<float>());
+			cc.Camera.SetOrthographicNearClip(props["OrthographicNear"].as<float>());
+			cc.Camera.SetOrthographicFarClip(props["OrthographicFar"].as<float>());
+
+			cc.Primary = cameraComponent["Primary"].as<bool>();
+			cc.FixedAspectRatio = cameraComponent["FixedAspectRatio"].as<bool>();
+		}
+
+		// SpriteRendererComponent
+		auto srComponent = data["SpriteRendererComponent"];
+		if (srComponent)
+		{
+			auto& src = deserializedEntity.AddComponent<SpriteRendererComponent>();
+			src.Color = srComponent["Color"].as<glm::vec4>();
+			std::string texturePath = srComponent["Texture"].as<std::string>();
+			src.TilingFactor = srComponent["TilingFactor"].as<float>();
+
+			if (!texturePath.empty())
+			{
+				src.TextureName = srComponent["TextureName"].as<std::string>();
+				src.TexturePath = texturePath;
+				src.Texture = Texture2D::Create(texturePath);
+			}
+		}
+
+		// CircleRendererComponent
+		auto circleComponent = data["CircleRendererComponent"];
+		if (circleComponent)
+		{
+			auto& cc = deserializedEntity.AddComponent<CircleRendererComponent>();
+			cc.Color = circleComponent["Color"].as<glm::vec4>();
+			cc.Thickness = circleComponent["Thickness"].as<float>();
+			cc.Fade = circleComponent["Fade"].as<float>();
+		}
+
+		// Rigidbody2DComponent 
+		auto rbComponent = data["Rigidbody2DComponent"];
+		if (rbComponent)
+		{
+			auto& rb = deserializedEntity.AddComponent<Rigidbody2DComponent>();
+			rb.Type = (Rigidbody2DComponent::BodyType)rbComponent["Type"].as<int>();
+			rb.FixedRotation = rbComponent["FixedRotation"].as<bool>();
+		}
+
+		// BoxCollider2DComponent 
+		auto bcComponent = data["BoxCollider2DComponent"];
+		if (bcComponent)
+		{
+			auto& bc = deserializedEntity.AddComponent<BoxCollider2DComponent>();
+			bc.Offset = bcComponent["Offset"].as<glm::vec2>();
+			bc.Size = bcComponent["Size"].as<glm::vec2>();
+			bc.Density = bcComponent["Density"].as<float>();
+			bc.Friction = bcComponent["Friction"].as<float>();
+			bc.Restitution = bcComponent["Restitution"].as<float>();
+			bc.RestitutionThreshold = bcComponent["RestitutionThreshold"].as<float>();
+		}
+
+		// CircleCollider2DComponent 
+		auto ccComponent = data["CircleCollider2DComponent"];
+		if (ccComponent)
+		{
+			auto& cc = deserializedEntity.AddComponent<CircleCollider2DComponent>();
+			cc.Offset = ccComponent["Offset"].as<glm::vec2>();
+			cc.Radius = ccComponent["Radius"].as<float>();
+			cc.Density = ccComponent["Density"].as<float>();
+			cc.Friction = ccComponent["Friction"].as<float>();
+			cc.Restitution = ccComponent["Restitution"].as<float>();
+			cc.RestitutionThreshold = ccComponent["RestitutionThreshold"].as<float>();
+		}
+
+		return deserializedEntity;
 	}
 
 	bool SceneSerializer::DeserializeRuntime(const std::string& filepath)

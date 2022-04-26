@@ -15,6 +15,7 @@ VULKAN_SDK = os.getenv("VULKAN_SDK")
 
 -- Include directories relative to root folder (solution directory)
 IncludeDir = {}
+IncludeDir["Assimp"] = "Venus/vendor/assimp/include"
 IncludeDir["GLFW"] = "Venus/vendor/GLFW/include"
 IncludeDir["Glad"] = "Venus/vendor/Glad/include"
 IncludeDir["ImGui"] = "Venus/vendor/imgui"
@@ -35,6 +36,8 @@ LibraryDir["VulkanSDK_Debug"] = "%{wks.location}/Venus/vendor/VulkanSDK/Lib"
 LibraryDir["VulkanSDK_DebugDLL"] = "%{wks.location}/Venus/vendor/VulkanSDK/Bin"
 
 Library = {}
+Library["Assimp_Debug"] = "Venus/vendor/assimp/bin/Debug/assimp-vc142-mtd.lib"
+Library["Assimp_Release"] = "Venus/vendor/assimp/bin/Release/assimp-vc142-mt.lib"
 Library["Vulkan"] = "%{LibraryDir.VulkanSDK}/vulkan-1.lib"
 Library["VulkanUtils"] = "%{LibraryDir.VulkanSDK}/VkLayer_utils.lib"
 Library["ShaderC_Debug"] = "%{LibraryDir.VulkanSDK_Debug}/shaderc_sharedd.lib"
@@ -45,6 +48,9 @@ Library["ShaderC_Release"] = "%{LibraryDir.VulkanSDK}/shaderc_shared.lib"
 Library["SPIRV_Cross_Release"] = "%{LibraryDir.VulkanSDK}/spirv-cross-core.lib"
 Library["SPIRV_Cross_GLSL_Release"] = "%{LibraryDir.VulkanSDK}/spirv-cross-glsl.lib"
 
+Binaries = {}
+Binaries["Assimp_Debug"] = "Venus/vendor/assimp/bin/Debug/assimp-vc142-mtd.dll"
+Binaries["Assimp_Release"] = "Venus/vendor/assimp/bin/Release/assimp-vc142-mt.dll"
 
 group "Dependencies"
 	include "Venus/vendor/GLFW"
@@ -90,6 +96,7 @@ project "Venus"
 	{
 		"%{prj.name}/src",
 		"%{prj.name}/vendor/spdlog/include",
+		"%{IncludeDir.Assimp}",
 		"%{IncludeDir.GLFW}",
 		"%{IncludeDir.Glad}",
 		"%{IncludeDir.ImGui}",

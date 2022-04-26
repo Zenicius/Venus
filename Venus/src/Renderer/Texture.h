@@ -6,6 +6,20 @@
 
 namespace Venus {
 
+	enum class TextureFilterMode 
+	{
+		Point = 0,
+		Bilinear = 1
+	};
+
+	enum class TextureWrapMode
+	{
+		Repeat = 0,
+		Mirrored = 1,
+		ClampToEdge = 2,
+		ClampToBorder = 3
+	};
+
 	class Texture
 	{
 		public:
@@ -29,5 +43,6 @@ namespace Venus {
 		public:
 			static Ref<Texture2D> Create(uint32_t width, uint32_t height);
 			static Ref<Texture2D> Create(const std::string& path);
+			static Ref<Texture2D> Create(const std::string& path, TextureFilterMode filterMode, TextureWrapMode wrapMode);
 	};
 }

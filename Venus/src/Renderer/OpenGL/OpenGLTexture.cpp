@@ -75,6 +75,90 @@ namespace Venus {
 		}
 	}
 
+	OpenGLTexture2D::OpenGLTexture2D(const std::string& path, TextureFilterMode filterMode, TextureWrapMode wrapMode)
+		: m_Path(path)
+	{
+		VS_PROFILE_FUNCTION();
+
+		int width, height, channels;
+		stbi_set_flip_vertically_on_load(1);
+		stbi_uc* data = nullptr;
+		{
+			VS_PROFILE_SCOPE("stbi_load - OpenGLTexture2D::OpenGLTexture2D(const std::string&)");
+			data = stbi_load(path.c_str(), &width, &height, &channels, 0);
+		}
+
+		if (data)
+		{
+			m_IsLoaded = true;
+
+			m_Width = width;
+			m_Height = height;
+
+			GLenum internalFormat = 0, dataFormat = 0;
+			if (channels == 4)
+			{
+				internalFormat = GL_RGBA8;
+				dataFormat = GL_RGBA;
+			}
+			else if (channels == 3)
+			{
+				internalFormat = GL_RGB8;
+				dataFormat = GL_RGB;
+			}
+
+			m_InternalFormat = internalFormat;
+			m_DataFormat = dataFormat;
+
+			VS_CORE_ASSERT(internalFormat & dataFormat, "Format not supported!");
+
+			glCreateTextures(GL_TEXTURE_2D, 1, &m_RendererID);
+			glTextureStorage2D(m_RendererID, 1, internalFormat, m_Width, m_Height);
+
+			GLenum filter = GL_LINEAR;
+			switch (filterMode)
+			{
+				case TextureFilterMode::Point:
+					filter = GL_NEAREST;
+					break;
+
+				case TextureFilterMode::Bilinear:
+					filter = GL_LINEAR;
+					break;
+			}
+
+			GLenum wrap = GL_REPEAT;
+			switch (wrapMode)
+			{
+				case TextureWrapMode::Repeat:
+					wrap = GL_REPEAT;
+					break;
+
+				case TextureWrapMode::Mirrored:
+					wrap = GL_MIRRORED_REPEAT;
+					break;
+
+				case TextureWrapMode::ClampToEdge:
+					wrap = GL_CLAMP_TO_EDGE;
+					break;
+
+				case TextureWrapMode::ClampToBorder:
+					wrap = GL_CLAMP_TO_BORDER;
+					break;
+			}
+
+			glTextureParameteri(m_RendererID, GL_TEXTURE_MIN_FILTER, filter);
+			glTextureParameteri(m_RendererID, GL_TEXTURE_MAG_FILTER, filter);
+
+			glTextureParameteri(m_RendererID, GL_TEXTURE_WRAP_S, wrap);
+			glTextureParameteri(m_RendererID, GL_TEXTURE_WRAP_T, wrap);
+
+			glTextureSubImage2D(m_RendererID, 0, 0, 0, m_Width, m_Height, dataFormat, GL_UNSIGNED_BYTE, data);
+
+			stbi_image_free(data);
+		}
+	}
+
 	OpenGLTexture2D::~OpenGLTexture2D()
 	{
 		VS_PROFILE_FUNCTION();

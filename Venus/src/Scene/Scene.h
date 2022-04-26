@@ -33,6 +33,7 @@ namespace Venus {
 			void OnUpdateRuntime(Timestep ts);
 			void OnViewportResize(uint32_t width, uint32_t height);
 
+			Entity GetEntityByUUID(UUID uuid);
 			Entity GetPrimaryCamera();
 			
 			template<typename... Components>

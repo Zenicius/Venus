@@ -2,6 +2,7 @@
 #include "Scene.h"
 
 #include "Entity.h"
+#include "Scripting/ScriptableEntity.h"
 #include "Components.h"
 #include "Renderer/Renderer2D.h"
 
@@ -93,73 +94,100 @@ namespace Venus {
 		CopyComponent<Rigidbody2DComponent>(destRegistry, srcRegistry, enttMap);
 		CopyComponent<BoxCollider2DComponent>(destRegistry, srcRegistry, enttMap);
 		CopyComponent<CircleCollider2DComponent>(destRegistry, srcRegistry, enttMap);
+		CopyComponent<NativeScriptComponent>(destRegistry, srcRegistry, enttMap);
 
 		return newScene;
 	}
 
 	void Scene::OnRuntimeStart()
 	{
-		m_PhysicsWorld = new b2World({ 0.0f, -9.8f });
-
-		auto view = m_Registry.view<Rigidbody2DComponent>();
-		for (auto e : view)
+		// Physics
 		{
-			Entity entity = { e, this };
+			m_PhysicsWorld = new b2World({ 0.0f, -9.8f });
 
-			auto& transform = entity.GetComponent<TransformComponent>();
-			auto& rb = entity.GetComponent<Rigidbody2DComponent>();
-
-			b2BodyDef bodyDef;
-			bodyDef.type = Venus2DBodyTypeToBox2DType(rb.Type);
-			bodyDef.position.Set(transform.Position.x, transform.Position.y);
-			bodyDef.angle = transform.Rotation.z;
-
-			b2Body* body = m_PhysicsWorld->CreateBody(&bodyDef);;
-			body->SetFixedRotation(rb.FixedRotation);
-
-			rb.RuntimeBody = body;
-
-			if (entity.HasComponent<BoxCollider2DComponent>())
+			auto view = m_Registry.view<Rigidbody2DComponent>();
+			for (auto e : view)
 			{
-				auto& bc = entity.GetComponent<BoxCollider2DComponent>();
+				Entity entity = { e, this };
 
-				b2PolygonShape shape;
-				shape.SetAsBox(bc.Size.x * transform.Scale.x, bc.Size.y * transform.Scale.y);
+				auto& transform = entity.GetComponent<TransformComponent>();
+				auto& rb = entity.GetComponent<Rigidbody2DComponent>();
 
-				b2FixtureDef fixture;
-				fixture.shape = &shape;
-				fixture.density = bc.Density;
-				fixture.friction = bc.Friction;
-				fixture.restitution = bc.Restitution;
-				fixture.restitutionThreshold = bc.RestitutionThreshold;
+				b2BodyDef bodyDef;
+				bodyDef.type = Venus2DBodyTypeToBox2DType(rb.Type);
+				bodyDef.position.Set(transform.Position.x, transform.Position.y);
+				bodyDef.angle = transform.Rotation.z;
 
-				body->CreateFixture(&fixture);
+				b2Body* body = m_PhysicsWorld->CreateBody(&bodyDef);;
+				body->SetFixedRotation(rb.FixedRotation);
+
+				rb.RuntimeBody = body;
+
+				if (entity.HasComponent<BoxCollider2DComponent>())
+				{
+					auto& bc = entity.GetComponent<BoxCollider2DComponent>();
+
+					b2PolygonShape shape;
+					shape.SetAsBox(bc.Size.x * transform.Scale.x, bc.Size.y * transform.Scale.y);
+
+					b2FixtureDef fixture;
+					fixture.shape = &shape;
+					fixture.density = bc.Density;
+					fixture.friction = bc.Friction;
+					fixture.restitution = bc.Restitution;
+					fixture.restitutionThreshold = bc.RestitutionThreshold;
+
+					body->CreateFixture(&fixture);
+				}
+
+				else if (entity.HasComponent<CircleCollider2DComponent>())
+				{
+					auto& cc2d = entity.GetComponent<CircleCollider2DComponent>();
+
+					b2CircleShape circleShape;
+					circleShape.m_p.Set(cc2d.Offset.x, cc2d.Offset.y);
+					circleShape.m_radius = transform.Scale.x * cc2d.Radius;
+
+					b2FixtureDef fixture;
+					fixture.shape = &circleShape;
+					fixture.density = cc2d.Density;
+					fixture.friction = cc2d.Friction;
+					fixture.restitution = cc2d.Restitution;
+					fixture.restitutionThreshold = cc2d.RestitutionThreshold;
+
+					body->CreateFixture(&fixture);
+				}
 			}
+		}
 		
-			else if (entity.HasComponent<CircleCollider2DComponent>())
+		// Scripts
+		{
+			m_Registry.view<NativeScriptComponent>().each([=](auto entity, auto& nsc)
 			{
-				auto& cc2d = entity.GetComponent<CircleCollider2DComponent>();
-
-				b2CircleShape circleShape;
-				circleShape.m_p.Set(cc2d.Offset.x, cc2d.Offset.y);
-				circleShape.m_radius = transform.Scale.x * cc2d.Radius;
-
-				b2FixtureDef fixture;
-				fixture.shape = &circleShape;
-				fixture.density = cc2d.Density;
-				fixture.friction = cc2d.Friction;
-				fixture.restitution = cc2d.Restitution;
-				fixture.restitutionThreshold = cc2d.RestitutionThreshold;
-
-				body->CreateFixture(&fixture);
-			}
+				if (!nsc.Instance)
+				{
+					nsc.Instance = nsc.InstantiateScript();
+					nsc.Instance->m_Entity = Entity{ entity, this };
+					nsc.Instance->OnCreate();
+				}
+			});
 		}
 	}
 
 	void Scene::OnRuntimeStop()
 	{
+		// Physics
 		delete m_PhysicsWorld;
 		m_PhysicsWorld = nullptr;
+
+		// Scripts
+		m_Registry.view<NativeScriptComponent>().each([=](auto entity, auto& nsc)
+		{
+			if (nsc.Instance)
+			{
+				nsc.DestroyScript(&nsc);
+			}
+		});
 	}
 
 	Entity Scene::CreateEntity(const std::string& name)
@@ -224,6 +252,7 @@ namespace Venus {
 				Renderer2D::DrawCircle(transform.GetTransform(), circle.Color, circle.Thickness, circle.Fade, (int)entity);
 			}
 		}
+
 		Renderer2D::EndScene();
 	}
 
@@ -248,6 +277,14 @@ namespace Venus {
 			transform.Rotation.z = body->GetAngle();
 		}
 
+		// Scripts
+		m_Registry.view<NativeScriptComponent>().each([=](auto entity, auto& nsc)
+		{
+			if (nsc.Instance)
+			{
+				nsc.Instance->OnUpdate(ts);
+			}
+		});
 
 		// Get Main Camera
 		Camera* mainCamera = nullptr;
@@ -308,6 +345,20 @@ namespace Venus {
 			if (!cameraComponent.FixedAspectRatio)
 				cameraComponent.Camera.SetViewportSize(width, height);
 		}
+	}
+
+	Entity Scene::GetEntityByUUID(UUID uuid)
+	{
+		auto view = m_Registry.view<IDComponent>();
+		for (auto entity : view)
+		{
+			const auto& id = view.get<IDComponent>(entity).ID;
+			
+			if (uuid == id)
+				return Entity{ entity, this };
+		}
+
+		return {};
 	}
 
 	Entity Scene::GetPrimaryCamera()
@@ -375,4 +426,8 @@ namespace Venus {
 	{
 	}
 
+	template<>
+	void Scene::OnComponentAdded<NativeScriptComponent>(Entity entity, NativeScriptComponent& component)
+	{
+	}
 }
