@@ -3,6 +3,7 @@
 #include "Engine/UUID.h"
 #include "Scene/SceneCamera.h"
 #include "Renderer/Texture.h"
+#include "Renderer/Mesh.h"
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include "glm/glm.hpp"
@@ -134,19 +135,14 @@ namespace Venus {
 		CircleCollider2DComponent(const CircleCollider2DComponent&) = default;
 	};
 
-	class ScriptableEntity;
-	struct NativeScriptComponent
+	struct MeshRendererComponent 
 	{
-		ScriptableEntity* Instance = nullptr;
+		std::string ModelName = "None"; // Editor Only
+		std::string ModelPath = std::string(); // Internal Only
 
-		ScriptableEntity* (*InstantiateScript)();
-		void(*DestroyScript)(NativeScriptComponent*);
+		Ref<Model> Model;
 
-		template<typename T>
-		void Bind()
-		{
-			InstantiateScript = []() { return static_cast<ScriptableEntity*>(new T()); };
-			DestroyScript = [](NativeScriptComponent* nsc) { delete nsc->Instance; nsc->Instance = nullptr; };
-		}
+		MeshRendererComponent() = default;
+		MeshRendererComponent(const MeshRendererComponent&) = default;
 	};
 }

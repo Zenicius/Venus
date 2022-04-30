@@ -2,9 +2,9 @@
 #include "Scene.h"
 
 #include "Entity.h"
-#include "Scripting/ScriptableEntity.h"
 #include "Components.h"
 #include "Renderer/Renderer2D.h"
+#include "Renderer/Renderer.h"
 
 #include "box2d/b2_world.h"
 #include "box2d/b2_body.h"
@@ -94,7 +94,7 @@ namespace Venus {
 		CopyComponent<Rigidbody2DComponent>(destRegistry, srcRegistry, enttMap);
 		CopyComponent<BoxCollider2DComponent>(destRegistry, srcRegistry, enttMap);
 		CopyComponent<CircleCollider2DComponent>(destRegistry, srcRegistry, enttMap);
-		CopyComponent<NativeScriptComponent>(destRegistry, srcRegistry, enttMap);
+		CopyComponent<MeshRendererComponent>(destRegistry, srcRegistry, enttMap);
 
 		return newScene;
 	}
@@ -160,18 +160,6 @@ namespace Venus {
 			}
 		}
 		
-		// Scripts
-		{
-			m_Registry.view<NativeScriptComponent>().each([=](auto entity, auto& nsc)
-			{
-				if (!nsc.Instance)
-				{
-					nsc.Instance = nsc.InstantiateScript();
-					nsc.Instance->m_Entity = Entity{ entity, this };
-					nsc.Instance->OnCreate();
-				}
-			});
-		}
 	}
 
 	void Scene::OnRuntimeStop()
@@ -179,15 +167,6 @@ namespace Venus {
 		// Physics
 		delete m_PhysicsWorld;
 		m_PhysicsWorld = nullptr;
-
-		// Scripts
-		m_Registry.view<NativeScriptComponent>().each([=](auto entity, auto& nsc)
-		{
-			if (nsc.Instance)
-			{
-				nsc.DestroyScript(&nsc);
-			}
-		});
 	}
 
 	Entity Scene::CreateEntity(const std::string& name)
@@ -220,6 +199,7 @@ namespace Venus {
 		CopyComponentIfExists<Rigidbody2DComponent>(newEntity, entity);
 		CopyComponentIfExists<BoxCollider2DComponent>(newEntity, entity);
 		CopyComponentIfExists<CircleCollider2DComponent>(newEntity, entity);
+		CopyComponentIfExists<MeshRendererComponent>(newEntity, entity);
 
 		return newEntity;
 	}
@@ -231,8 +211,29 @@ namespace Venus {
 
 	void Scene::OnUpdateEditor(Timestep ts, EditorCamera& camera)
 	{
-		Renderer2D::BeginScene(camera);
+		Renderer::BeginScene(camera);
+
+		/////////////////////////////////////////////////////////////////////////////
+		// 3D ///////////////////////////////////////////////////////////////////////
+		/////////////////////////////////////////////////////////////////////////////
+
+		// Models
+		{
+			auto view = m_Registry.view<TransformComponent, MeshRendererComponent>();
+			for (auto entity : view)
+			{
+				auto [transform, model] = view.get<TransformComponent, MeshRendererComponent>(entity);
+
+				// TEMP Default Model to be added
+				if(!model.ModelPath.empty())
+					Renderer::SubmitModel(model.Model, transform.GetTransform(), (int)entity);
+			}
+		}
 		
+		/////////////////////////////////////////////////////////////////////////////
+		// 2D ///////////////////////////////////////////////////////////////////////
+		/////////////////////////////////////////////////////////////////////////////
+
 		// Quads
 		{
 			auto group = m_Registry.group<TransformComponent>(entt::get<SpriteRendererComponent>);
@@ -253,12 +254,12 @@ namespace Venus {
 			}
 		}
 
-		Renderer2D::EndScene();
+		Renderer::EndScene();
 	}
 
 	void Scene::OnUpdateRuntime(Timestep ts)
 	{	
-		// Physics
+		// 2D Physics
 		m_PhysicsWorld->Step(ts, m_VelocityIterations, m_PositionIterations);
 		
 		auto view = m_Registry.view<Rigidbody2DComponent>();
@@ -276,17 +277,8 @@ namespace Venus {
 			transform.Position.y = position.y;
 			transform.Rotation.z = body->GetAngle();
 		}
-
-		// Scripts
-		m_Registry.view<NativeScriptComponent>().each([=](auto entity, auto& nsc)
-		{
-			if (nsc.Instance)
-			{
-				nsc.Instance->OnUpdate(ts);
-			}
-		});
-
-		// Get Main Camera
+	
+		// Camera
 		Camera* mainCamera = nullptr;
 		glm::mat4 cameraTransform;
 		{
@@ -307,8 +299,29 @@ namespace Venus {
 		// Render
 		if (mainCamera)
 		{	
-			Renderer2D::BeginScene(*mainCamera, cameraTransform);
+			Renderer::BeginScene(*mainCamera, cameraTransform);
+
+			/////////////////////////////////////////////////////////////////////////////
+			// 3D ///////////////////////////////////////////////////////////////////////
+			/////////////////////////////////////////////////////////////////////////////
+
+			// Models
+			{
+				auto view = m_Registry.view<TransformComponent, MeshRendererComponent>();
+				for (auto entity : view)
+				{
+					auto [transform, model] = view.get<TransformComponent, MeshRendererComponent>(entity);
+
+					// TEMP Default Model to be added
+					if (!model.ModelPath.empty())
+						Renderer::SubmitModel(model.Model, transform.GetTransform(), (int)entity);
+				}
+			}
 			
+			/////////////////////////////////////////////////////////////////////////////
+			// 2D ///////////////////////////////////////////////////////////////////////
+			/////////////////////////////////////////////////////////////////////////////
+
 			// Quads
 			{
 				auto group = m_Registry.group<TransformComponent>(entt::get<SpriteRendererComponent>);
@@ -329,7 +342,7 @@ namespace Venus {
 				}
 			}
 
-			Renderer2D::EndScene();
+			Renderer::EndScene();
 		}
 	}
 
@@ -427,7 +440,7 @@ namespace Venus {
 	}
 
 	template<>
-	void Scene::OnComponentAdded<NativeScriptComponent>(Entity entity, NativeScriptComponent& component)
+	void Scene::OnComponentAdded<MeshRendererComponent>(Entity entity, MeshRendererComponent& component)
 	{
 	}
 }

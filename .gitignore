@@ -1,3 +1,7 @@
+# Cache files
+*.frag
+*.vert
+
 # User files
 *.sln
 *.vcxproj
@@ -42,5 +46,18 @@
 .vs/
 bin/
 bin-int/
+
+Venus/vendor/assimp
 Venus/vendor/VulkanSDK
 
+VenusEditor/assets/cache
+VenusEditor/assets/models
+VenusEditor/assets/prefabs
+VenusEditor/assets/fonts
+VenusEditor/assets/textures
+
+Sandbox/assets/cache
+Sandbox/assets/models
+Sandbox/assets/prefabs
+Sandbox/assets/fonts
+Sandbox/assets/textures

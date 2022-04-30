@@ -358,6 +358,7 @@ namespace Venus {
 
 		CORE_LOG_TRACE("Uniform buffers:");
 		*/
+
 		for (const auto& resource : resources.uniform_buffers)
 		{
 			const auto& bufferType = compiler.get_type(resource.base_type_id);

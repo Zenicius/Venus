@@ -1,15 +1,15 @@
 #include <Venus.h>
 #include <Engine/EntryPoint.h>
 
-#include "TestLayer.h"
+#include "DevLayer.h"
 
 class SandboxApp : public Venus::Application
 {
 	public:
 		SandboxApp(Venus::ApplicationCommandLineArgs args)
-			:Venus::Application("Venus - Sandbox")
+			:Venus::Application("Venus Engine")
 		{
-			PushLayer(new TestLayer());
+			PushLayer(new DevLayer());
 		}
 
 		~SandboxApp()

@@ -1,6 +1,5 @@
 #pragma once
 #include <Venus.h>
-#include <Box2D/include/box2d/b2_body.h>
 
 namespace Venus {
 

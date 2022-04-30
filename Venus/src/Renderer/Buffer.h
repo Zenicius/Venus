@@ -115,6 +115,7 @@ namespace Venus {
 
 			static Ref<VertexBuffer> Create(uint32_t size);
 			static Ref<VertexBuffer> Create(float* vertices, uint32_t size);
+			static Ref<VertexBuffer> Create(void* vertices, uint32_t size);
 	};
 
 	// Currently Venus only supports 32-bit index buffers

@@ -13,44 +13,55 @@ outputdir = "%{cfg.buildcfg}-%{cfg.system}-%{cfg.architecture}"
 
 VULKAN_SDK = os.getenv("VULKAN_SDK")
 
+-- INCLUDES
 -- Include directories relative to root folder (solution directory)
 IncludeDir = {}
 IncludeDir["Assimp"] = "Venus/vendor/assimp/include"
+IncludeDir["AssimpBuild"] = "Venus/vendor/assimp/build/include"
 IncludeDir["GLFW"] = "Venus/vendor/GLFW/include"
 IncludeDir["Glad"] = "Venus/vendor/Glad/include"
 IncludeDir["ImGui"] = "Venus/vendor/imgui"
 IncludeDir["glm"] = "Venus/vendor/glm"
 IncludeDir["stb_image"] = "Venus/vendor/stb_image"
-IncludeDir["shaderc"] = "Venus/vendor/shaderc/include"
-IncludeDir["SPIRV_Cross"] = "Venus/vendor/SPIRV-Cross"
 IncludeDir["VulkanSDK"] = "%{VULKAN_SDK}/Include"
 IncludeDir["entt"] = "Venus/vendor/entt/include"
 IncludeDir["yaml_cpp"] = "Venus/vendor/yaml-cpp/include"
 IncludeDir["ImGuizmo"] = "Venus/vendor/ImGuizmo"
 IncludeDir["Box2D"] = "Venus/vendor/Box2D/include"
 
+
+--LIBS
 LibraryDir = {}
 
+--DIRS
 LibraryDir["VulkanSDK"] = "%{VULKAN_SDK}/Lib"
 LibraryDir["VulkanSDK_Debug"] = "%{wks.location}/Venus/vendor/VulkanSDK/Lib"
 LibraryDir["VulkanSDK_DebugDLL"] = "%{wks.location}/Venus/vendor/VulkanSDK/Bin"
 
 Library = {}
-Library["Assimp_Debug"] = "Venus/vendor/assimp/bin/Debug/assimp-vc142-mtd.lib"
-Library["Assimp_Release"] = "Venus/vendor/assimp/bin/Release/assimp-vc142-mt.lib"
+-- assimp
+Library["Assimp_Debug"] = "%{wks.location}/Venus/vendor/assimp/build/lib/Debug/assimp-vc142-mtd.lib"
+Library["Assimp_Release"] = "%{wks.location}/Venus/vendor/assimp/build/lib/Release/assimp-vc142-mt.lib"
+
+-- Vulkan
 Library["Vulkan"] = "%{LibraryDir.VulkanSDK}/vulkan-1.lib"
 Library["VulkanUtils"] = "%{LibraryDir.VulkanSDK}/VkLayer_utils.lib"
+
+-- Debug
 Library["ShaderC_Debug"] = "%{LibraryDir.VulkanSDK_Debug}/shaderc_sharedd.lib"
 Library["SPIRV_Cross_Debug"] = "%{LibraryDir.VulkanSDK_Debug}/spirv-cross-cored.lib"
 Library["SPIRV_Cross_GLSL_Debug"] = "%{LibraryDir.VulkanSDK_Debug}/spirv-cross-glsld.lib"
 Library["SPIRV_Tools_Debug"] = "%{LibraryDir.VulkanSDK_Debug}/SPIRV-Toolsd.lib"
+
+-- Release
 Library["ShaderC_Release"] = "%{LibraryDir.VulkanSDK}/shaderc_shared.lib"
 Library["SPIRV_Cross_Release"] = "%{LibraryDir.VulkanSDK}/spirv-cross-core.lib"
 Library["SPIRV_Cross_GLSL_Release"] = "%{LibraryDir.VulkanSDK}/spirv-cross-glsl.lib"
 
+--BINS
 Binaries = {}
-Binaries["Assimp_Debug"] = "Venus/vendor/assimp/bin/Debug/assimp-vc142-mtd.dll"
-Binaries["Assimp_Release"] = "Venus/vendor/assimp/bin/Release/assimp-vc142-mt.dll"
+Binaries["Assimp_Debug"] = "%{wks.location}/Venus/vendor/assimp/build/bin/Debug/assimp-vc142-mtd.dll"
+Binaries["Assimp_Release"] = "%{wks.location}/Venus/vendor/assimp/build/bin/Release/assimp-vc142-mt.dll"
 
 group "Dependencies"
 	include "Venus/vendor/GLFW"
@@ -76,14 +87,18 @@ project "Venus"
 
 	files
 	{
-		"%{prj.name}/src/**.h",
+		"%{prj.name}/src/**.h", 
+		"%{prj.name}/src/**.c", 
+		"%{prj.name}/src/**.hpp", 
 		"%{prj.name}/src/**.cpp",
-		"%{prj.name}/vendor/glm/glm/**.hpp",
-		"%{prj.name}/vendor/glm/glm/**.inl",
-		"%{prj.name}/vendor/stb_image/**.h",
-		"%{prj.name}/vendor/stb_image/**.cpp",
-		"%{prj.name}/vendor/ImGuizmo/ImGuizmo.h",
-		"%{prj.name}/vendor/ImGuizmo/ImGuizmo.cpp"
+
+		"Venus/vendor/stb_image/**.h",
+		"Venus/vendor/stb_image/**.cpp",
+		"Venus/vendor/glm/glm/**.hpp",
+		"Venus/vendor/glm/glm/**.inl",
+
+		"Venus/vendor/ImGuizmo/ImGuizmo.h",
+		"Venus/vendor/ImGuizmo/ImGuizmo.cpp",
 	}
 
 	defines
@@ -94,7 +109,10 @@ project "Venus"
 
 	includedirs
 	{
+
 		"%{prj.name}/src",
+		"%{prj.name}/vendor",
+
 		"%{prj.name}/vendor/spdlog/include",
 		"%{IncludeDir.Assimp}",
 		"%{IncludeDir.GLFW}",
@@ -119,7 +137,7 @@ project "Venus"
 		"opengl32.lib"
 	}
 
-	filter "files:%{prj.name}Venus/vendor/ImGuizmo/ImGuizmo.cpp"
+	filter "files:Venus/vendor/ImGuizmo/ImGuizmo.cpp"
 	flags { "NoPCH" }
 
 	filter "system:windows"
@@ -159,7 +177,6 @@ project "Venus"
 			"%{Library.ShaderC_Release}",
 			"%{Library.SPIRV_Cross_Release}",
 			"%{Library.SPIRV_Cross_GLSL_Release}"
-		
 		}
 
 -- VENUS EDITOR PROJECT
@@ -173,27 +190,33 @@ project "VenusEditor"
 	targetdir ("bin/" .. outputdir .. "/%{prj.name}")
 	objdir ("bin-int/" .. outputdir .. "/%{prj.name}")
 
+	links
+	{
+		"Venus"
+	}
+
 	files
 	{
-		"%{prj.name}/src/**.h",
+		"%{prj.name}/src/**.h", 
+		"%{prj.name}/src/**.c", 
+		"%{prj.name}/src/**.hpp", 
 		"%{prj.name}/src/**.cpp",
 	}
 
 	includedirs
 	{
+		"%{prj.name}/src",
+
 		"Venus/vendor/spdlog/include",
+		
 		"Venus/src",
 		"Venus/vendor",
+		
 		"%{IncludeDir.GLFW}",
 		"%{IncludeDir.Glad}",
 		"%{IncludeDir.glm}",
 		"%{IncludeDir.stb_image}",
 		"%{IncludeDir.entt}"
-	}
-
-	links
-	{
-		"Venus"
 	}
 
 	filter "system:windows"
@@ -204,9 +227,15 @@ project "VenusEditor"
 		runtime "Debug"
 		symbols "on"
 
+		links
+		{
+			"%{Library.Assimp_Debug}"
+		}
+
 		postbuildcommands
 		{
-			"{COPYDIR} \"%{LibraryDir.VulkanSDK_DebugDLL}\" \"%{cfg.targetdir}\""
+			"{COPYDIR} \"%{LibraryDir.VulkanSDK_DebugDLL}\" \"%{cfg.targetdir}\"",
+			'{COPY} "%{Binaries.Assimp_Debug}" "%{cfg.targetdir}"'
 		}
 
 	filter "configurations:Release"
@@ -214,10 +243,30 @@ project "VenusEditor"
 		runtime "Release"
 		optimize "on"
 
+		links
+		{
+			"%{Library.Assimp_Release}"
+		}
+
+		postbuildcommands 
+		{
+			'{COPY} "%{Binaries.Assimp_Release}" "%{cfg.targetdir}"'
+		}
+
 	filter "configurations:Dist"
 		defines "VS_DIST"
 		runtime "Release"
 		optimize "on"
+
+		links
+		{
+			"%{Library.Assimp_Release}"
+		}
+
+		postbuildcommands 
+		{
+			'{COPY} "%{Binaries.Assimp_Release}" "%{cfg.targetdir}"'
+		}
 
 
 -- SANDBOX PROJECT
@@ -231,27 +280,32 @@ project "Sandbox"
 	targetdir ("bin/" .. outputdir .. "/%{prj.name}")
 	objdir ("bin-int/" .. outputdir .. "/%{prj.name}")
 
+	links
+	{
+		"Venus"
+	}
+
 	files
 	{
-		"%{prj.name}/src/**.h",
-		"%{prj.name}/src/**.cpp",
+		"%{prj.name}/src/**.h", 
+		"%{prj.name}/src/**.c", 
+		"%{prj.name}/src/**.hpp", 
+		"%{prj.name}/src/**.cpp" 
 	}
 
 	includedirs
 	{
 		"Venus/vendor/spdlog/include",
+
+		"%{prj.name}/src",
 		"Venus/src",
 		"Venus/vendor",
+		
 		"%{IncludeDir.GLFW}",
 		"%{IncludeDir.Glad}",
 		"%{IncludeDir.glm}",
 		"%{IncludeDir.stb_image}",
 		"%{IncludeDir.entt}"
-	}
-
-	links
-	{
-		"Venus"
 	}
 
 	filter "system:windows"
@@ -262,9 +316,15 @@ project "Sandbox"
 		runtime "Debug"
 		symbols "on"
 
+		links
+		{
+			"%{Library.Assimp_Debug}"
+		}
+
 		postbuildcommands
 		{
-			"{COPYDIR} \"%{LibraryDir.VulkanSDK_DebugDLL}\" \"%{cfg.targetdir}\""
+			"{COPYDIR} \"%{LibraryDir.VulkanSDK_DebugDLL}\" \"%{cfg.targetdir}\"",
+			'{COPY} "%{Binaries.Assimp_Debug}" "%{cfg.targetdir}"'
 		}
 
 	filter "configurations:Release"
@@ -272,7 +332,27 @@ project "Sandbox"
 		runtime "Release"
 		optimize "on"
 
+		links
+		{
+			"%{Library.Assimp_Release}"
+		}
+
+		postbuildcommands 
+		{
+			'{COPY} "%{Binaries.Assimp_Release}" "%{cfg.targetdir}"'
+		}
+
 	filter "configurations:Dist"
 		defines "VS_DIST"
 		runtime "Release"
 		optimize "on"
+
+		links
+		{
+			"%{Library.Assimp_Release}"
+		}
+
+		postbuildcommands 
+		{
+			'{COPY} "%{Binaries.Assimp_Release}" "%{cfg.targetdir}"'
+		}

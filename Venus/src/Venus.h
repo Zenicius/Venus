@@ -27,9 +27,6 @@
 #include "Scene/Components.h"
 #include "Scene/SceneSerializer.h"
 
-// Scripting
-#include "Scene/Scripting/ScriptableEntity.h"
-
 // Renderer
 #include "Renderer/Renderer.h"
 #include "Renderer/Renderer2D.h"
@@ -42,10 +39,7 @@
 #include "Renderer/OrthographicCamera.h"
 #include "Renderer/OrthographicCameraController.h"
 #include "Renderer/EditorCamera.h"
-#include "Renderer/Particle/ParticleSystem.h"
-
-// Particles
-#include "Renderer/Particle/Particle.h"
+#include "Renderer/Mesh.h"
 
 // Utils
 #include "Utils/Random.h"

@@ -331,6 +331,15 @@ namespace Venus {
 				}
 			}
 
+			if (!m_SelectedEntity.HasComponent<MeshRendererComponent>())
+			{
+				if (ImGui::MenuItem("Mesh Renderer"))
+				{
+					m_SelectedEntity.AddComponent<MeshRendererComponent>();
+					ImGui::CloseCurrentPopup();
+				}
+			}
+
 			if (!m_SelectedEntity.HasComponent<SpriteRendererComponent>())
 			{
 				if (ImGui::MenuItem("Sprite Renderer"))
@@ -376,16 +385,6 @@ namespace Venus {
 				}
 			}
 
-			if (!m_SelectedEntity.HasComponent<NativeScriptComponent>())
-			{
-				if (ImGui::MenuItem("Native Script"))
-				{
-					m_SelectedEntity.AddComponent<NativeScriptComponent>();
-					ImGui::CloseCurrentPopup();
-				}
-			}
-
-
 			ImGui::EndPopup();
 		}
 
@@ -401,6 +400,29 @@ namespace Venus {
 			RenderVec3Control("Scale", component.Scale, 1.0f);
 		});
 
+		// Mesh Renderer Component
+		RenderComponent<MeshRendererComponent>(ICON_FA_CUBE  "  Mesh Renderer", entity, true, [](auto& component)
+		{
+			// Texture
+			ImGui::Columns(2);
+			ImGui::Text("Model");
+			ImGui::NextColumn();
+
+			// Model Open Dialog
+			if (ImGui::Button(component.ModelName.c_str(), ImVec2(100.0f, 0.0f)))
+			{
+				std::string filePath = FileDialogs::OpenFile("3D Object (*.obj, *.fbx)\0*.obj;*.fbx\0");
+				if (!filePath.empty())
+				{
+					std::filesystem::path modelPath = filePath;
+					component.Model = CreateRef<Model>(modelPath.string());
+					component.ModelName = modelPath.stem().string();
+					component.ModelPath = modelPath.string();
+				}
+			}
+
+			ImGui::Columns(1);
+		});
 
 		// Sprite Renderer Component
 		RenderComponent<SpriteRendererComponent>(ICON_FA_FILE_IMAGE_O "  Sprite Renderer", entity, true, [](auto& component)
@@ -576,12 +598,6 @@ namespace Venus {
 			ImGui::DragFloat("Friction", &component.Friction, 0.01f, 0.0f, 1.0f);
 			ImGui::DragFloat("Restitution", &component.Restitution, 0.01f, 0.0f, 1.0f);
 			ImGui::DragFloat("RestitutionThreshold", &component.RestitutionThreshold, 0.1f, 0.0f);
-		});
-
-		// Native Script Component
-		RenderComponent<NativeScriptComponent>(ICON_FA_CODE    "  Native Script", entity, true, [](auto& component)
-		{
-			ImGui::Text("Test");
 		});
 	}
 }

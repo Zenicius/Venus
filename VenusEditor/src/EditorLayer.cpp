@@ -598,13 +598,14 @@ namespace Venus {
 		m_SceneState = SceneState::Edit;
 	}
 
+	// TODO: Move to Scene?
 	void EditorLayer::OnOverlayRender()
 	{
 		switch (m_SceneState)
 		{
 			case SceneState::Edit:
 			{
-				Renderer2D::BeginScene(m_EditorCamera);
+				Renderer::BeginScene(m_EditorCamera);
 				break;
 			}
 
@@ -615,7 +616,7 @@ namespace Venus {
 				{
 					auto camera = cameraEntity.GetComponent<CameraComponent>().Camera;
 					auto transform = cameraEntity.GetComponent<TransformComponent>().GetTransform();
-					Renderer2D::BeginScene(camera, transform);
+					Renderer::BeginScene(camera, transform);
 				}
 				break;
 			}
@@ -694,7 +695,7 @@ namespace Venus {
 			Renderer2D::DrawRect(transform, { 0.2f, 0.3f, 0.9f, 1.0f });
 		}
 
-		Renderer2D::EndScene();
+		Renderer::EndScene();
 	}
 
 	void EditorLayer::UpdateWindowTitle(const std::string& sceneName)

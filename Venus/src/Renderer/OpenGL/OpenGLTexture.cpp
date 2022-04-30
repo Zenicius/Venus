@@ -73,6 +73,9 @@ namespace Venus {
 
 			stbi_image_free(data);
 		}
+		else
+			CORE_LOG_ERROR("Could not find texture: {0}", path);
+
 	}
 
 	OpenGLTexture2D::OpenGLTexture2D(const std::string& path, TextureFilterMode filterMode, TextureWrapMode wrapMode)
