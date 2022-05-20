@@ -22,6 +22,7 @@ namespace Venus {
 	{
 		m_Context = context;
 		m_SelectedEntity = {};
+		m_Context->SetEditorSelectedEntity(-1);
 	}
 
 	void ObjectsPanel::OnImGuiRender()
@@ -37,45 +38,75 @@ namespace Venus {
 
 		// Deselect entity by clicking blank spaces
 		if (ImGui::IsMouseDown(0) && ImGui::IsWindowHovered())
+		{
 			m_SelectedEntity = {};
+			m_Context->SetEditorSelectedEntity(-1);
+		}
 
 		// Create Menu by Right-Clicking at blank spaces
 		if (ImGui::BeginPopupContextWindow(0, 1, false))
 		{
-			// TEMP
-			if (ImGui::BeginMenu("Create"))
+
+			if (ImGui::MenuItem("Create Empty"))
 			{
-				if (ImGui::MenuItem("Empty Object"))
+				auto entity = m_Context->CreateEntity();
+				m_SelectedEntity = entity;
+				m_Context->SetEditorSelectedEntity(entity);
+			}
+
+			if (ImGui::MenuItem("Create Camera"))
+			{
+				auto entity = m_Context->CreateEntity("Camera");
+				entity.AddComponent<CameraComponent>();
+				m_SelectedEntity = entity;
+				m_Context->SetEditorSelectedEntity(entity);
+			}
+
+			ImGui::Separator();
+
+			if (ImGui::BeginMenu("3D Objects"))
+			{
+				if (ImGui::MenuItem("Cube"))
 				{
-					auto entity = m_Context->CreateEntity();
+					auto entity = m_Context->CreateEntity("Cube");
+					entity.AddComponent<MeshRendererComponent>();
 					m_SelectedEntity = entity;
+					m_Context->SetEditorSelectedEntity(entity);
 				}
 
-				ImGui::Separator();
+				if (ImGui::MenuItem("Sphere"))
+				{
+					auto entity = m_Context->CreateEntity("Sphere");
+					auto& component = entity.AddComponent<MeshRendererComponent>();
 
+					component.Model = Factory::CreateSphere(1.0f);
+					component.ModelName = "Sphere";
+
+					m_SelectedEntity = entity;
+					m_Context->SetEditorSelectedEntity(entity);
+				}
+
+				ImGui::EndMenu();
+			}
+
+			ImGui::Separator();
+
+			if (ImGui::BeginMenu("2D Objects"))
+			{
 				if (ImGui::MenuItem("Sprite"))
 				{
 					auto entity = m_Context->CreateEntity("Sprite");
 					entity.AddComponent<SpriteRendererComponent>(glm::vec4{ 1.0f, 1.0f, 1.0f, 1.0f });
 					m_SelectedEntity = entity;
+					m_Context->SetEditorSelectedEntity(entity);
 				}
-
-				ImGui::Separator();
 
 				if (ImGui::MenuItem("Circle"))
 				{
 					auto entity = m_Context->CreateEntity("Circle");
 					entity.AddComponent<CircleRendererComponent>(glm::vec4{ 1.0f, 1.0f, 1.0f, 1.0f });
 					m_SelectedEntity = entity;
-				}
-
-				ImGui::Separator();
-
-				if (ImGui::MenuItem("Camera"))
-				{
-					auto entity = m_Context->CreateEntity("Camera");
-					entity.AddComponent<CameraComponent>();
-					m_SelectedEntity = entity;
+					m_Context->SetEditorSelectedEntity(entity);
 				}
 
 				ImGui::EndMenu();
@@ -121,7 +152,10 @@ namespace Venus {
 		if (ImGui::BeginPopupContextItem())
 		{
 			if (ImGui::MenuItem("Duplicate Entity"))
+			{
 				m_SelectedEntity = m_Context->DuplicateEntity(entity);
+				m_Context->SetEditorSelectedEntity(m_SelectedEntity);
+			}
 
 			ImGui::Separator();
 
@@ -142,6 +176,7 @@ namespace Venus {
 		if (ImGui::IsItemClicked())
 		{
 			m_SelectedEntity = entity;
+			m_Context->SetEditorSelectedEntity(entity);
 		}
 
 		if (open)
@@ -153,7 +188,10 @@ namespace Venus {
 		{
 			m_Context->DestroyEntity(entity);
 			if (m_SelectedEntity == entity)
+			{
 				m_SelectedEntity = {};
+				m_Context->SetEditorSelectedEntity(-1);
+			}
 		}
 	}
 
@@ -250,8 +288,7 @@ namespace Venus {
 			bool open = ImGui::TreeNodeEx((void*)typeid(T).hash_code(), treeNodeFlags, name.c_str());
 			ImGui::PopStyleVar();
 			
-			// Component Settings TEMP: Delete only
-
+			// Component Settings 
 			ImGui::SameLine(contentRegionAvail.x - lineHeight * 0.5f);
 			if (ImGui::Button(ICON_FA_COG, { lineHeight, lineHeight }))
 			{
@@ -586,7 +623,8 @@ namespace Venus {
 			ImGui::DragFloat("Density", &component.Density, 0.01f, 0.0f, 1.0f);
 			ImGui::DragFloat("Friction", &component.Friction, 0.01f, 0.0f, 1.0f);
 			ImGui::DragFloat("Restitution", &component.Restitution, 0.01f, 0.0f, 1.0f);
-			ImGui::DragFloat("RestitutionThreshold", &component.RestitutionThreshold, 0.1f, 0.0f);
+			ImGui::DragFloat("Threshold", &component.RestitutionThreshold, 0.1f, 0.0f);
+			ImGui::Checkbox("Show Area", &component.ShowArea);
 		});
 		
 		// CircleCollider2D Component
@@ -597,7 +635,8 @@ namespace Venus {
 			ImGui::DragFloat("Density", &component.Density, 0.01f, 0.0f, 1.0f);
 			ImGui::DragFloat("Friction", &component.Friction, 0.01f, 0.0f, 1.0f);
 			ImGui::DragFloat("Restitution", &component.Restitution, 0.01f, 0.0f, 1.0f);
-			ImGui::DragFloat("RestitutionThreshold", &component.RestitutionThreshold, 0.1f, 0.0f);
+			ImGui::DragFloat("Threshold", &component.RestitutionThreshold, 0.1f, 0.0f);
+			ImGui::Checkbox("Show Area", &component.ShowArea);
 		});
 	}
 }

@@ -17,17 +17,12 @@ namespace Venus {
 
 	void EditorLayer::OnAttach()
 	{
-		// Framebuffer
-		FramebufferSpecification fbSpec;
-		fbSpec.Attachments = { FramebufferTextureFormat::RGBA8, FramebufferTextureFormat::RED_INTEGER, FramebufferTextureFormat::Depth };
-		fbSpec.Width = 1280;
-		fbSpec.Height = 720;
-		m_Framebuffer = Framebuffer::Create(fbSpec);
-
 		// Scene
 		m_EditorScene = CreateRef<Scene>();		
 		m_ActiveScene = m_EditorScene;
 		m_EditorCamera = EditorCamera(30.0f, 1280.0f / 720.0f, 0.1f, 1000.0f);
+
+		m_SceneRenderer = CreateRef<SceneRenderer>(m_ActiveScene);
 
 		// Panels
 		m_ObjectsPanel.SetContext(m_ActiveScene);
@@ -47,43 +42,23 @@ namespace Venus {
 
 	void EditorLayer::OnUpdate(Timestep ts)
 	{
-		// Resize
-		if (FramebufferSpecification spec = m_Framebuffer->GetSpecification();
-			m_ViewportSize.x > 0.0f && m_ViewportSize.y > 0.0f && // zero sized framebuffer is invalid
-			(spec.Width != m_ViewportSize.x || spec.Height != m_ViewportSize.y))
-		{
-			m_Framebuffer->Resize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);
-			m_EditorCamera.SetViewportSize(m_ViewportSize.x, m_ViewportSize.y);
-			m_ActiveScene->OnViewportResize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);
-		}
-
 		// Render
-		Renderer2D::ResetStats();
-		m_Framebuffer->Bind();
-
-		RenderCommand::SetClearColor(m_ClearColor);
-		RenderCommand::Clear();
-		m_Framebuffer->ClearAttachment(1, -1);
-
 		switch (m_SceneState)
 		{
 			case SceneState::Edit:
 			{
 				m_EditorCamera.OnUpdate(ts);
-				m_ActiveScene->OnUpdateEditor(ts, m_EditorCamera);
+				m_ActiveScene->OnUpdateEditor(m_SceneRenderer, ts, m_EditorCamera);
 				break;
 			}
 			case SceneState::Play:
 			{
-				m_ActiveScene->OnUpdateRuntime(ts);
+				m_ActiveScene->OnUpdateRuntime(m_SceneRenderer, ts);
 				break;
 			}
-		}
+		} 
 
-		OnOverlayRender();
-		UpdateHoveredEntity();
-
-		m_Framebuffer->Unbind();
+		//UpdateHoveredEntity();
 	}
 
 	void EditorLayer::OnImGuiRender()
@@ -194,64 +169,77 @@ namespace Venus {
 				ImGui::EndMenu();
 			}
 
-			// Edit
-			if (ImGui::BeginMenu("Edit", false))
-			{
-
-				ImGui::EndMenu();
-			}
-
 			// Create 
 			if (ImGui::BeginMenu("Create"))
 			{
-				if (ImGui::MenuItem("Empty Object"))
+				if (ImGui::MenuItem("Create Empty"))
 				{
 					auto entity = m_ActiveScene->CreateEntity();
 					m_ObjectsPanel.SetSelectedEntity(entity);
+					m_ActiveScene->SetEditorSelectedEntity(entity);
 				}
 
-				ImGui::Separator();
-
-				if (ImGui::MenuItem("Sprite"))
-				{
-					auto entity = m_ActiveScene->CreateEntity("Sprite");
-					entity.AddComponent<SpriteRendererComponent>(glm::vec4{ 1.0f, 1.0f, 1.0f, 1.0f });
-					m_ObjectsPanel.SetSelectedEntity(entity);
-				}
-
-				ImGui::Separator();
-
-				if (ImGui::MenuItem("Circle"))
-				{
-					auto entity = m_ActiveScene->CreateEntity("Circle");
-					entity.AddComponent<CircleRendererComponent>(glm::vec4{ 1.0f, 1.0f, 1.0f, 1.0f });
-					m_ObjectsPanel.SetSelectedEntity(entity);
-				}
-
-				ImGui::Separator();
-
-				if (ImGui::MenuItem("Camera"))
+				if (ImGui::MenuItem("Create Camera"))
 				{
 					auto entity = m_ActiveScene->CreateEntity("Camera");
 					entity.AddComponent<CameraComponent>();
 					m_ObjectsPanel.SetSelectedEntity(entity);
+					m_ActiveScene->SetEditorSelectedEntity(entity);
+				}
+
+				ImGui::Separator();
+
+				if (ImGui::BeginMenu("3D Objects"))
+				{
+					if (ImGui::MenuItem("Cube"))
+					{
+						auto entity = m_ActiveScene->CreateEntity("Cube");
+						entity.AddComponent<MeshRendererComponent>();
+						m_ObjectsPanel.SetSelectedEntity(entity);
+						m_ActiveScene->SetEditorSelectedEntity(entity);
+					}
+
+					if (ImGui::MenuItem("Sphere"))
+					{
+						auto entity = m_ActiveScene->CreateEntity("Sphere");
+						auto& component = entity.AddComponent<MeshRendererComponent>();
+
+						component.Model = Factory::CreateSphere(1.0f);
+						component.ModelName = "Sphere";
+
+						m_ObjectsPanel.SetSelectedEntity(entity);
+						m_ActiveScene->SetEditorSelectedEntity(entity);
+					}
+
+					ImGui::EndMenu();
+				}
+
+				ImGui::Separator();
+
+				if (ImGui::BeginMenu("2D Objects"))
+				{
+					if (ImGui::MenuItem("Sprite"))
+					{
+						auto entity = m_ActiveScene->CreateEntity("Sprite");
+						entity.AddComponent<SpriteRendererComponent>(glm::vec4{ 1.0f, 1.0f, 1.0f, 1.0f });
+						m_ObjectsPanel.SetSelectedEntity(entity);
+						m_ActiveScene->SetEditorSelectedEntity(entity);
+					}
+
+					if (ImGui::MenuItem("Circle"))
+					{
+						auto entity = m_ActiveScene->CreateEntity("Circle");
+						entity.AddComponent<CircleRendererComponent>(glm::vec4{ 1.0f, 1.0f, 1.0f, 1.0f });
+						m_ObjectsPanel.SetSelectedEntity(entity);
+						m_ActiveScene->SetEditorSelectedEntity(entity);
+					}
+
+					ImGui::EndMenu();
 				}
 
 				ImGui::EndMenu();
 			}
 			
-			// View
-			if (ImGui::BeginMenu("View", false))
-			{
-				ImGui::EndMenu();
-			}
-
-			// Help
-			if (ImGui::BeginMenu("Help", false))
-			{
-				ImGui::EndMenu();
-			}
-
 			ImGui::EndMenuBar();
 		}
 	}
@@ -360,7 +348,13 @@ namespace Venus {
 		glm::vec2 viewportPanelSize = { ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y };
 		m_ViewportSize = viewportPanelSize;
 
-		uint32_t textureID = m_Framebuffer->GetColorAttachmentRendererID();
+		// Set Viewport Size
+		m_EditorCamera.SetViewportSize(m_ViewportSize.x, m_ViewportSize.y);
+		m_ActiveScene->OnViewportResize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);
+		m_SceneRenderer->SetViewportSize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);
+
+		// Viewport Image
+		uint32_t textureID = m_SceneRenderer->GetFinalImage();
 		ImGui::Image(reinterpret_cast<void*>(textureID), ImVec2{ m_ViewportSize.x, m_ViewportSize.y }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
 
 		// Viewport Drag and Drop
@@ -387,14 +381,21 @@ namespace Venus {
 				m_ObjectsPanel.SetSelectedEntity(entity);
 			}
 
-			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_FREFAB"))
+			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_MODEL"))
 			{
 				const wchar_t* path = (const wchar_t*)payload->Data;
-				// TODO Maybe move to function
-				SceneSerializer serializer(m_ActiveScene);
-				Entity entity = serializer.DeserializePrefab((std::filesystem::path(g_AssetPath) / path).string());
+				std::string name = std::filesystem::path(path).stem().string();
+				Entity entity = m_ActiveScene->CreateEntity(name);
+				auto& meshRenderer = entity.AddComponent<MeshRendererComponent>();
+
+				std::filesystem::path modelPath = std::filesystem::path(g_AssetPath) / path;
+				meshRenderer.Model = CreateRef<Model>(modelPath.string());
+				meshRenderer.ModelName = modelPath.stem().string();
+				meshRenderer.ModelPath = modelPath.string();
+
 				m_ObjectsPanel.SetSelectedEntity(entity);
 			}
+
 		}
 
 		// Gizmos TEMP
@@ -470,8 +471,6 @@ namespace Venus {
 		ImGui::Checkbox("Show Camera Icon", &m_ShowCameraIcon);
 		if (ImGui::Checkbox("Lock Camera Rotation", &m_CameraLocked))
 			m_EditorCamera.SetCameraLocked(m_CameraLocked);
-		ImGui::Checkbox("Show Physics Colliders in Editor", &m_ShowPhysicsColliderEditor);
-		ImGui::Checkbox("Show Physics Colliders in Runtime", &m_ShowPhysicsColliderRuntime);
 
 		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 20.0f);
 
@@ -598,106 +597,6 @@ namespace Venus {
 		m_SceneState = SceneState::Edit;
 	}
 
-	// TODO: Move to Scene?
-	void EditorLayer::OnOverlayRender()
-	{
-		switch (m_SceneState)
-		{
-			case SceneState::Edit:
-			{
-				Renderer::BeginScene(m_EditorCamera);
-				break;
-			}
-
-			case SceneState::Play:
-			{
-				Entity cameraEntity = m_ActiveScene->GetPrimaryCamera();
-				if (cameraEntity)
-				{
-					auto camera = cameraEntity.GetComponent<CameraComponent>().Camera;
-					auto transform = cameraEntity.GetComponent<TransformComponent>().GetTransform();
-					Renderer::BeginScene(camera, transform);
-				}
-				break;
-			}
-		}
-
-		// Physics Colliders
-		if ((m_SceneState == SceneState::Edit && m_ShowPhysicsColliderEditor) ||
-			(m_SceneState == SceneState::Play && m_ShowPhysicsColliderRuntime))
-		{
-			// Box Colliders
-			{
-				auto view = m_ActiveScene->GetAllEntitiesWith<TransformComponent, BoxCollider2DComponent>();
-				for (auto entity : view)
-				{
-					auto [tc, collider] = view.get<TransformComponent, BoxCollider2DComponent>(entity);
-
-					glm::vec3 translation = tc.Position + glm::vec3(collider.Offset, 0.001f);
-					glm::vec3 scale = tc.Scale * glm::vec3(collider.Size * 2.0f, 1.0f);
-
-					glm::mat4 transform = glm::translate(glm::mat4(1.0f), translation)
-						* glm::rotate(glm::mat4(1.0f), tc.Rotation.z, glm::vec3(0.0f, 0.0f, 1.0f))
-						* glm::scale(glm::mat4(1.0f), scale);
-
-					Renderer2D::DrawRect(transform, { 0.0f, 1.0f, 0.0f, 1.0f });
-				}
-			}
-
-			// Circles Colliders
-			{
-				auto view = m_ActiveScene->GetAllEntitiesWith<TransformComponent, CircleCollider2DComponent>();
-
-				float zIndex = 0.001f;
-				glm::vec3 cameraForwardDirection = m_EditorCamera.GetForwardDirection();
-				glm::vec3 projectionCollider = cameraForwardDirection * glm::vec3(zIndex);
-
-				for (auto entity : view)
-				{
-					auto [tc, collider] = view.get<TransformComponent, CircleCollider2DComponent>(entity);
-
-					glm::vec3 translation = tc.Position + glm::vec3(collider.Offset, -projectionCollider.z);
-					glm::vec3 scale = tc.Scale * glm::vec3(collider.Radius * 2.0f);
-
-					glm::mat4 transform = glm::translate(glm::mat4(1.0f), translation)
-						* glm::scale(glm::mat4(1.0f), scale);
-
-					Renderer2D::DrawCircle(transform, { 0.0f, 1.0f, 0.0f, 1.0f }, 0.05f);
-				}
-			}
-		}
-
-		// Camera Icon in Editor
-		if (m_SceneState != SceneState::Play && m_ShowCameraIcon)
-		{
-			auto view = m_ActiveScene->GetAllEntitiesWith<TransformComponent, CameraComponent>();
-			for (auto entity : view)
-			{
-				const auto& tc = view.get<TransformComponent>(entity);
-
-				Renderer2D::DrawQuad(tc.GetTransform(), m_SceneCameraIcon, 1.0f, glm::vec4(1.0f), (int)entity);
-			}
-		}
-
-		// Selected Entity in Editor
-		if (m_SceneState == SceneState::Edit && m_ObjectsPanel.GetSelectedEntity())
-		{
-			Entity entity = m_ObjectsPanel.GetSelectedEntity();
-			const auto& tc = entity.GetComponent<TransformComponent>();
-
-			glm::vec3 translation = tc.Position;
-			glm::vec3 scale = { tc.Scale.x + 0.1f, tc.Scale.y + 0.1f, tc.Scale.z };
-
-			glm::mat4 transform = glm::translate(glm::mat4(1.0f), translation)
-				* glm::toMat4(glm::quat(tc.Rotation))
-				* glm::scale(glm::mat4(1.0f), scale);
-
-			Renderer2D::DrawRect(transform, { 0.2f, 0.3f, 0.9f, 1.0f });
-		}
-
-		Renderer::EndScene();
-	}
-
 	void EditorLayer::UpdateWindowTitle(const std::string& sceneName)
 	{
 		std::string rendererApi = RendererAPI::GetAPIName();
@@ -714,11 +613,13 @@ namespace Venus {
 		int mouseX = (int)mx;
 		int mouseY = (int)my;
 
+		/*
 		if (mouseX >= 0 && mouseY >= 0 && mouseX < (int)viewportSize.x && mouseY < (int)viewportSize.y)
 		{
 			int pixelData = m_Framebuffer->ReadPixel(1, mouseX, mouseY);
 			m_HoveredEntity = pixelData == -1 ? Entity() : Entity((entt::entity)pixelData, m_ActiveScene.get());
 		}
+		*/
 	}
 
 	bool EditorLayer::OnKeyPressed(KeyPressedEvent& e)
@@ -807,6 +708,7 @@ namespace Venus {
 				if (m_ViewportHovered && !ImGuizmo::IsOver() && !Input::IsKeyPressed(Key::LeftShift))
 				{
 					m_ObjectsPanel.SetSelectedEntity(m_HoveredEntity);
+					m_ActiveScene->SetEditorSelectedEntity(m_HoveredEntity);
 				}
 			}
 		}

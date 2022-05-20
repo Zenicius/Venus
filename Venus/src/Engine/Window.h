@@ -12,11 +12,15 @@ namespace Venus {
 		std::string Title;
 		uint32_t Width;
 		uint32_t Height;
+		bool Vsync;
+		bool Fullscreen;
 
 		WindowProps(const std::string& title = "Venus Engine",
 			uint32_t width = 1600,
-			uint32_t height = 900)
-			: Title(title), Width(width), Height(height)
+			uint32_t height = 900,
+			bool vSync = true,
+			bool fullscreen = true)
+			: Title(title), Width(width), Height(height), Vsync(vSync), Fullscreen(fullscreen)
 		{
 		}
 	};
@@ -39,6 +43,7 @@ namespace Venus {
 			virtual void SetVSync(bool enabled) = 0;
 			virtual bool IsVSync() const = 0;
 			virtual void SetWindowTitle(const std::string& title) = 0;
+			virtual void Maximize() = 0;
 
 			virtual void* GetNativeWindow() const = 0;
 

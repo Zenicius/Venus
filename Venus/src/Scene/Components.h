@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Engine/UUID.h"
+#include "Scene/Factory.h"
 #include "Scene/SceneCamera.h"
 #include "Renderer/Texture.h"
 #include "Renderer/Mesh.h"
@@ -111,8 +112,9 @@ namespace Venus {
 		float Density = 1.0f;
 		float Friction = 0.5f;
 		float Restitution = 0.0f;
-		float RestitutionThreshold = 0.5f;
+		float RestitutionThreshold = 0.5f;	
 
+		bool ShowArea = false; // Editor Only
 		void* RuntimeFixture = nullptr; // Runtime Only
 
 		BoxCollider2DComponent() = default;
@@ -129,6 +131,7 @@ namespace Venus {
 		float Restitution = 0.0f;
 		float RestitutionThreshold = 0.5f;
 
+		bool ShowArea = false; // Editor Only
 		void* RuntimeFixture = nullptr; // Runtime Only
 
 		CircleCollider2DComponent() = default;
@@ -137,10 +140,10 @@ namespace Venus {
 
 	struct MeshRendererComponent 
 	{
-		std::string ModelName = "None"; // Editor Only
+		std::string ModelName = "Cube"; // Editor Only
 		std::string ModelPath = std::string(); // Internal Only
 
-		Ref<Model> Model;
+		Ref<Model> Model = Factory::CreateCube(glm::vec3(1.0f));
 
 		MeshRendererComponent() = default;
 		MeshRendererComponent(const MeshRendererComponent&) = default;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Venus.h>
+
 #include "Panels/ObjectsPanel.h"
 #include "Panels/AssetBrowserPanel.h"
 #include "Panels/RendererStatsPanel.h"
@@ -28,7 +29,6 @@ namespace Venus {
 
 			void OnScenePlay();
 			void OnSceneStop();
-			void OnOverlayRender();
 
 			bool OnKeyPressed(KeyPressedEvent& e);
 			bool OnMouseButtonPressed(MouseButtonPressedEvent& e);
@@ -60,14 +60,13 @@ namespace Venus {
 			Ref<Texture2D> m_GizmosPositionIcon, m_GizmosRotationIcon, m_GizmosScaleIcon;
 			Ref<Texture2D> m_SceneCameraIcon;
 
-			// Framebuffer
-			Ref<Framebuffer> m_Framebuffer;
-
 			// Scenes
 			SceneState m_SceneState = SceneState::Edit;
 
 			Ref<Scene> m_ActiveScene;
 			Ref<Scene> m_EditorScene, m_RuntimeScene;
+
+			Ref<SceneRenderer> m_SceneRenderer;
 
 			EditorCamera m_EditorCamera;
 			Entity m_HoveredEntity;
@@ -85,8 +84,6 @@ namespace Venus {
 
 			// Editor Settings
 			bool m_ShowWelcomeMessage = false;
-			bool m_ShowPhysicsColliderEditor = true;
-			bool m_ShowPhysicsColliderRuntime = false;
 			bool m_ShowCameraIcon = true;
 	};
 }

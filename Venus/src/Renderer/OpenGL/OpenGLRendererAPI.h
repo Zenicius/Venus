@@ -13,6 +13,18 @@ namespace Venus {
 			virtual void SetClearColor(const glm::vec4& color) override;
 			virtual void Clear() override;
 
+			virtual void DisableStencilTest() override;
+			virtual void EnableStencilTest() override;
+			virtual void DisableStencilWrite() override;
+			virtual void EnableStencilWrite() override;
+			virtual void DisableDepthTest() override;
+			virtual void EnableDepthTest() override;
+			virtual void SetStencilTest(int function, int value, int mask) override;
+
+			// TEMP
+			virtual void BindTexture(int textureID) override;
+			virtual void BindFramebuffer(int framebufferID) override;
+
 			virtual void DrawIndexed(const Ref<VertexArray>& vertexArray, uint32_t indexCount = 0) override;
 			virtual void DrawLines(const Ref<VertexArray>& vertexArray, uint32_t vertexCount) override;
 

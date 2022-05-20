@@ -13,7 +13,10 @@ layout(location = 4) in vec2 a_TexCoord;
 // Uniforms
 layout(std140, binding = 0) uniform Camera
 {
-	mat4 u_ViewProjection;
+	mat4 u_ViewMatrix;
+	mat4 u_ProjectionMatrix;
+	mat4 u_ViewProjectionMatrix;
+	vec3 u_Position;
 };
 
 layout(std140, binding = 1) uniform Model
@@ -41,7 +44,7 @@ void main()
 
 	v_EntityID = u_EntityID;
 
-	gl_Position = u_ViewProjection * vec4(Output.WorldPosition, 1.0);
+	gl_Position = u_ViewProjectionMatrix * vec4(Output.WorldPosition, 1.0);
 }
 
 #type fragment

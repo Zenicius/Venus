@@ -189,6 +189,19 @@ namespace Venus {
 			out << YAML::EndMap;
 		}
 
+		// SpriteRendererComponent
+		if (entity.HasComponent<MeshRendererComponent>())
+		{
+			out << YAML::Key << "MeshRendererComponent";
+			out << YAML::BeginMap;
+
+			auto& meshRendererComponent = entity.GetComponent<MeshRendererComponent>();
+			out << YAML::Key << "Name" << YAML::Value << meshRendererComponent.ModelName;
+			out << YAML::Key << "Path" << YAML::Value << meshRendererComponent.ModelPath;
+
+			out << YAML::EndMap;
+		}
+
 		// CircleRendererComponent
 		if (entity.HasComponent<CircleRendererComponent>())
 		{
@@ -272,21 +285,6 @@ namespace Venus {
 		std::ofstream fout(filepath);
 		fout << out.c_str();
 		fout.close();
-	}
-
-	void SceneSerializer::SerializePrefab(UUID id, const std::string& filepath)
-	{
-		Entity entity = m_Scene->GetEntityByUUID(id);
-		if (entity)
-		{
-			std::string name = entity.GetComponent<TagComponent>().Name;
-			YAML::Emitter out;
-			SerializeEntity(out, entity);
-
-			std::ofstream fout(filepath + "/" + name + ".vspfab");
-			fout << out.c_str();
-			fout.close();
-		}
 	}
 
 	void SceneSerializer::SerializeRuntime(const std::string& filepath)
@@ -376,6 +374,23 @@ namespace Venus {
 						src.TexturePath = texturePath;
 						src.Texture = Texture2D::Create(texturePath);
 					}
+				}
+
+				// MeshRendererComponent
+				auto mRComponent = entity["MeshRendererComponent"];
+				if (mRComponent)
+				{
+					auto& meshRenderer = deserializedEntity.AddComponent<MeshRendererComponent>();
+					meshRenderer.ModelName = mRComponent["Name"].as<std::string>();
+					std::string modelPath = mRComponent["Path"].as<std::string>();
+
+					if (!modelPath.empty())
+					{
+						meshRenderer.ModelPath = modelPath;
+						meshRenderer.Model = CreateRef<Model>(modelPath);
+					}
+					else if(meshRenderer.ModelName.compare("Sphere") == 0)
+						meshRenderer.Model = Factory::CreateSphere(1.0f);
 				}
 
 				// CircleRendererComponent

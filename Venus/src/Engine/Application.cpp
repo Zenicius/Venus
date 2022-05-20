@@ -17,9 +17,10 @@ namespace Venus {
 		: m_CommandLineArgs(args)
 	{
 		VS_PROFILE_FUNCTION();
-
 		VS_CORE_ASSERT(!s_Instance, "Application already exists!");
+		
 		s_Instance = this;
+
 		m_Window = Window::Create(WindowProps(name));
 		m_Window->SetEventCallback(VS_BIND_EVENT_FN(Application::OnEvent));
 

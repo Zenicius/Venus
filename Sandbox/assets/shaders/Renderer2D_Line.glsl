@@ -9,7 +9,10 @@ layout(location = 2) in int a_EntityID;
 
 layout(std140, binding = 0) uniform Camera
 {
-	mat4 u_ViewProjection;
+	mat4 u_ViewMatrix;
+	mat4 u_ProjectionMatrix;
+	mat4 u_ViewProjectionMatrix;
+	vec3 u_Position;
 };
 
 struct VertexOutput
@@ -25,7 +28,7 @@ void main()
 	Output.Color = a_Color;
 	v_EntityID = a_EntityID;
 
-	gl_Position = u_ViewProjection * vec4(a_Position, 1.0);
+	gl_Position = u_ViewProjectionMatrix * vec4(a_Position, 1.0);
 }
 
 #type fragment

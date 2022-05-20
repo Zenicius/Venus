@@ -69,7 +69,6 @@ namespace Venus {
 			switch (element.Type)
 			{
 				case ShaderDataType::Float:
-				case ShaderDataType::Float2:
 				{
 					glEnableVertexAttribArray(m_VertexBufferIndex);
 					glVertexAttribPointer(m_VertexBufferIndex,
@@ -80,6 +79,17 @@ namespace Venus {
 						(const void*)element.Offset);
 					m_VertexBufferIndex++;
 					break;
+				}
+				case ShaderDataType::Float2:
+				{
+					glEnableVertexAttribArray(m_VertexBufferIndex);
+					glVertexAttribPointer(m_VertexBufferIndex,
+						element.GetComponentCount(),
+						ShaderDataTypeToOpenGLBaseType(element.Type),
+						element.Normalized ? GL_TRUE : GL_FALSE,
+						layout.GetStride(),
+						(const void*)element.Offset);
+					m_VertexBufferIndex++;
 					break;
 				}
 				case ShaderDataType::Float3:

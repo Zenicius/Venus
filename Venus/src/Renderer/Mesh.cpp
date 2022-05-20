@@ -1,6 +1,8 @@
 #include "pch.h"
 #include "Mesh.h"
 
+#include "Engine/Timer.h"
+
 #include "glad/glad.h"
 
 #include <assimp/scene.h>
@@ -58,6 +60,8 @@ namespace Venus {
 
 	void Model::LoadModel()
 	{
+		Timer timer;
+
 		Assimp::Importer importer;
 		const aiScene* scene = importer.ReadFile(m_Path, aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_FlipUVs | aiProcess_CalcTangentSpace);
 
@@ -68,6 +72,8 @@ namespace Venus {
 			CORE_LOG_TRACE("Loading Model: {0}", m_Path);
 			ProcessNode(scene->mRootNode, scene);
 		}
+
+		CORE_LOG_WARN("Model {0} loading took: {1} ms", m_Path, timer.ElapsedMillis());
 	}
 
 	void Model::Init()
@@ -184,7 +190,7 @@ namespace Venus {
 
 		std::vector<MaterialTexture> normalMaps = LoadMaterialTextures(material, TextureType::Normal);
 		textures.insert(textures.end(), normalMaps.begin(), normalMaps.end());
-
+		
 		return Mesh(vertices, indices, textures);
 	}
 
@@ -216,7 +222,7 @@ namespace Venus {
 			case TextureType::Specular:	return aiTextureType::aiTextureType_SPECULAR;
 		}
 
-		VS_CORE_ASSERT(false, "Unknown 2D Body type");
+		VS_CORE_ASSERT(false, "Unknown Material Texture Type");
 		return aiTextureType::aiTextureType_NONE;
 	}
 

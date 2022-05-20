@@ -76,7 +76,7 @@ namespace Venus {
 			void ProcessNode(aiNode* node, const aiScene* scene);
 			Mesh ProcessMesh(aiMesh* mesh, const aiScene* scene);
 
-			std::vector<MaterialTexture> Model::LoadMaterialTextures(aiMaterial* material, TextureType type);
+			std::vector<MaterialTexture> LoadMaterialTextures(aiMaterial* material, TextureType type);
 
 			std::vector<Mesh> m_Meshes;
 			std::vector<Ref<Texture2D>> m_DiffuseMaps;
@@ -86,6 +86,7 @@ namespace Venus {
 			std::string m_Path;
 
 			friend class Renderer;
+			friend class Factory;
 	};
 
 }

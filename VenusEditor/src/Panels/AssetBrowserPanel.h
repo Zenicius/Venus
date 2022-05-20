@@ -12,7 +12,8 @@ namespace Venus {
 		Texture,
 		Font,
 		Scene,
-		Prefab,
+		Model,
+		Script,
 		Other
 	};
 
@@ -67,7 +68,8 @@ namespace Venus {
 			Ref<Texture2D> m_TextureIcon;
 			Ref<Texture2D> m_SceneIcon;
 			Ref<Texture2D> m_FontIcon;
-			Ref<Texture2D> m_PrefabIcon;
+		    Ref<Texture2D> m_ModelIcon;
+		    Ref<Texture2D> m_ScriptIcon;
 	};
 
 }

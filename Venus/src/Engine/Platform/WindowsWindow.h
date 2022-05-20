@@ -23,6 +23,7 @@ namespace Venus {
 			void SetVSync(bool enabled) override;
 			bool IsVSync() const override;
 			void SetWindowTitle(const std::string& title) override { glfwSetWindowTitle(m_Window, title.c_str()); }
+			void Maximize() override;
 
 			virtual void* GetNativeWindow() const { return m_Window; }
 

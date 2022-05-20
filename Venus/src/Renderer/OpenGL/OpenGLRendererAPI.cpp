@@ -41,6 +41,7 @@ namespace Venus {
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 		glEnable(GL_DEPTH_TEST);
+
 		glEnable(GL_LINE_SMOOTH);
 	}
 
@@ -56,7 +57,54 @@ namespace Venus {
 
 	void OpenGLRendererAPI::Clear()
 	{
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+	}
+
+	void OpenGLRendererAPI::DisableStencilTest()
+	{
+		glDisable(GL_STENCIL_TEST);
+	}
+
+	void OpenGLRendererAPI::EnableStencilTest()
+	{
+		glEnable(GL_STENCIL_TEST);
+		glStencilOp(GL_KEEP, GL_REPLACE, GL_REPLACE);
+	}
+
+	void OpenGLRendererAPI::DisableStencilWrite()
+	{
+		glStencilMask(0x00);
+	}
+
+	void OpenGLRendererAPI::EnableStencilWrite()
+	{
+		glStencilMask(0xFF);
+	}
+
+	void OpenGLRendererAPI::DisableDepthTest()
+	{
+		glDisable(GL_DEPTH_TEST);
+	}
+
+	void OpenGLRendererAPI::EnableDepthTest()
+	{
+		glEnable(GL_DEPTH_TEST);
+	}
+
+	void OpenGLRendererAPI::SetStencilTest(int function, int value, int mask)
+	{
+		glStencilFunc((GLenum)function, value, mask);
+	}
+
+	void OpenGLRendererAPI::BindTexture(int textureID)
+	{
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, textureID);
+	}
+
+	void OpenGLRendererAPI::BindFramebuffer(int framebufferID)
+	{
+		glBindFramebuffer(GL_FRAMEBUFFER, framebufferID);
 	}
 
 	void OpenGLRendererAPI::DrawIndexed(const Ref<VertexArray>& vertexArray, uint32_t indexCount)

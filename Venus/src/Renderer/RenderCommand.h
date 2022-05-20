@@ -27,6 +27,58 @@ namespace Venus {
 				s_RendererAPI->Clear();
 			}
 
+			static void DisableStencilTest()
+			{
+				s_RendererAPI->DisableStencilTest();
+			}
+
+			static void EnableStencilTest()
+			{
+				s_RendererAPI->EnableStencilTest();
+			}
+
+			static void DisableStencilWrite()
+			{
+				s_RendererAPI->DisableStencilWrite();
+			}
+
+			static void EnableStencilWrite()
+			{
+				s_RendererAPI->EnableStencilWrite();
+			}
+
+			static void DisableDepthTest()
+			{
+				s_RendererAPI->DisableDepthTest();
+			}
+
+			static void EnableDepthTest()
+			{
+				s_RendererAPI->EnableDepthTest();
+			}
+
+			static void SetStencilTest(int function, int value, int mask)
+			{
+				s_RendererAPI->SetStencilTest(function, value, mask);
+			}
+
+			static void SetLineWidth(float width)
+			{
+				s_RendererAPI->SetLineWidth(width);
+			}
+
+			// TEMP
+			static void BindTexture(int textureID)
+			{
+				s_RendererAPI->BindTexture(textureID);
+			}
+			
+			// TEMP
+			static void BindFramebuffer(int framebufferID)
+			{
+				s_RendererAPI->BindFramebuffer(framebufferID);
+			}
+
 			static void DrawIndexed(const Ref<VertexArray>& vertexArray, uint32_t indexCount = 0)
 			{
 				s_RendererAPI->DrawIndexed(vertexArray, indexCount);
@@ -35,11 +87,6 @@ namespace Venus {
 			static void DrawLines(const Ref<VertexArray>& vertexArray, uint32_t vertexCount)
 			{
 				s_RendererAPI->DrawLines(vertexArray, vertexCount);
-			}
-
-			static void SetLineWidth(float width)
-			{
-				s_RendererAPI->SetLineWidth(width);
 			}
 
 		private:

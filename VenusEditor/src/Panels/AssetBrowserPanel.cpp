@@ -16,10 +16,11 @@ namespace Venus {
 		m_FowardIcon = Texture2D::Create(s_IconsPath + "/foward.png");
 		m_SearchIcon = Texture2D::Create(s_IconsPath + "/search.png");
 		m_SettingsIcon = Texture2D::Create(s_IconsPath + "/settings.png");
-		m_TextureIcon = Texture2D::Create(s_IconsPath + "/file.png");
-		m_SceneIcon = Texture2D::Create(s_IconsPath + "/file.png");
-		m_FontIcon = Texture2D::Create(s_IconsPath + "/file.png");
-		m_PrefabIcon = Texture2D::Create(s_IconsPath + "/file.png");
+		m_TextureIcon = Texture2D::Create(s_IconsPath + "/texture.png");
+		m_SceneIcon = Texture2D::Create(s_IconsPath + "/scene.png");
+		m_FontIcon = Texture2D::Create(s_IconsPath + "/font.png");
+		m_ModelIcon = Texture2D::Create(s_IconsPath + "/model.png");
+		m_ScriptIcon = Texture2D::Create(s_IconsPath + "/script.png");
 	}
 
 	void AssetBrowserPanel::SetContext(const Ref<Scene>& context)
@@ -101,6 +102,12 @@ namespace Venus {
 					else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_FONT"))
 						MoveFileFromPayload(payload, entry.path());
 
+					else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_MODEL"))
+						MoveFileFromPayload(payload, entry.path());
+
+					else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_SCRIPT"))
+						MoveFileFromPayload(payload, entry.path());
+
 					else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_OTHER"))
 						MoveFileFromPayload(payload, entry.path());
 				}
@@ -154,8 +161,11 @@ namespace Venus {
 				case AssetType::Scene:
 					icon = m_SceneIcon;
 					break;
-				case AssetType::Prefab:
-					icon = m_PrefabIcon;
+				case AssetType::Model:
+					icon = m_ModelIcon;
+					break;
+				case AssetType::Script:
+					icon = m_ScriptIcon;
 					break;
 				case AssetType::Other:
 					icon = m_FileIcon;
@@ -263,17 +273,24 @@ namespace Venus {
 					break;
 				}
 
-				case AssetType::Prefab:
-				{
-					const wchar_t* filePath = relativePath.c_str();
-					ImGui::SetDragDropPayload("ASSET_PREFAB", filePath, (wcslen(filePath) + 1) * sizeof(wchar_t));
-					break;
-				}
-
 				case AssetType::Font:
 				{
 					const wchar_t* filePath = relativePath.c_str();
 					ImGui::SetDragDropPayload("ASSET_FONT", filePath, (wcslen(filePath) + 1) * sizeof(wchar_t));
+					break;
+				}
+
+				case AssetType::Model:
+				{
+					const wchar_t* filePath = relativePath.c_str();
+					ImGui::SetDragDropPayload("ASSET_MODEL", filePath, (wcslen(filePath) + 1) * sizeof(wchar_t));
+					break;
+				}
+
+				case AssetType::Script:
+				{
+					const wchar_t* filePath = relativePath.c_str();
+					ImGui::SetDragDropPayload("ASSET_SCRIPT", filePath, (wcslen(filePath) + 1) * sizeof(wchar_t));
 					break;
 				}
 
@@ -298,10 +315,13 @@ namespace Venus {
 				else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_SCENE"))
 					MoveFileFromPayload(payload, asset.path());
 
-				else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PREFAB"))
+				else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_FONT"))
 					MoveFileFromPayload(payload, asset.path());
 
-				else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_FONT"))
+				else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_MODEL"))
+					MoveFileFromPayload(payload, asset.path());
+
+				else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_SCRIPT"))
 					MoveFileFromPayload(payload, asset.path());
 
 				else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_OTHER"))
@@ -540,10 +560,13 @@ namespace Venus {
 			else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_SCENE"))
 				MoveFileFromPayload(payload, g_AssetPath);
 
-			else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PREFAB"))
+			else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_FONT"))
 				MoveFileFromPayload(payload, g_AssetPath);
 
-			else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_FONT"))
+			else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_MODEL"))
+				MoveFileFromPayload(payload, g_AssetPath);
+
+			else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_SCRIPT"))
 				MoveFileFromPayload(payload, g_AssetPath);
 
 			else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_OTHER"))
@@ -571,7 +594,7 @@ namespace Venus {
 	
 		ImGui::End();
 
-		OnAssetEditorRender();
+		//OnAssetEditorRender();
 	}
 
 	AssetType AssetBrowserPanel::GetFileType(std::filesystem::path file)
@@ -585,8 +608,11 @@ namespace Venus {
 		else if (file.extension().string() == ".venus")
 			return AssetType::Scene;
 
-		else if (file.extension().string() == ".vspfab")
-			return AssetType::Prefab;
+		else if (file.extension().string() == ".obj" || file.extension().string() == ".fbx")
+			return AssetType::Model;
+
+		else if (file.extension().string() == ".cs" || file.extension().string() == ".glsl")
+			return AssetType::Script;
 
 		else
 			return AssetType::Other;

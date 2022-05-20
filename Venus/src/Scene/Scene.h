@@ -11,6 +11,7 @@ class b2World;
 
 namespace Venus {
 	
+	class SceneRenderer;
 	class Entity;
 
 	class Scene 
@@ -29,12 +30,15 @@ namespace Venus {
 			Entity DuplicateEntity(Entity entity);
 			void DestroyEntity(Entity entity);
 
-			void OnUpdateEditor(Timestep ts, EditorCamera& camera);
-			void OnUpdateRuntime(Timestep ts);
+			void OnUpdateEditor(Ref<SceneRenderer> renderer, Timestep ts, EditorCamera& camera);
+			void OnUpdateRuntime(Ref<SceneRenderer> renderer, Timestep ts);
+			void OnOverlayRender(EditorCamera& camera);
 			void OnViewportResize(uint32_t width, uint32_t height);
 
 			Entity GetEntityByUUID(UUID uuid);
 			Entity GetPrimaryCamera();
+
+			void SetEditorSelectedEntity(uint32_t entity) { m_EditorSelectedEntity = entity; }
 			
 			template<typename... Components>
 			auto GetAllEntitiesWith()
@@ -52,6 +56,7 @@ namespace Venus {
 
 			// Entities
 			entt::registry m_Registry;
+			uint32_t m_EditorSelectedEntity = -1;
 
 			// Physics 
 			b2World* m_PhysicsWorld = nullptr;

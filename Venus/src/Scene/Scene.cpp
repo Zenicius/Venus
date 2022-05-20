@@ -5,6 +5,7 @@
 #include "Components.h"
 #include "Renderer/Renderer2D.h"
 #include "Renderer/Renderer.h"
+#include "Renderer/SceneRenderer.h"
 
 #include "box2d/b2_world.h"
 #include "box2d/b2_body.h"
@@ -209,14 +210,14 @@ namespace Venus {
 		m_Registry.destroy(entity);
 	}
 
-	void Scene::OnUpdateEditor(Timestep ts, EditorCamera& camera)
+	void Scene::OnUpdateEditor(Ref<SceneRenderer> renderer, Timestep ts, EditorCamera& camera)
 	{
-		Renderer::BeginScene(camera);
+		renderer->BeginScene(camera);
 
 		/////////////////////////////////////////////////////////////////////////////
 		// 3D ///////////////////////////////////////////////////////////////////////
 		/////////////////////////////////////////////////////////////////////////////
-
+	
 		// Models
 		{
 			auto view = m_Registry.view<TransformComponent, MeshRendererComponent>();
@@ -224,9 +225,7 @@ namespace Venus {
 			{
 				auto [transform, model] = view.get<TransformComponent, MeshRendererComponent>(entity);
 
-				// TEMP Default Model to be added
-				if(!model.ModelPath.empty())
-					Renderer::SubmitModel(model.Model, transform.GetTransform(), (int)entity);
+				renderer->SubmitModel(model.Model, transform.GetTransform());
 			}
 		}
 		
@@ -254,10 +253,13 @@ namespace Venus {
 			}
 		}
 
-		Renderer::EndScene();
+		// Overlay
+		//OnOverlayRender(camera);
+
+		renderer->EndScene();
 	}
 
-	void Scene::OnUpdateRuntime(Timestep ts)
+	void Scene::OnUpdateRuntime(Ref<SceneRenderer> renderer, Timestep ts)
 	{	
 		// 2D Physics
 		m_PhysicsWorld->Step(ts, m_VelocityIterations, m_PositionIterations);
@@ -299,7 +301,7 @@ namespace Venus {
 		// Render
 		if (mainCamera)
 		{	
-			Renderer::BeginScene(*mainCamera, cameraTransform);
+			renderer->BeginScene(*mainCamera, cameraTransform);
 
 			/////////////////////////////////////////////////////////////////////////////
 			// 3D ///////////////////////////////////////////////////////////////////////
@@ -311,10 +313,8 @@ namespace Venus {
 				for (auto entity : view)
 				{
 					auto [transform, model] = view.get<TransformComponent, MeshRendererComponent>(entity);
-
-					// TEMP Default Model to be added
-					if (!model.ModelPath.empty())
-						Renderer::SubmitModel(model.Model, transform.GetTransform(), (int)entity);
+						
+					renderer->SubmitModel(model.Model, transform.GetTransform());
 				}
 			}
 			
@@ -342,8 +342,92 @@ namespace Venus {
 				}
 			}
 
-			Renderer::EndScene();
+			renderer->EndScene();
 		}
+	}
+
+	void Scene::OnOverlayRender(EditorCamera& editorCamera)
+	{
+		// Selected Entity
+		Entity entity = { (entt::entity)m_EditorSelectedEntity, this };
+		if (entity)
+		{
+			// Entity Outline
+			if (entity.HasComponent<MeshRendererComponent>())
+			{
+				const auto& meshRendererComponent = entity.GetComponent<MeshRendererComponent>();
+				const auto& transformComponent = entity.GetComponent<TransformComponent>();
+
+				//Renderer::RenderSelectedModel(meshRendererComponent.Model, transformComponent.GetTransform());
+			}
+			else if (entity.HasComponent<SpriteRendererComponent>())
+			{
+				const auto& tc = entity.GetComponent<TransformComponent>();
+
+				glm::vec3 translation = tc.Position;
+				glm::vec3 scale = { tc.Scale.x + 0.05f, tc.Scale.y + 0.05f, tc.Scale.z };
+
+				glm::mat4 transform = glm::translate(glm::mat4(1.0f), translation)
+					* glm::toMat4(glm::quat(tc.Rotation))
+					* glm::scale(glm::mat4(1.0f), scale);
+
+				Renderer2D::DrawRect(transform, { 0.75f, 0.18f, 0.22f, 1.0f });
+			}
+			else if (entity.HasComponent<CircleRendererComponent>())
+			{
+				const auto& tc = entity.GetComponent<TransformComponent>();
+
+				glm::vec3 translation = tc.Position;
+				glm::vec3 scale = { tc.Scale.x + 0.05f, tc.Scale.y + 0.05f, tc.Scale.z };
+
+				glm::mat4 transform = glm::translate(glm::mat4(1.0f), translation)
+					* glm::toMat4(glm::quat(tc.Rotation))
+					* glm::scale(glm::mat4(1.0f), scale);
+
+				Renderer2D::DrawCircle(transform, { 0.75f, 0.18f, 0.22f, 1.0f }, 0.05);
+			}
+
+			// Colliders Area
+			if (entity.HasComponent<BoxCollider2DComponent>())
+			{
+				const auto& bc = entity.GetComponent<BoxCollider2DComponent>();
+				if (bc.ShowArea)
+				{
+					const auto& tc = entity.GetComponent<TransformComponent>();
+
+					glm::vec3 translation = tc.Position + glm::vec3(bc.Offset, 0.001f);
+					glm::vec3 scale = tc.Scale * glm::vec3(bc.Size * 2.0f, 1.0f);
+
+					glm::mat4 transform = glm::translate(glm::mat4(1.0f), translation)
+						* glm::rotate(glm::mat4(1.0f), tc.Rotation.z, glm::vec3(0.0f, 0.0f, 1.0f))
+						* glm::scale(glm::mat4(1.0f), scale);
+
+					Renderer2D::DrawRect(transform, { 0.0f, 1.0f, 0.0f, 1.0f });
+				}
+			}
+
+			if (entity.HasComponent<CircleCollider2DComponent>())
+			{
+				const auto& cc = entity.GetComponent<CircleCollider2DComponent>();
+				if (cc.ShowArea)
+				{
+					float zIndex = 0.001f;
+					glm::vec3 cameraForwardDirection = editorCamera.GetForwardDirection();
+					glm::vec3 projectionCollider = cameraForwardDirection * glm::vec3(zIndex);
+
+					const auto& tc = entity.GetComponent<TransformComponent>();
+					
+					glm::vec3 translation = tc.Position + glm::vec3(cc.Offset, -projectionCollider.z);
+					glm::vec3 scale = tc.Scale * glm::vec3(cc.Radius * 2.0f);
+
+					glm::mat4 transform = glm::translate(glm::mat4(1.0f), translation)
+						* glm::scale(glm::mat4(1.0f), scale);
+
+					Renderer2D::DrawCircle(transform, { 0.0f, 1.0f, 0.0f, 1.0f }, 0.05f);
+				}
+			}
+		}
+		
 	}
 
 	void Scene::OnViewportResize(uint32_t width, uint32_t height)

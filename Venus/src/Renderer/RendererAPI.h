@@ -22,10 +22,21 @@ namespace Venus {
 			virtual void SetClearColor(const glm::vec4& color) = 0;
 			virtual void Clear() = 0;
 
-			virtual void DrawIndexed(const Ref<VertexArray>& vertexArray, uint32_t indexCount = 0) = 0;
-			virtual void DrawLines(const Ref<VertexArray>& vertexArrray, uint32_t vertexCount) = 0;
+			virtual void DisableStencilTest() = 0;
+			virtual void EnableStencilTest() = 0;
+			virtual void DisableStencilWrite() = 0;
+			virtual void EnableStencilWrite() = 0;
+			virtual void DisableDepthTest() = 0;
+			virtual void EnableDepthTest() = 0;
+			virtual void SetStencilTest(int function, int value, int mask) = 0;
 
 			virtual void SetLineWidth(float width) = 0;
+			
+			virtual void BindTexture(int textureID) = 0;
+			virtual void BindFramebuffer(int framebufferID) = 0;
+
+			virtual void DrawIndexed(const Ref<VertexArray>& vertexArray, uint32_t indexCount = 0) = 0;
+			virtual void DrawLines(const Ref<VertexArray>& vertexArrray, uint32_t vertexCount) = 0;
 
 			static API GetAPI() { return s_API; }
 			static std::string GetAPIName();

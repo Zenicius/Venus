@@ -18,6 +18,7 @@ void DevLayer::OnAttach()
 	//m_ActiveModel = Venus::Model("assets/models/cucumber/Cucumber.obj");
 	m_ActiveModel = Venus::CreateRef<Venus::Model>("assets/models/trator/trator.obj");
 	//m_ActiveModel = Venus::Model("assets/models/onion/onion.obj");
+	//m_ActiveModel = Venus::Factory::CreateCube(glm::vec3(1.0f));
 
 	m_EditorCamera = Venus::EditorCamera(30.0f, 1600.f / 900.0f, 0.1f, 1000.0f);
 }
@@ -43,7 +44,7 @@ void DevLayer::OnUpdate(Venus::Timestep ts)
 
 	Venus::Renderer::BeginScene(m_EditorCamera);
 	{
-		Venus::Renderer::SubmitModel(m_ActiveModel, m_ModelTransform.GetTransform());
+		Venus::Renderer::RenderModel(m_ActiveModel, m_ModelTransform.GetTransform());
 	}
 	Venus::Renderer::EndScene();
 }
