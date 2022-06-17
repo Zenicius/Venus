@@ -1,0 +1,105 @@
+Scene: Light Test
+Entities:
+  - Entity: 14184309954463426519
+    TagComponent:
+      Name: Cylinder
+    TransformComponent:
+      Position: [0, 2.93735838, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    MeshRendererComponent:
+      Name: Cylinder
+      Path: ""
+  - Entity: 5985012982182830985
+    TagComponent:
+      Name: Point Light Copied Copied
+    TransformComponent:
+      Position: [-1.48188674, 4.43740034, -4.76143742]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    PointLightComponent:
+      Color: [0.412000477, 0.795366764, 0.128978416]
+      Intensity: 3.4000001
+      LightSize: 0.5
+      MinRadius: 1
+      Radius: 10.3000002
+      CastsShadows: true
+      SoftShadows: true
+      Falloff: 0.100000001
+  - Entity: 1828160075909173115
+    TagComponent:
+      Name: Point Light Copied
+    TransformComponent:
+      Position: [-0.408158422, 3.35328341, 2.71117592]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    PointLightComponent:
+      Color: [0.238090038, 0, 1]
+      Intensity: 4.69999981
+      LightSize: 0.5
+      MinRadius: 1
+      Radius: 5.5999999
+      CastsShadows: true
+      SoftShadows: true
+      Falloff: 1
+  - Entity: 4353984009568760350
+    TagComponent:
+      Name: Point Light
+    TransformComponent:
+      Position: [3.09501052, 3.35328341, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    PointLightComponent:
+      Color: [1, 0, 0]
+      Intensity: 4.5999999
+      LightSize: 0.5
+      MinRadius: 1
+      Radius: 4
+      CastsShadows: true
+      SoftShadows: true
+      Falloff: 1
+  - Entity: 14502439860957261616
+    TagComponent:
+      Name: Cube
+    TransformComponent:
+      Position: [0, -0.575719237, 0]
+      Rotation: [0, 0, 0]
+      Scale: [12.6650333, 1, 13.9801893]
+    MeshRendererComponent:
+      Name: Cube
+      Path: ""
+  - Entity: 13051921770065319274
+    TagComponent:
+      Name: Directional Light
+    TransformComponent:
+      Position: [0, 0, 0]
+      Rotation: [0, 0, -1.1010437]
+      Scale: [1, 1, 1]
+    DirectionalLightComponent:
+      Color: [0.10643848, 0.64890492, 0.98455596]
+      Intensity: 1
+      CastsShadows: true
+      SoftShadows: true
+      LightSize: 0.5
+  - Entity: 17043255525948347967
+    TagComponent:
+      Name: Sky Light
+    TransformComponent:
+      Position: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    SkyLightComponent:
+      EnvironmentMapName: Frozen_Waterfall_Ref
+      EnvironmentMapPath: D:\DEV\Venus\VenusEditor\assets\environment maps\Frozen_Waterfall_Ref.hdr
+      Intensity: 1.24000001
+      Lod: 2.29999995
+  - Entity: 8086742543796662361
+    TagComponent:
+      Name: Sphere
+    TransformComponent:
+      Position: [0, 3.25780773, 3.6486485]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    MeshRendererComponent:
+      Name: Sphere
+      Path: ""

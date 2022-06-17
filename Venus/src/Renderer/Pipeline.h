@@ -25,11 +25,15 @@ namespace Venus {
 		bool DepthTest = true;
 		bool StencilTest = false;
 		float LineWidth = 1.0f;
+
+		std::string DebugName = "";
 	};
 
 	class Pipeline
 	{
 		public:
+			static Ref<Pipeline> Create(const PipelineSpecification& spec);
+
 			Pipeline(const PipelineSpecification& spec);
 
 			PipelineSpecification& GetSpecification() { return m_Specification; }

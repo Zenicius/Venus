@@ -32,10 +32,7 @@ namespace Venus {
 			void OnAssetRender(std::filesystem::directory_entry asset, float size);
 			void OnAssetsExplorerRender();
 
-			// Asset Editor
-			void OnAssetEditorRender();
-
-			void OnImGuiRender();
+			void OnImGuiRender(bool& show);
 
 		private:
 			bool CheckDirectoryHasFolders(std::filesystem::path path);

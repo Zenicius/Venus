@@ -67,13 +67,21 @@ namespace Venus {
 				s_RendererAPI->SetLineWidth(width);
 			}
 
-			// TEMP
-			static void BindTexture(int textureID)
+			static void BindTexture(int location, int textureID)
 			{
-				s_RendererAPI->BindTexture(textureID);
+				s_RendererAPI->BindTexture(location, textureID);
+			}
+
+			static void BindTextureCube(int location, int textureID)
+			{
+				s_RendererAPI->BindTextureCube(location, textureID);
+			}
+
+			static void BindTextureArray(int location, int textureID)
+			{
+				s_RendererAPI->BindTextureArray(location, textureID);
 			}
 			
-			// TEMP
 			static void BindFramebuffer(int framebufferID)
 			{
 				s_RendererAPI->BindFramebuffer(framebufferID);
@@ -82,6 +90,11 @@ namespace Venus {
 			static void DrawIndexed(const Ref<VertexArray>& vertexArray, uint32_t indexCount = 0)
 			{
 				s_RendererAPI->DrawIndexed(vertexArray, indexCount);
+			}
+
+			static void DrawArrays(const Ref<VertexArray>& vertexArray, uint32_t indexCount)
+			{
+				s_RendererAPI->DrawArrays(vertexArray, indexCount);
 			}
 
 			static void DrawLines(const Ref<VertexArray>& vertexArray, uint32_t vertexCount)

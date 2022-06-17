@@ -2,23 +2,35 @@
 #include "Renderer/Renderer.h"
 #include "Renderer/Renderer2D.h"
 #include "Renderer/UniformBuffer.h"
+#include "Renderer/ComputePipeline.h"
+
+#include "glad/glad.h"
+
+#include "imgui.h"
 
 namespace Venus {
 
 	struct RendererData
 	{
-		// Camera Data
+		//-- Shaders--------------------------------
+		Ref<ShaderLibrary> ShaderLibrary;
+		//------------------------------------------
+
+
+		//-- Camera Data----------------------------
 		struct CameraData
 		{
 			glm::mat4 ViewMatrix;
 			glm::mat4 ProjectionMatrix;
 			glm::mat4 ViewProjectionMatrix;
-			glm::vec3 Position;
+			glm::mat4 InverseViewProjectionMatrix;
 		};
 		CameraData CameraBuffer;
 		Ref<UniformBuffer> CameraUniformBuffer;
+		//------------------------------------------
 
-		// Model Data
+
+		//-- Model Data-----------------------------
 		struct ModelData
 		{
 			glm::mat4 Transform;
@@ -26,17 +38,42 @@ namespace Venus {
 		};
 		ModelData ModelBuffer;
 		Ref<UniformBuffer> ModelDataBuffer;
+		//------------------------------------------
 
-		// Quad Data
+
+		//-- Quad Data------------------------------
 		Ref<VertexArray> QuadVertexArray;
 		Ref<VertexBuffer> QuadVertexBuffer;
 		Ref<IndexBuffer> QuadIndexBuffer;
+		//------------------------------------------
 
-		// Default Texture
+
+		//-- Cube Data------------------------------
+		Ref<VertexArray> CubeVertexArray;
+		Ref<VertexBuffer> CubeVertexBuffer;
+		Ref<IndexBuffer> CubeIndexBuffer;
+		//------------------------------------------
+		
+
+		//-- Default Textures-----------------------
 		Ref<Texture2D> DefaultTexture;
+		Ref<TextureCube> DefaultCube;
+		Ref<Texture2D> BRDFLutTexture;
+		uint32_t DebugTexture;
+		float DebugParam;
+		//------------------------------------------
 
-		// Stats
+
+		//-- Environment----------------------------
+		Ref<SceneEnvironment> EnviromentMap;
+		Ref<Material> EnvironmentMaterial;
+		uint32_t ShadowMap;
+		//------------------------------------------
+
+
+		//-- Stats----------------------------------
 		Renderer::Statistics Stats;
+		//------------------------------------------
 	};
 
 	static RendererData s_Data;
@@ -45,7 +82,29 @@ namespace Venus {
 	{
 		VS_PROFILE_FUNCTION();
 
-		// Quad
+		//-- Shaders-----------------------------------------------------------------------------------
+		s_Data.ShaderLibrary = ShaderLibrary::Create();
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/PBR.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Outline.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Grid.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Skybox.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/ShadowMap.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/ShadowMapDebug.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/FXAA.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Bloom.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/BloomDebug.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Composite.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/EquirectangularToCubeMap.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/EnvironmentMipFilter.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/EnvironmentIrradiance.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/PreethamSky.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Renderer2D_Quad.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Renderer2D_Circle.glsl");
+		Renderer::GetShaderLibrary()->Load("Resources/Shaders/Renderer2D_Line.glsl");
+		//---------------------------------------------------------------------------------------------
+
+
+		//-- Quad Data---------------------------------------------------------------------------------
 		struct QuadVertex
 		{
 			glm::vec3 Position;
@@ -73,20 +132,90 @@ namespace Venus {
 		});
 		
 		uint32_t indices[6] = { 0, 1, 2, 2, 3, 0 };
-		s_Data.QuadIndexBuffer = IndexBuffer::Create(indices, 6 * sizeof(uint32_t));
+		s_Data.QuadIndexBuffer = IndexBuffer::Create(indices, 6);
 
 		s_Data.QuadVertexArray = VertexArray::Create();
 		s_Data.QuadVertexArray->AddVertexBuffer(s_Data.QuadVertexBuffer);
 		s_Data.QuadVertexArray->SetIndexBuffer(s_Data.QuadIndexBuffer);
+		//---------------------------------------------------------------------------------------------
 
-		// Default white Texture
+
+		//-- Cube Data---------------------------------------------------------------------------------
+		float CubeVertices[] =
+		{
+			-1.0f, -1.0f,  1.0f,  //        7--------6
+			 1.0f, -1.0f,  1.0f,  //       /|       /|
+			 1.0f, -1.0f, -1.0f,  //      4--------5 |
+			-1.0f, -1.0f, -1.0f,  //      | |      | |
+			-1.0f,  1.0f,  1.0f,  //      | 3------|-2
+			 1.0f,  1.0f,  1.0f,  //      |/       |/
+			 1.0f,  1.0f, -1.0f,  //      0--------1
+			-1.0f,  1.0f, -1.0f
+		};
+
+		uint32_t CubeIndices[] =
+		{
+			// Right
+			1, 2, 6,
+			6, 5, 1,
+			// Left
+			0, 4, 7,
+			7, 3, 0,
+			// Top
+			4, 5, 6,
+			6, 7, 4,
+			// Bottom
+			0, 3, 2,
+			2, 1, 0,
+			// Back
+			0, 1, 5,
+			5, 4, 0,
+			// Front
+			3, 7, 6,
+			6, 2, 3
+		};
+
+		s_Data.CubeVertexBuffer = VertexBuffer::Create(CubeVertices, sizeof(float) * 24);
+		s_Data.CubeIndexBuffer = IndexBuffer::Create(CubeIndices, 36);
+		s_Data.CubeVertexBuffer->SetLayout({
+			{ ShaderDataType::Float3, "a_Position" }
+		});
+
+		s_Data.CubeVertexArray = VertexArray::Create();
+		s_Data.CubeVertexArray->AddVertexBuffer(s_Data.CubeVertexBuffer);
+		s_Data.CubeVertexArray->SetIndexBuffer(s_Data.CubeIndexBuffer);
+		//---------------------------------------------------------------------------------------------
+
+
+		//-- Default Textures--------------------------------------------------------------------------
 		s_Data.DefaultTexture = Texture2D::Create(1, 1);
 		uint32_t whiteTextureData = 0xffffffff;
 		s_Data.DefaultTexture->SetData(&whiteTextureData, sizeof(uint32_t));
+
+		s_Data.DefaultCube = TextureCube::Create(1, 1);
+		uint32_t blackTextureData = 0xff000000;
+		s_Data.DefaultCube->SetData(&blackTextureData, sizeof(uint32_t));
+
+		TextureProperties props;
+		props.WrapMode = TextureWrapMode::ClampToBorder;
+		s_Data.BRDFLutTexture = Texture2D::Create("Resources/Textures/BRDF_LUT.tga", props);
+
+		s_Data.DebugTexture = 0;
+		s_Data.DebugParam = 0.0f;
+		//---------------------------------------------------------------------------------------------
+
+
+		//-- Environment-------------------------------------------------------------------------------
+		s_Data.EnvironmentMaterial = Material::Create(Renderer::GetShaderLibrary()->Get("PBR"));
+		s_Data.EnviromentMap = Renderer::CreateEmptyEnvironmentMap();
+		s_Data.ShadowMap = 0;
+		//---------------------------------------------------------------------------------------------
 		
-		// Uniforms
+
+		//-- Uniforms----------------------------------------------------------------------------------
 		s_Data.CameraUniformBuffer = UniformBuffer::Create(sizeof(RendererData::CameraData), 0);
 		s_Data.ModelDataBuffer = UniformBuffer::Create(sizeof(RendererData::ModelData), 1);
+		//---------------------------------------------------------------------------------------------
 
 		RenderCommand::Init();
 		Renderer2D::Init();
@@ -120,11 +249,10 @@ namespace Venus {
 	{
 		VS_PROFILE_FUNCTION();
 		
-		// TEMP HACK Todo: Send correct values
-		s_Data.CameraBuffer.ViewMatrix = glm::mat4(1.0f);
-		s_Data.CameraBuffer.ProjectionMatrix = camera.GetProjection();
-		s_Data.CameraBuffer.ViewProjectionMatrix = camera.GetProjection() * glm::inverse(transform);
-		s_Data.CameraBuffer.Position = glm::vec3(1.0f);
+		s_Data.CameraBuffer.ViewMatrix = glm::inverse(transform);
+		s_Data.CameraBuffer.ProjectionMatrix = camera.GetProjectionMatrix();
+		s_Data.CameraBuffer.ViewProjectionMatrix = camera.GetProjectionMatrix() * glm::inverse(transform);
+		s_Data.CameraBuffer.InverseViewProjectionMatrix = glm::inverse(camera.GetProjectionMatrix() * glm::inverse(transform));
 		s_Data.CameraUniformBuffer->SetData(&s_Data.CameraBuffer, sizeof(RendererData::CameraData));
 
 		Renderer2D::BeginScene();
@@ -135,9 +263,9 @@ namespace Venus {
 		VS_PROFILE_FUNCTION();
 		
 		s_Data.CameraBuffer.ViewMatrix = camera.GetViewMatrix();
-		s_Data.CameraBuffer.ProjectionMatrix = camera.GetProjection();
+		s_Data.CameraBuffer.ProjectionMatrix = camera.GetProjectionMatrix();
 		s_Data.CameraBuffer.ViewProjectionMatrix = camera.GetViewProjection();
-		s_Data.CameraBuffer.Position = camera.GetPosition();
+		s_Data.CameraBuffer.InverseViewProjectionMatrix = glm::inverse(camera.GetViewProjection());
 		s_Data.CameraUniformBuffer->SetData(&s_Data.CameraBuffer, sizeof(RendererData::CameraData));
 
 		Renderer2D::BeginScene();
@@ -164,27 +292,12 @@ namespace Venus {
 	{
 		VS_PROFILE_FUNCTION();
 
-#if 0
-		s_Data.GridBuffer.Transform = transform;
-		s_Data.GridBuffer.Scale = scale;
-		s_Data.GridBuffer.Size = size;
-		s_Data.GridDataBuffer->SetData(&s_Data.GridBuffer, sizeof(RendererData::GridData));
-
-		s_Data.GridShader->Bind();
-
-		s_Data.Stats.VertexCount += 4;
-		s_Data.Stats.IndexCount += 6;
-		s_Data.Stats.DrawCalls++;
-
-		RenderCommand::DrawIndexed(s_Data.GridVertexArray);
-#endif
+		pipeline->GetFramebuffer()->Bind();
+		pipeline->GetShader()->Bind();
 
 		s_Data.ModelBuffer.Transform = transform;
 		s_Data.ModelBuffer.EntityID = -1;
 		s_Data.ModelDataBuffer->SetData(&s_Data.ModelBuffer, sizeof(RendererData::ModelData));
-
-		pipeline->GetFramebuffer()->Bind();
-		pipeline->GetShader()->Bind();
 
 		s_Data.Stats.VertexCount += 4;
 		s_Data.Stats.IndexCount += 6;
@@ -195,40 +308,58 @@ namespace Venus {
 		pipeline->GetFramebuffer()->Unbind();
 	}
 
-	void Renderer::RenderModel(const Ref<Pipeline>& pipeline, const Ref<Model>& model, const glm::mat4& transform, int entityID)
+	void Renderer::RenderQuadWithMaterial(const Ref<Pipeline>& pipeline, const glm::mat4& transform, const Ref<Material>& material)
 	{
 		VS_PROFILE_FUNCTION();
 
-#if 0
+		pipeline->GetFramebuffer()->Bind();
+		pipeline->GetShader()->Bind();
+		material->Bind();
+
 		s_Data.ModelBuffer.Transform = transform;
-		s_Data.ModelBuffer.EntityID = entityID;
+		s_Data.ModelBuffer.EntityID = -1;
 		s_Data.ModelDataBuffer->SetData(&s_Data.ModelBuffer, sizeof(RendererData::ModelData));
 
-		s_Data.PBRShader->Bind();
-		
-		for (auto& mesh : model->m_Meshes)
-		{
-			s_Data.Stats.VertexCount += mesh.m_Vertices.size();
-			s_Data.Stats.IndexCount += mesh.m_Indices.size();
-			s_Data.Stats.DrawCalls++;
+		s_Data.Stats.VertexCount += 4;
+		s_Data.Stats.IndexCount += 6;
+		s_Data.Stats.DrawCalls++;
 
-			// Temp Hack
-			bool diffuseTex = false;
-			for (auto& texture : mesh.m_Textures)
-			{
-				if ((int)texture.Type == 0)
-				{
-					model->m_DiffuseMaps[texture.Index]->Bind(0);
-					diffuseTex = true;
-				}
-				
-				if(!diffuseTex)
-					s_Data.DefaultTexture->Bind(0);
-			}
-			
-			RenderCommand::DrawIndexed(mesh.m_VertexArray);
-		}
-#endif
+		RenderCommand::DrawIndexed(s_Data.QuadVertexArray);
+
+		pipeline->GetFramebuffer()->Unbind();
+	}
+
+	void Renderer::RenderFullscreenQuad(const Ref<Pipeline>& pipeline, const Ref<Material>& material)
+	{
+		pipeline->GetFramebuffer()->Bind();
+		pipeline->GetShader()->Bind();
+		material->Bind();
+
+		s_Data.Stats.VertexCount += 4;
+		s_Data.Stats.IndexCount += 6;
+		s_Data.Stats.DrawCalls++;
+
+		RenderCommand::DrawIndexed(s_Data.QuadVertexArray);
+
+		pipeline->GetFramebuffer()->Unbind();
+	}
+
+	void Renderer::RenderCube(const Ref<Pipeline>& pipeline, const Ref<Material>& material)
+	{
+		glDepthMask(GL_FALSE);
+		pipeline->GetFramebuffer()->Bind();
+		pipeline->GetShader()->Bind();
+		material->Bind();
+
+		RenderCommand::DrawIndexed(s_Data.CubeVertexArray);
+
+		pipeline->GetFramebuffer()->Unbind();
+		glDepthMask(GL_TRUE);
+	}
+
+	void Renderer::RenderModel(const Ref<Pipeline>& pipeline, const Ref<Model>& model, const glm::mat4& transform, int entityID)
+	{
+		VS_PROFILE_FUNCTION();
 
 		pipeline->GetFramebuffer()->Bind();
 		pipeline->GetShader()->Bind();
@@ -237,6 +368,33 @@ namespace Venus {
 		s_Data.ModelBuffer.EntityID = entityID;
 		s_Data.ModelDataBuffer->SetData(&s_Data.ModelBuffer, sizeof(RendererData::ModelData));
 
+		for (auto& mesh : model->m_Meshes)
+		{
+			s_Data.Stats.VertexCount += mesh.m_Vertices.size();
+			s_Data.Stats.IndexCount += mesh.m_Indices.size();
+			s_Data.Stats.DrawCalls++;
+
+			RenderCommand::DrawIndexed(mesh.m_VertexArray);
+		}
+
+		pipeline->GetFramebuffer()->Unbind();
+	}
+
+	void Renderer::RenderModelWithMaterial(const Ref<Pipeline>& pipeline, const Ref<Model>& model, const glm::mat4& transform, int entityID)
+	{
+		VS_PROFILE_FUNCTION();
+
+		pipeline->GetFramebuffer()->Bind();
+		pipeline->GetShader()->Bind();
+
+		auto& materialTable = model->GetMaterials();
+		auto& envMaterial = s_Data.EnvironmentMaterial;
+
+		s_Data.ModelBuffer.Transform = transform;
+		s_Data.ModelBuffer.EntityID = entityID;
+		s_Data.ModelDataBuffer->SetData(&s_Data.ModelBuffer, sizeof(RendererData::ModelData));
+
+		envMaterial->Bind();
 
 		for (auto& mesh : model->m_Meshes)
 		{
@@ -244,19 +402,7 @@ namespace Venus {
 			s_Data.Stats.IndexCount += mesh.m_Indices.size();
 			s_Data.Stats.DrawCalls++;
 
-			// Temp Hack
-			bool diffuseTex = false;
-			for (auto& texture : mesh.m_Textures)
-			{
-				if ((int)texture.Type == 0)
-				{
-					model->m_DiffuseMaps[texture.Index]->Bind(0);
-					diffuseTex = true;
-				}
-
-				if (!diffuseTex)
-					s_Data.DefaultTexture->Bind(0);
-			}
+			materialTable[mesh.m_MaterialIndex]->GetMaterial()->Bind();
 
 			RenderCommand::DrawIndexed(mesh.m_VertexArray);
 		}
@@ -267,93 +413,106 @@ namespace Venus {
 	void Renderer::RenderSelectedModel(const Ref<Pipeline>& pipeline, const Ref<Model>& model, const glm::mat4& transform, int entityID)
 	{
 		VS_PROFILE_FUNCTION();
+	}
 
-#if 0
-		// First Pass, Normal Model
-		RenderCommand::EnableStencilTest();
-		RenderCommand::SetStencilTest(0x0207, 1, 0xFF); // GL_ALWAYS
-		RenderCommand::EnableStencilWrite();
-		RenderModel(model, transform, entityID);
+	Ref<SceneEnvironment> Renderer::CreateEmptyEnvironmentMap()
+	{
+		auto& defaultCube = Renderer::GetDefaultTextureCube();
+		Ref<SceneEnvironment> emptyEnv = SceneEnvironment::Create(defaultCube, defaultCube);
 
-		// Second Pass, Outlined
-		s_Data.BlurFramebuffer->Bind();
+		return emptyEnv;
+	}
 
-		RenderCommand::DisableDepthTest();
-		RenderCommand::DisableStencilWrite();
-	
-		s_Data.ModelBuffer.Transform = transform;
-		s_Data.ModelBuffer.EntityID = entityID;
-		s_Data.ModelDataBuffer->SetData(&s_Data.ModelBuffer, sizeof(RendererData::ModelData));
+	Ref<SceneEnvironment> Renderer::CreateEnvironmentMap(const std::string& path)
+	{
+		CORE_LOG_INFO("Creating ENV MAP: {0}", path);
 
-		s_Data.OutlineShader->Bind();
+		const uint32_t cubeMapSize = 1024;
+		const uint32_t irradianceMapSize = 32;
 
-		for (auto& mesh : model->m_Meshes)
+		// Load HDR Env
+		TextureProperties props;
+		props.WrapMode = TextureWrapMode::ClampToEdge;
+		props.FlipVertically = false;
+		Ref<Texture2D> hdrTexture = Texture2D::Create(path, props);
+
+		// Convert Equirectangular to Cubemap
+		TextureProperties cubeProps;
+		cubeProps.Format = TextureFormat::RGBA32F;
+		Ref<TextureCube> cubeMap = TextureCube::Create(cubeMapSize, cubeMapSize, cubeProps);
 		{
-			s_Data.Stats.VertexCount += mesh.m_Vertices.size();
-			s_Data.Stats.IndexCount += mesh.m_Indices.size();
-			s_Data.Stats.DrawCalls++;
+			CORE_LOG_INFO("Converting Equirectangular to Cubemap");
+			Ref<ComputePipeline> computePipeline = ComputePipeline::Create(Renderer::GetShaderLibrary()->Get("EquirectangularToCubeMap"));
+			computePipeline->Begin();
+			computePipeline->BindWriteOnlyImage(0, cubeMap);
+			hdrTexture->Bind(1);
+			computePipeline->Execute(cubeMapSize / 32, cubeMapSize / 32, 6);
 
-			s_Data.DefaultTexture->Bind(0);
-
-			RenderCommand::DrawIndexed(mesh.m_VertexArray);
+			cubeMap->GenerateMips();
 		}
 
-		// Third Pass, Blur
-		s_Data.TargetFramebuffer->Bind();
-
-		RenderCommand::DisableDepthTest();
-		RenderCommand::EnableStencilTest();
-		RenderCommand::SetStencilTest(0x0205, 1, 0xFF); // GL_NOTEQUAL
-		RenderCommand::DisableStencilWrite();
-
-		s_Data.BlurShader->Bind();
-
-		s_Data.Stats.VertexCount += 4;
-		s_Data.Stats.IndexCount += 6;
-		s_Data.Stats.DrawCalls++;
-
-		RenderCommand::BindTexture(s_Data.BlurFramebuffer->GetColorAttachmentRendererID());
-		RenderCommand::DrawIndexed(s_Data.GridVertexArray);
-
-		// Reset
-		RenderCommand::EnableStencilWrite();
-		RenderCommand::DisableStencilTest();
-		RenderCommand::EnableDepthTest();
-
-		// First Pass, Normal Model
-		RenderCommand::EnableStencilTest();
-		RenderCommand::SetStencilTest(0x0207, 1, 0xFF); // GL_ALWAYS
-		RenderCommand::EnableStencilWrite();
-		RenderModel(model, transform, entityID);
-
-		// Second Pass, Outlined
-		RenderCommand::DisableDepthTest();
-		RenderCommand::DisableStencilWrite();
-		RenderCommand::SetStencilTest(0x0205, 1, 0xFF); // GL_NOTEQUAL
-
-		s_Data.ModelBuffer.Transform = transform;
-		s_Data.ModelBuffer.EntityID = entityID;
-		s_Data.ModelDataBuffer->SetData(&s_Data.ModelBuffer, sizeof(RendererData::ModelData));
-
-		s_Data.OutlineShader->Bind();
-
-		for (auto& mesh : model->m_Meshes)
+		// Pre-filter mipmap levels
+		Ref<TextureCube> filteredCubeMap = TextureCube::Create(cubeMapSize, cubeMapSize, cubeProps);
 		{
-			s_Data.Stats.VertexCount += mesh.m_Vertices.size();
-			s_Data.Stats.IndexCount += mesh.m_Indices.size();
-			s_Data.Stats.DrawCalls++;
+			Ref<ComputePipeline> computePipeline = ComputePipeline::Create(Renderer::GetShaderLibrary()->Get("EnvironmentMipFilter"));
+			uint32_t mipCount = filteredCubeMap->GetMipLevelCount();
+			const float deltaRoughness = 1.0f / glm::max((float)mipCount - 1.0f, 1.0f);
 
-			s_Data.DefaultTexture->Bind(0);
+			computePipeline->Begin();
+			for (uint32_t i = 0, size = cubeMapSize; i < mipCount; i++, size /= 2)
+			{
+				uint32_t numGroups = glm::max(1u, size / 32);
+				float roughness = i * deltaRoughness;
+				roughness = glm::max(roughness, 0.05f);
 
-			RenderCommand::DrawIndexed(mesh.m_VertexArray);
+				CORE_LOG_INFO("Mip: {0} / NumGroups for this pass: {1} / Roughness: {2}", i, numGroups, roughness);
+
+				computePipeline->GetShader()->SetFloat("u_Uniforms.Roughness", roughness);
+				computePipeline->BindWriteOnlyImage(0, filteredCubeMap, i);
+				cubeMap->Bind(1);
+				computePipeline->Execute(numGroups, numGroups, 6);
+			}
 		}
 
-		// Reset
-		RenderCommand::EnableStencilWrite();
-		RenderCommand::DisableStencilTest();
-		RenderCommand::SetStencilTest(0x0207, 0, 0xFF); // GL_ALWAYS
-		RenderCommand::EnableDepthTest();
-#endif
+		// Irradiance Cube map
+		Ref<TextureCube> irradianceCubeMap = TextureCube::Create(irradianceMapSize, irradianceMapSize, cubeProps);
+		{
+			Ref<ComputePipeline> computePipeline = ComputePipeline::Create(Renderer::GetShaderLibrary()->Get("EnvironmentIrradiance"));
+			
+			CORE_LOG_INFO("Irradiance Map Compute");
+
+			computePipeline->Begin();
+			computePipeline->GetShader()->SetFloat("u_Uniforms.Samples", 512);
+			computePipeline->BindWriteOnlyImage(0, irradianceCubeMap);
+			filteredCubeMap->Bind(1);
+			computePipeline->Execute(irradianceMapSize / 32, irradianceMapSize / 32, 6);
+
+			irradianceCubeMap->GenerateMips();
+		}
+
+		return SceneEnvironment::Create(filteredCubeMap, irradianceCubeMap);
+	}
+
+	Ref<TextureCube> Renderer::CreatePreethamSky(glm::vec3 TurbidityAzimuthInclination)
+	{
+		uint32_t cubeMapSize = 1024;
+
+		TextureProperties cubeProps;
+		cubeProps.Format = TextureFormat::RGBA32F;
+		Ref<TextureCube> cubeMap = TextureCube::Create(cubeMapSize, cubeMapSize, cubeProps);
+
+		Ref<ComputePipeline> computePipeline = ComputePipeline::Create(Renderer::GetShaderLibrary()->Get("PreethamSky"));
+
+		computePipeline->Begin();
+		computePipeline->GetShader()->SetFloat3("u_Uniforms.TurbidityAzimuthInclination", 
+			{ TurbidityAzimuthInclination.x, TurbidityAzimuthInclination.y, TurbidityAzimuthInclination.z });
+
+		computePipeline->BindWriteOnlyImage(0, cubeMap);
+		computePipeline->Execute(cubeMapSize / 32, cubeMapSize / 32, 6);
+
+		cubeMap->GenerateMips();
+
+		return cubeMap;
 	}
 
 	void Renderer::ResetStats()
@@ -363,9 +522,54 @@ namespace Venus {
 		Renderer2D::ResetStats();
 	}
 
+	void Renderer::SetEnvironment(Ref<SceneEnvironment> envMap, uint32_t shadowMap)
+	{
+		auto& envMaterial = s_Data.EnvironmentMaterial;
+
+		s_Data.EnviromentMap = envMap;
+		s_Data.ShadowMap = shadowMap;
+
+		envMaterial->SetCubeMap("u_EnvRadianceTex", 4, envMap->GetRadianceMap()->GetRendererID());
+		envMaterial->SetCubeMap("u_EnvIrradianceTex", 5, envMap->GetIrradianceMap()->GetRendererID());
+		envMaterial->SetTexture("u_BRDFLUTTexture", 6, s_Data.BRDFLutTexture->GetRendererID());
+		envMaterial->SetTextureArray("u_ShadowMapTexture", 7, shadowMap);
+	}
+
 	Ref<Texture2D> Renderer::GetDefaultTexture()
 	{
 		return s_Data.DefaultTexture;
+	}
+
+	Ref<TextureCube> Renderer::GetDefaultTextureCube()
+	{
+		return s_Data.DefaultCube;
+	}
+
+	Ref<ShaderLibrary> Renderer::GetShaderLibrary()
+	{
+		return s_Data.ShaderLibrary;
+	}
+
+	float Renderer::GetDebugParam()
+	{
+		return s_Data.DebugParam;
+	}
+
+	void Renderer::SetDebugTexture(uint32_t textureID)
+	{
+		s_Data.DebugTexture = textureID;
+	}
+
+	void Renderer::OnImGuiRender()
+	{
+		ImGui::Begin("Renderer Debug");
+		ImGui::DragFloat("Layer", &s_Data.DebugParam, 1.0f, 0.0f, 3.0f);
+		glm::vec2 viewportPanelSize = { ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y };
+		if (s_Data.DebugTexture > 0)
+		{
+			ImGui::Image(reinterpret_cast<void*>(s_Data.DebugTexture), ImVec2{ 512, 512 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
+		}		
+		ImGui::End();
 	}
 
 	Renderer::Statistics Renderer::GetStats()

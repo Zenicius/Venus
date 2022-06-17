@@ -13,15 +13,23 @@ namespace Venus {
 
 	Application* Application::s_Instance = nullptr;
 
-	Application::Application(const std::string& name, ApplicationCommandLineArgs args)
+	Application::Application(ApplicationSpecification spec, ApplicationCommandLineArgs args)
 		: m_CommandLineArgs(args)
 	{
 		VS_PROFILE_FUNCTION();
 		VS_CORE_ASSERT(!s_Instance, "Application already exists!");
-		
+
 		s_Instance = this;
 
-		m_Window = Window::Create(WindowProps(name));
+		WindowProps props;
+		props.Title = spec.Name;
+		props.Width = spec.Width;
+		props.Height = spec.Height;
+		props.Fullscreen = spec.Fullscreen;
+		props.Vsync = spec.Vsync;
+		props.Decorated = spec.WindowDecorated;
+
+		m_Window = Window::Create(props);
 		m_Window->SetEventCallback(VS_BIND_EVENT_FN(Application::OnEvent));
 
 		Renderer::Init();
@@ -34,6 +42,8 @@ namespace Venus {
 	{
 		VS_PROFILE_FUNCTION();
 
+		m_Window->SetEventCallback([](Event& e) {});
+		
 		Renderer::Shutdown();
 	}
 
@@ -66,11 +76,11 @@ namespace Venus {
 		dispatcher.Dispatch<WindowCloseEvent>(VS_BIND_EVENT_FN(Application::OnWindowClose));
 		dispatcher.Dispatch<WindowResizeEvent>(VS_BIND_EVENT_FN(Application::OnWindowResize));
 
-		for (auto it = m_LayerStack.rbegin(); it != m_LayerStack.rend(); ++it)
+		for (auto it = m_LayerStack.end(); it != m_LayerStack.begin(); )
 		{
+			(*--it)->OnEvent(e);
 			if (e.Handled)
 				break;
-			(*it)->OnEvent(e);
 		}
 	}
 
@@ -83,7 +93,7 @@ namespace Venus {
 			VS_PROFILE_SCOPE("RunLoop");
 
 			float time = (float)glfwGetTime();
-			Timestep timestep = time - m_LastFrameTime;
+			m_Timestep = time - m_LastFrameTime;
 			m_LastFrameTime = time;
 
 			if (!m_Minimized)
@@ -92,7 +102,7 @@ namespace Venus {
 					VS_PROFILE_SCOPE("LayerStack OnUpdate");
 
 					for (Layer* layer : m_LayerStack)
-						layer->OnUpdate(timestep);
+						layer->OnUpdate(m_Timestep);
 				}
 
 				m_ImGuiLayer->Begin();

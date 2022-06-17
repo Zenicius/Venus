@@ -1,8 +1,10 @@
 #include "pch.h"
 #include "Scene.h"
 
-#include "Entity.h"
+#include "Math/Math.h"
+
 #include "Components.h"
+#include "Entity.h"
 #include "Renderer/Renderer2D.h"
 #include "Renderer/Renderer.h"
 #include "Renderer/SceneRenderer.h"
@@ -96,6 +98,9 @@ namespace Venus {
 		CopyComponent<BoxCollider2DComponent>(destRegistry, srcRegistry, enttMap);
 		CopyComponent<CircleCollider2DComponent>(destRegistry, srcRegistry, enttMap);
 		CopyComponent<MeshRendererComponent>(destRegistry, srcRegistry, enttMap);
+		CopyComponent<PointLightComponent>(destRegistry, srcRegistry, enttMap);
+		CopyComponent<DirectionalLightComponent>(destRegistry, srcRegistry, enttMap);
+		CopyComponent<SkyLightComponent>(destRegistry, srcRegistry, enttMap);
 
 		return newScene;
 	}
@@ -201,6 +206,9 @@ namespace Venus {
 		CopyComponentIfExists<BoxCollider2DComponent>(newEntity, entity);
 		CopyComponentIfExists<CircleCollider2DComponent>(newEntity, entity);
 		CopyComponentIfExists<MeshRendererComponent>(newEntity, entity);
+		CopyComponentIfExists<PointLightComponent>(newEntity, entity);
+		CopyComponentIfExists<DirectionalLightComponent>(newEntity, entity);
+		CopyComponentIfExists<SkyLightComponent>(newEntity, entity);
 
 		return newEntity;
 	}
@@ -212,6 +220,70 @@ namespace Venus {
 
 	void Scene::OnUpdateEditor(Ref<SceneRenderer> renderer, Timestep ts, EditorCamera& camera)
 	{
+		/////////////////////////////////////////////////////////////////////////////
+		// LIGHTS ///////////////////////////////////////////////////////////////////
+		/////////////////////////////////////////////////////////////////////////////
+
+		{
+			m_LightEnvironment = LightEnvironment();
+
+			// Directional Light
+			{
+				auto dirLights = m_Registry.view<TransformComponent, DirectionalLightComponent>();
+				for (auto entity : dirLights)
+				{
+					auto [transfomComponent, lightComponent] = dirLights.get<TransformComponent, DirectionalLightComponent>(entity);
+					glm::vec3 direction = -glm::normalize(glm::mat3(transfomComponent.GetTransform()) * glm::vec3(1.0f));
+					m_LightEnvironment.DirectionalLight =
+					{
+						direction,
+						lightComponent.Color,
+						lightComponent.Intensity,
+						lightComponent.CastsShadows
+					};
+					m_LightEnvironment.HasDirLight = true;
+					m_LightEnvironment.CastsShadows = lightComponent.CastsShadows;
+				}
+			}
+			
+			// Point Lights
+			{
+				auto pointLights = m_Registry.view<TransformComponent, PointLightComponent>();
+				m_LightEnvironment.PointLights.resize(pointLights.size());
+				uint32_t index = 0;
+
+				for (auto entity : pointLights)
+				{
+					auto [transformComponent, lightComponent] = pointLights.get<TransformComponent, PointLightComponent>(entity);
+					auto position = GetWorldSpacePosition(Entity(entity, this));
+					m_LightEnvironment.PointLights[index++] =
+					{
+						position,
+						lightComponent.Intensity,
+						lightComponent.Color,
+						lightComponent.MinRadius,
+						lightComponent.Radius,
+						lightComponent.Falloff,
+						lightComponent.LightSize,
+						lightComponent.CastsShadows,
+					};
+				}
+			}
+
+			// Sky Light
+			{
+				auto skyLights = m_Registry.view<SkyLightComponent>();
+				for (auto entity : skyLights)
+				{
+					auto lightComponent = skyLights.get<SkyLightComponent>(entity);
+
+					m_LightEnvironment.SkyLight.EnvironmentMap = lightComponent.EnvironmentMap;
+					m_LightEnvironment.SkyLight.Intensity = lightComponent.Intensity;
+					m_LightEnvironment.SkyLight.Lod = lightComponent.Lod;
+				}
+			}
+		}
+
 		renderer->BeginScene(camera);
 
 		/////////////////////////////////////////////////////////////////////////////
@@ -225,7 +297,10 @@ namespace Venus {
 			{
 				auto [transform, model] = view.get<TransformComponent, MeshRendererComponent>(entity);
 
-				renderer->SubmitModel(model.Model, transform.GetTransform());
+				if (m_EditorSelectedEntity == (uint32_t)entity)
+					renderer->SubmitSelectedModel(model.Model, transform.GetTransform(), (int)entity);
+				else
+					renderer->SubmitModel(model.Model, transform.GetTransform(), (int)entity);
 			}
 		}
 		
@@ -261,7 +336,10 @@ namespace Venus {
 
 	void Scene::OnUpdateRuntime(Ref<SceneRenderer> renderer, Timestep ts)
 	{	
-		// 2D Physics
+		/////////////////////////////////////////////////////////////////////////////
+		// 2D PHYSICS ///////////////////////////////////////////////////////////////
+		/////////////////////////////////////////////////////////////////////////////
+
 		m_PhysicsWorld->Step(ts, m_VelocityIterations, m_PositionIterations);
 		
 		auto view = m_Registry.view<Rigidbody2DComponent>();
@@ -280,8 +358,72 @@ namespace Venus {
 			transform.Rotation.z = body->GetAngle();
 		}
 	
-		// Camera
-		Camera* mainCamera = nullptr;
+		/////////////////////////////////////////////////////////////////////////////
+		// LIGHTS ///////////////////////////////////////////////////////////////////
+		/////////////////////////////////////////////////////////////////////////////
+
+		{
+			m_LightEnvironment = LightEnvironment();
+
+			// Directional Light
+			{
+				auto dirLights = m_Registry.view<TransformComponent, DirectionalLightComponent>();
+				for (auto entity : dirLights)
+				{
+					auto [transfomComponent, lightComponent] = dirLights.get<TransformComponent, DirectionalLightComponent>(entity);
+					glm::vec3 direction = -glm::normalize(glm::mat3(transfomComponent.GetTransform()) * glm::vec3(1.0f));
+					m_LightEnvironment.DirectionalLight =
+					{
+						direction,
+						lightComponent.Color,
+						lightComponent.Intensity,
+						lightComponent.CastsShadows
+					};
+					m_LightEnvironment.HasDirLight = true;
+					m_LightEnvironment.CastsShadows = lightComponent.CastsShadows;
+				}
+			}
+
+			// Point Lights
+			{
+				auto pointLights = m_Registry.view<TransformComponent, PointLightComponent>();
+				m_LightEnvironment.PointLights.resize(pointLights.size());
+				uint32_t index = 0;
+
+				for (auto entity : pointLights)
+				{
+					auto [transformComponent, lightComponent] = pointLights.get<TransformComponent, PointLightComponent>(entity);
+					auto position = GetWorldSpacePosition(Entity(entity, this));
+					m_LightEnvironment.PointLights[index++] =
+					{
+						position,
+						lightComponent.Intensity,
+						lightComponent.Color,
+						lightComponent.MinRadius,
+						lightComponent.Radius,
+						lightComponent.Falloff,
+						lightComponent.LightSize,
+						lightComponent.CastsShadows,
+					};
+				}
+			}
+
+			// Sky Light
+			{
+				auto skyLights = m_Registry.view<SkyLightComponent>();
+				for (auto entity : skyLights)
+				{
+					auto lightComponent = skyLights.get<SkyLightComponent>(entity);
+
+					m_LightEnvironment.SkyLight.EnvironmentMap = lightComponent.EnvironmentMap;
+					m_LightEnvironment.SkyLight.Intensity = lightComponent.Intensity;
+					m_LightEnvironment.SkyLight.Lod = lightComponent.Lod;
+				}
+			}
+		}
+
+		// Render ----------------------------------------------------------------------------------------------
+		SceneCamera* mainCamera = nullptr;
 		glm::mat4 cameraTransform;
 		{
 			auto view = m_Registry.view<TransformComponent, CameraComponent>();
@@ -297,8 +439,6 @@ namespace Venus {
 				}
 			}
 		}
-
-		// Render
 		if (mainCamera)
 		{	
 			renderer->BeginScene(*mainCamera, cameraTransform);
@@ -314,7 +454,7 @@ namespace Venus {
 				{
 					auto [transform, model] = view.get<TransformComponent, MeshRendererComponent>(entity);
 						
-					renderer->SubmitModel(model.Model, transform.GetTransform());
+					renderer->SubmitModel(model.Model, transform.GetTransform(), (int)entity);
 				}
 			}
 			
@@ -471,6 +611,16 @@ namespace Venus {
 		return {};
 	}
 
+	glm::vec3 Scene::GetWorldSpacePosition(Entity entity)
+	{
+		glm::mat4 transform = entity.GetComponent<TransformComponent>().GetTransform();
+
+		TransformComponent result;
+		Math::DecomposeTransform(transform, result.Position, result.Rotation, result.Scale);
+
+		return result.Position;
+	}
+
 	template<typename T>
 	void Scene::OnComponentAdded(Entity, T& component)
 	{
@@ -525,6 +675,21 @@ namespace Venus {
 
 	template<>
 	void Scene::OnComponentAdded<MeshRendererComponent>(Entity entity, MeshRendererComponent& component)
+	{
+	}
+
+	template<>
+	void Scene::OnComponentAdded<PointLightComponent>(Entity entity, PointLightComponent& component)
+	{
+	}
+
+	template<>
+	void Scene::OnComponentAdded<DirectionalLightComponent>(Entity entity, DirectionalLightComponent& component)
+	{
+	}
+
+	template<>
+	void Scene::OnComponentAdded<SkyLightComponent>(Entity entity, SkyLightComponent& component)
 	{
 	}
 }

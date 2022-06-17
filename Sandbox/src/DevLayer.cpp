@@ -16,7 +16,7 @@ void DevLayer::OnAttach()
 	//m_ActiveModel = Venus::Model("assets/models/fish/fish.obj");
 	//m_ActiveModel = Venus::Model("assets/models/house/house.obj");
 	//m_ActiveModel = Venus::Model("assets/models/cucumber/Cucumber.obj");
-	m_ActiveModel = Venus::CreateRef<Venus::Model>("assets/models/trator/trator.obj");
+	//m_ActiveModel = Venus::CreateRef<Venus::Model>("assets/models/trator/trator.obj");
 	//m_ActiveModel = Venus::Model("assets/models/onion/onion.obj");
 	//m_ActiveModel = Venus::Factory::CreateCube(glm::vec3(1.0f));
 
@@ -29,24 +29,6 @@ void DevLayer::OnDetach()
 
 void DevLayer::OnUpdate(Venus::Timestep ts)
 {
-	{
-		Venus::RenderCommand::SetClearColor(m_ClearColor);
-		Venus::RenderCommand::Clear();
-
-		Venus::Renderer::ResetStats();
-	}
-
-
-	m_EditorCamera.OnUpdate(ts);
-	
-	if(m_RotateModel)
-		m_ModelTransform.Rotation.y += 0.5 * ts;
-
-	Venus::Renderer::BeginScene(m_EditorCamera);
-	{
-		Venus::Renderer::RenderModel(m_ActiveModel, m_ModelTransform.GetTransform());
-	}
-	Venus::Renderer::EndScene();
 }
 
 void DevLayer::OnImGuiRender()

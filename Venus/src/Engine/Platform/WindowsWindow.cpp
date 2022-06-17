@@ -10,6 +10,8 @@
 #include "Renderer/Renderer.h"
 #include "Renderer/OpenGL/OpenGLContext.h"
 
+#include "stb_image.h"
+
 namespace Venus {
 
 	static uint8_t s_GLFWWindowCount = 0;
@@ -42,7 +44,6 @@ namespace Venus {
 		m_Data.Height = props.Height;
 
 		CORE_LOG_INFO("Creating window {0} ({1}, {2})", props.Title, props.Width, props.Height);
-
 		if (s_GLFWWindowCount == 0)
 		{
 			VS_PROFILE_SCOPE("glfwInit");
@@ -53,6 +54,9 @@ namespace Venus {
 
 		{
 			VS_PROFILE_SCOPE("glfwCreateWindow");
+
+			glfwWindowHint(GLFW_TITLEBAR, props.Decorated);
+
 #if defined(VS_DEBUG)
 			if (Renderer::GetAPI() == RendererAPI::API::OpenGL)
 				glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
@@ -152,13 +156,26 @@ namespace Venus {
 				data.EventCallback(event);
 			});
 
+		glfwSetTitlebarHitTestCallback(m_Window, [](GLFWwindow* window, int x, int y, int* hit)
+			{
+				WindowData& data = *(WindowData*)glfwGetWindowUserPointer(window);
+				WindowTitleBarHitTestEvent event(x, y, *hit);
+				data.EventCallback(event);
+			});
+
 		glfwSetCursorPosCallback(m_Window, [](GLFWwindow* window, double xPos, double yPos)
 			{
 				WindowData& data = *(WindowData*)glfwGetWindowUserPointer(window);
-
 				MouseMovedEvent event((float)xPos, (float)yPos);
 				data.EventCallback(event);
 			});
+
+		// Venus Icon
+		GLFWimage icon;
+		int channels;
+		icon.pixels = stbi_load("Resources/Icons/venus.png", &icon.width, &icon.height, &channels, 4);
+		glfwSetWindowIcon(m_Window, 1, &icon);
+		stbi_image_free(icon.pixels);
 	}
 
 	void WindowsWindow::Shutdown()
@@ -202,6 +219,21 @@ namespace Venus {
 	void WindowsWindow::Maximize()
 	{
 		glfwMaximizeWindow(m_Window);
+	}
+
+	bool WindowsWindow::IsMaximized()
+	{
+		return (bool)glfwGetWindowAttrib(m_Window, GLFW_MAXIMIZED);
+	}
+
+	void WindowsWindow::Minimize()
+	{
+		glfwIconifyWindow(m_Window);
+	}
+
+	void WindowsWindow::Restore()
+	{
+		glfwRestoreWindow(m_Window);
 	}
 
 }

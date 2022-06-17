@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "Engine/Input.h"
-
 #include "Engine/Application.h"
+#include "Engine/Platform/WindowsWindow.h"
 
 #include <GLFW/glfw3.h>
 
@@ -38,6 +38,12 @@ namespace Venus {
 	float Input::GetMouseY()
 	{
 		return GetMousePosition().y;
+	}
+
+	void Input::SetCursorMode(CursorMode mode)
+	{
+		auto& window = static_cast<WindowsWindow&>(Application::Get().GetWindow());
+		glfwSetInputMode(static_cast<GLFWwindow*>(window.GetNativeWindow()), GLFW_CURSOR, GLFW_CURSOR_NORMAL + (int)mode);
 	}
 
 }

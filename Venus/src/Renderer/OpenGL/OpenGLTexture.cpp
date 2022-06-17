@@ -2,186 +2,270 @@
 #include "OpenGLTexture.h"
 
 #include <stb_image.h>
+#include "glm/glm.hpp"
 
 namespace Venus {
 
-	OpenGLTexture2D::OpenGLTexture2D(uint32_t width, uint32_t height)
-		: m_Width(width), m_Height(height)
-	{
-		VS_PROFILE_FUNCTION();
+	/////////////////////////////////////////////////////////////////////////////
+	// Texture 2D ///////////////////////////////////////////////////////////////
+	/////////////////////////////////////////////////////////////////////////////
 
-		m_InternalFormat = GL_RGBA8;
+	OpenGLTexture2D::OpenGLTexture2D(uint32_t width, uint32_t height, TextureProperties props)
+		: m_Width(width), m_Height(height), m_Properties(props)
+	{
+		m_InternalFormat = OpenGLTextureFormat(props.Format);
 		m_DataFormat = GL_RGBA;
 
+		uint32_t mipmapCount = props.GenerateMipmaps ? GetMipLevelCount() : 1;
+
 		glCreateTextures(GL_TEXTURE_2D, 1, &m_RendererID);
-		glTextureStorage2D(m_RendererID, 1, m_InternalFormat, m_Width, m_Height);
+		glTextureStorage2D(m_RendererID, mipmapCount, m_InternalFormat, m_Width, m_Height);
 
-		glTextureParameteri(m_RendererID, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTextureParameteri(m_RendererID, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTextureParameteri(m_RendererID, GL_TEXTURE_MIN_FILTER, OpenGLFilterMode(props.Filter));
+		glTextureParameteri(m_RendererID, GL_TEXTURE_MAG_FILTER, OpenGLFilterMode(props.Filter));
 
-		glTextureParameteri(m_RendererID, GL_TEXTURE_WRAP_S, GL_REPEAT);
-		glTextureParameteri(m_RendererID, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTextureParameteri(m_RendererID, GL_TEXTURE_WRAP_S, OpenGLWrapMode(props.WrapMode));
+		glTextureParameteri(m_RendererID, GL_TEXTURE_WRAP_T, OpenGLWrapMode(props.WrapMode));
+
+		if(props.GenerateMipmaps)
+			GenerateMips();
 	}
 
-	OpenGLTexture2D::OpenGLTexture2D(const std::string& path)
-		: m_Path(path)
+	OpenGLTexture2D::OpenGLTexture2D(const std::string& path, TextureProperties props)
+		: m_Path(path), m_Properties(props)
 	{
-		VS_PROFILE_FUNCTION();
-
 		int width, height, channels;
-		stbi_set_flip_vertically_on_load(1);
-		stbi_uc* data = nullptr;
+
+		//-- HDR Image------------------------------------------------------------------------------
+		if (stbi_is_hdr(path.c_str()))
 		{
-			VS_PROFILE_SCOPE("stbi_load - OpenGLTexture2D::OpenGLTexture2D(const std::string&)");
-			data = stbi_load(path.c_str(), &width, &height, &channels, 0);
-		}
-			
-		if (data)
-		{
-			m_IsLoaded = true;
+			stbi_set_flip_vertically_on_load(m_Properties.FlipVertically);
+			float* data = nullptr;
+			data = stbi_loadf(path.c_str(), &width, &height, &channels, 4);
 
-			m_Width = width;
-			m_Height = height;
+			CORE_LOG_INFO("Texture is HDR!");
 
-			GLenum internalFormat = 0, dataFormat = 0;
-			if (channels == 4)
+			if (data)
 			{
-				internalFormat = GL_RGBA8;
-				dataFormat = GL_RGBA;
+				m_IsLoaded = true;
+
+				m_Width = width;
+				m_Height = height;
+
+				props.Format = TextureFormat::RGBA32F;
+
+				uint32_t mipmapCount = props.GenerateMipmaps ? GetMipLevelCount() : 1;
+
+				m_InternalFormat = OpenGLTextureFormat(props.Format);
+				m_DataFormat = GL_RGBA;
+
+				glCreateTextures(GL_TEXTURE_2D, 1, &m_RendererID);
+				glTextureStorage2D(m_RendererID, mipmapCount, m_InternalFormat, m_Width, m_Height);
+
+				glTextureParameteri(m_RendererID, GL_TEXTURE_MIN_FILTER, OpenGLFilterMode(props.Filter));
+				glTextureParameteri(m_RendererID, GL_TEXTURE_MAG_FILTER, OpenGLFilterMode(props.Filter));
+
+				glTextureParameteri(m_RendererID, GL_TEXTURE_WRAP_S, OpenGLWrapMode(props.WrapMode));
+				glTextureParameteri(m_RendererID, GL_TEXTURE_WRAP_T, OpenGLWrapMode(props.WrapMode));
+
+				glTextureSubImage2D(m_RendererID, 0, 0, 0, m_Width, m_Height, m_DataFormat, GL_FLOAT, data);
+
+				if (props.GenerateMipmaps)
+					GenerateMips();
+
+				stbi_image_free(data);
 			}
-			else if (channels == 3)
-			{
-				internalFormat = GL_RGB8;
-				dataFormat = GL_RGB;
-			}
-
-			m_InternalFormat = internalFormat;
-			m_DataFormat = dataFormat;
-
-			VS_CORE_ASSERT(internalFormat & dataFormat, "Format not supported!");
-
-			glCreateTextures(GL_TEXTURE_2D, 1, &m_RendererID);
-			glTextureStorage2D(m_RendererID, 1, internalFormat, m_Width, m_Height);
-
-			glTextureParameteri(m_RendererID, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-			glTextureParameteri(m_RendererID, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-			glTextureParameteri(m_RendererID, GL_TEXTURE_WRAP_S, GL_REPEAT);
-			glTextureParameteri(m_RendererID, GL_TEXTURE_WRAP_T, GL_REPEAT);
-
-			glTextureSubImage2D(m_RendererID, 0, 0, 0, m_Width, m_Height, dataFormat, GL_UNSIGNED_BYTE, data);
-
-			stbi_image_free(data);
+			else
+				CORE_LOG_ERROR("Could not find HDR texture: {0}", path);
 		}
+		//-- Normal Image---------------------------------------------------------------------------
 		else
-			CORE_LOG_ERROR("Could not find texture: {0}", path);
-
-	}
-
-	OpenGLTexture2D::OpenGLTexture2D(const std::string& path, TextureFilterMode filterMode, TextureWrapMode wrapMode)
-		: m_Path(path)
-	{
-		VS_PROFILE_FUNCTION();
-
-		int width, height, channels;
-		stbi_set_flip_vertically_on_load(1);
-		stbi_uc* data = nullptr;
 		{
-			VS_PROFILE_SCOPE("stbi_load - OpenGLTexture2D::OpenGLTexture2D(const std::string&)");
-			data = stbi_load(path.c_str(), &width, &height, &channels, 0);
-		}
+			stbi_set_flip_vertically_on_load(m_Properties.FlipVertically);
+			stbi_uc* data = nullptr;
+			data = stbi_load(path.c_str(), &width, &height, &channels, 4);
 
-		if (data)
-		{
-			m_IsLoaded = true;
-
-			m_Width = width;
-			m_Height = height;
-
-			GLenum internalFormat = 0, dataFormat = 0;
-			if (channels == 4)
+			if (data)
 			{
-				internalFormat = GL_RGBA8;
-				dataFormat = GL_RGBA;
+				m_IsLoaded = true;
+
+				m_Width = width;
+				m_Height = height;
+
+				m_InternalFormat = OpenGLTextureFormat(props.Format);
+				m_DataFormat = GL_RGBA;
+
+				uint32_t mipmapCount = props.GenerateMipmaps ? GetMipLevelCount() : 1;
+
+				glCreateTextures(GL_TEXTURE_2D, 1, &m_RendererID);
+				glTextureStorage2D(m_RendererID, mipmapCount, m_InternalFormat, m_Width, m_Height);
+
+				glTextureParameteri(m_RendererID, GL_TEXTURE_MIN_FILTER, OpenGLFilterMode(props.Filter));
+				glTextureParameteri(m_RendererID, GL_TEXTURE_MAG_FILTER, OpenGLFilterMode(props.Filter));
+
+				glTextureParameteri(m_RendererID, GL_TEXTURE_WRAP_S, OpenGLWrapMode(props.WrapMode));
+				glTextureParameteri(m_RendererID, GL_TEXTURE_WRAP_T, OpenGLWrapMode(props.WrapMode));
+
+				glTextureSubImage2D(m_RendererID, 0, 0, 0, m_Width, m_Height, m_DataFormat, GL_UNSIGNED_BYTE, data);
+
+				if (props.GenerateMipmaps)
+					GenerateMips();
+
+				stbi_image_free(data);
 			}
-			else if (channels == 3)
-			{
-				internalFormat = GL_RGB8;
-				dataFormat = GL_RGB;
-			}
-
-			m_InternalFormat = internalFormat;
-			m_DataFormat = dataFormat;
-
-			VS_CORE_ASSERT(internalFormat & dataFormat, "Format not supported!");
-
-			glCreateTextures(GL_TEXTURE_2D, 1, &m_RendererID);
-			glTextureStorage2D(m_RendererID, 1, internalFormat, m_Width, m_Height);
-
-			GLenum filter = GL_LINEAR;
-			switch (filterMode)
-			{
-				case TextureFilterMode::Point:
-					filter = GL_NEAREST;
-					break;
-
-				case TextureFilterMode::Bilinear:
-					filter = GL_LINEAR;
-					break;
-			}
-
-			GLenum wrap = GL_REPEAT;
-			switch (wrapMode)
-			{
-				case TextureWrapMode::Repeat:
-					wrap = GL_REPEAT;
-					break;
-
-				case TextureWrapMode::Mirrored:
-					wrap = GL_MIRRORED_REPEAT;
-					break;
-
-				case TextureWrapMode::ClampToEdge:
-					wrap = GL_CLAMP_TO_EDGE;
-					break;
-
-				case TextureWrapMode::ClampToBorder:
-					wrap = GL_CLAMP_TO_BORDER;
-					break;
-			}
-
-			glTextureParameteri(m_RendererID, GL_TEXTURE_MIN_FILTER, filter);
-			glTextureParameteri(m_RendererID, GL_TEXTURE_MAG_FILTER, filter);
-
-			glTextureParameteri(m_RendererID, GL_TEXTURE_WRAP_S, wrap);
-			glTextureParameteri(m_RendererID, GL_TEXTURE_WRAP_T, wrap);
-
-			glTextureSubImage2D(m_RendererID, 0, 0, 0, m_Width, m_Height, dataFormat, GL_UNSIGNED_BYTE, data);
-
-			stbi_image_free(data);
+			else
+				CORE_LOG_ERROR("Could not find texture: {0}", path);
 		}
 	}
 
 	OpenGLTexture2D::~OpenGLTexture2D()
 	{
-		VS_PROFILE_FUNCTION();
-
 		glDeleteTextures(1, &m_RendererID);
 	}
 
 	void OpenGLTexture2D::SetData(void* data, uint32_t size)
-	{
-		VS_PROFILE_FUNCTION();
-
-		uint32_t bpp = m_DataFormat == GL_RGBA ? 4 : 3;
+	{uint32_t bpp = m_DataFormat == GL_RGBA ? 4 : 3;
 		VS_CORE_ASSERT(size == m_Width * m_Height * bpp, "Data must be entire texture!");
 		glTextureSubImage2D(m_RendererID, 0, 0, 0, m_Width, m_Height, m_DataFormat, GL_UNSIGNED_BYTE, data);
 	}
 
+	void OpenGLTexture2D::GenerateMips()
+	{
+		glBindTexture(GL_TEXTURE_2D, m_RendererID);
+		glGenerateMipmap(GL_TEXTURE_2D);
+	}
+
 	void OpenGLTexture2D::Bind(uint32_t slot) const
 	{
-		VS_PROFILE_FUNCTION();
-
 		glBindTextureUnit(slot, m_RendererID);
+	}
+
+	uint32_t OpenGLTexture2D::GetMipLevelCount() const
+	{
+		return (uint32_t)std::floor(std::log2(glm::min(m_Width, m_Height))) + 1;
+	}
+
+	std::pair<uint32_t, uint32_t> OpenGLTexture2D::GetMipSize(uint32_t mip) const
+	{
+		uint32_t width = m_Width;
+		uint32_t height = m_Height;
+
+		while (mip != 0)
+		{
+			width /= 2;
+			height /= 2;
+			mip--;
+		}
+
+		return {width, height};
+	}
+
+	/////////////////////////////////////////////////////////////////////////////
+	// Texture Cube /////////////////////////////////////////////////////////////
+	/////////////////////////////////////////////////////////////////////////////
+
+	OpenGLTextureCube::OpenGLTextureCube(uint32_t width, uint32_t height, TextureProperties props)
+		: m_Width(width), m_Height(height), m_Properties(props)
+	{
+		m_InternalFormat = OpenGLTextureFormat(props.Format);
+		m_DataFormat = GL_RGBA;
+
+		glGenTextures(1, &m_RendererID);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, m_RendererID);
+
+		for (uint32_t i = 0; i < 6; ++i)
+		{
+			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, m_InternalFormat, m_Width, m_Height, 0, m_DataFormat, GL_FLOAT, nullptr); // Const FLOAT?
+		}
+
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); 
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+		glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+	}
+
+	OpenGLTextureCube::OpenGLTextureCube(std::vector<std::string> paths, TextureProperties props)
+	{
+		m_InternalFormat = OpenGLTextureFormat(props.Format);
+		m_DataFormat = GL_RGBA;
+
+		glGenTextures(1, &m_RendererID);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, m_RendererID);
+
+		int width, height, channels;
+
+		for (uint32_t i = 0; i < paths.size(); i++)
+		{
+			stbi_uc* data = nullptr;
+			data = stbi_load(paths[i].c_str(), &width, &height, &channels, 4);
+
+			if (data)
+			{
+				m_Width = width;
+				m_Height = height;
+
+				glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, m_InternalFormat, m_Width, m_Height, 0, m_DataFormat, GL_UNSIGNED_BYTE, data);
+				stbi_image_free(data);
+			}
+			else
+				CORE_LOG_ERROR("Could not find texture: {0}", paths[i]); 
+		}
+
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+		glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+	}
+
+	OpenGLTextureCube::~OpenGLTextureCube()
+	{
+		glDeleteTextures(1, &m_RendererID);
+	}
+
+	void OpenGLTextureCube::SetData(void* data, uint32_t size)
+	{
+		// Same data for all faces for now...
+		glBindTexture(GL_TEXTURE_CUBE_MAP, m_RendererID);
+		for (uint32_t i = 0; i < 6; ++i)
+		{
+			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, m_InternalFormat, m_Width, m_Height, 0, m_DataFormat, GL_FLOAT, data); // Const FLOAT?
+		}
+	}
+
+	void OpenGLTextureCube::GenerateMips()
+	{
+		glBindTexture(GL_TEXTURE_CUBE_MAP, m_RendererID);
+		glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+	}
+
+	void OpenGLTextureCube::Bind(uint32_t slot) const
+	{
+		glBindTextureUnit(slot, m_RendererID);
+	}
+
+	uint32_t OpenGLTextureCube::GetMipLevelCount() const
+	{
+		return (uint32_t)std::floor(std::log2(glm::min(m_Width, m_Height))) + 1;
+	}
+
+	std::pair<uint32_t, uint32_t> OpenGLTextureCube::GetMipSize(uint32_t mip) const
+	{
+		uint32_t width = m_Width;
+		uint32_t height = m_Height;
+
+		while (mip != 0)
+		{
+			width /= 2;
+			height /= 2;
+			mip--;
+		}
+
+		return { width, height };
 	}
 }

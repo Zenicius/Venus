@@ -21,11 +21,13 @@ namespace Venus {
 			virtual void EnableDepthTest() override;
 			virtual void SetStencilTest(int function, int value, int mask) override;
 
-			// TEMP
-			virtual void BindTexture(int textureID) override;
+			virtual void BindTexture(int location, int textureID) override;
+			virtual void BindTextureCube(int location, int textureID) override;
+			virtual void BindTextureArray(int location, int textureID) override;
 			virtual void BindFramebuffer(int framebufferID) override;
 
 			virtual void DrawIndexed(const Ref<VertexArray>& vertexArray, uint32_t indexCount = 0) override;
+			virtual void DrawArrays(const Ref<VertexArray>& vertexArray, uint32_t indexCount) override;
 			virtual void DrawLines(const Ref<VertexArray>& vertexArray, uint32_t vertexCount) override;
 
 			virtual void SetLineWidth(float width) override;

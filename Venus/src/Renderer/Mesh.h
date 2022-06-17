@@ -3,8 +3,11 @@
 #include "glm/glm.hpp"
 
 #include "Texture.h"
-#include <Renderer/Buffer.h>
-#include <Renderer/VertexArray.h>
+#include "Renderer/Buffer.h"
+#include "Renderer/VertexArray.h"
+#include "Renderer/MeshMaterial.h"
+
+#include <map>
 
 struct aiNode;
 struct aiMesh;
@@ -24,37 +27,21 @@ namespace Venus {
 		glm::vec2 TexCoords;
 	};
 
-	// TEMP Move To Material 
-	enum class TextureType
-	{
-		Diffuse = 0,
-		Normal = 1,
-		Specular = 2,
-
-		Unknown = 3
-	};
-
-	struct MaterialTexture {
-		uint32_t Index;
-		TextureType Type;
-	};
-
 	class Mesh
 	{
 		public:
-			Mesh(std::vector<Vertex> vertices, std::vector<uint32_t> indices, std::vector<MaterialTexture> textures);
+			Mesh(std::vector<Vertex> vertices, std::vector<uint32_t> indices, uint32_t materialIndex);
 
 		private:
 			void InitMesh();
 
 			std::vector<Vertex> m_Vertices;
 			std::vector<uint32_t> m_Indices;
+			uint32_t m_MaterialIndex;
 			
 			Ref<VertexArray> m_VertexArray;
 			Ref<VertexBuffer> m_VertexBuffer;
 			Ref<IndexBuffer> m_IndexBuffer;
-
-			std::vector<MaterialTexture> m_Textures;
 
 			friend class Renderer;
 			friend class Model;
@@ -62,27 +49,23 @@ namespace Venus {
 
 	class Model
 	{
-
 		public:
+			static Ref<Model> Create(const std::string& path);
 			Model();
 			Model(const std::string& path);
 
-			void LogMeshStatistics();
+			void LogMeshStatistics(const aiScene* scene);
+			std::map<uint32_t, Ref<MeshMaterial>> GetMaterials() { return m_Materials; }
 
 		private:
 			void LoadModel();
-			void Init();
 
 			void ProcessNode(aiNode* node, const aiScene* scene);
 			Mesh ProcessMesh(aiMesh* mesh, const aiScene* scene);
 
-			std::vector<MaterialTexture> LoadMaterialTextures(aiMaterial* material, TextureType type);
-
 			std::vector<Mesh> m_Meshes;
-			std::vector<Ref<Texture2D>> m_DiffuseMaps;
-			std::vector<Ref<Texture2D>> m_NormalMaps;
-			std::vector<Ref<Texture2D>> m_SpecularMaps;
-
+			std::map<uint32_t, Ref<MeshMaterial>> m_Materials; // TODO: MaterialTable
+			
 			std::string m_Path;
 
 			friend class Renderer;

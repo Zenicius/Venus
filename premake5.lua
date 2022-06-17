@@ -35,8 +35,8 @@ LibraryDir = {}
 
 --DIRS
 LibraryDir["VulkanSDK"] = "%{VULKAN_SDK}/Lib"
-LibraryDir["VulkanSDK_Debug"] = "%{wks.location}/Venus/vendor/VulkanSDK/Lib"
-LibraryDir["VulkanSDK_DebugDLL"] = "%{wks.location}/Venus/vendor/VulkanSDK/Bin"
+LibraryDir["VulkanSDK_Debug"] = "%{VULKAN_SDK}/Lib"
+LibraryDir["VulkanSDK_DebugDLL"] = "%{VULKAN_SDK}/Bin"
 
 Library = {}
 -- assimp

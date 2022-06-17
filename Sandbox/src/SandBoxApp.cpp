@@ -7,7 +7,7 @@ class SandboxApp : public Venus::Application
 {
 	public:
 		SandboxApp(Venus::ApplicationCommandLineArgs args)
-			:Venus::Application("Venus Engine")
+			:Venus::Application()
 		{
 			PushLayer(new DevLayer());
 		}

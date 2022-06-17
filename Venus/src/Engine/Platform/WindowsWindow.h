@@ -18,12 +18,17 @@ namespace Venus {
 			unsigned int GetWidth() const override { return m_Data.Width; }
 			unsigned int GetHeight() const override { return m_Data.Height; }
 
-			// Window attributes
 			void SetEventCallback(const EventCallbackFn& callback) override { m_Data.EventCallback = callback; }
+
 			void SetVSync(bool enabled) override;
 			bool IsVSync() const override;
+
 			void SetWindowTitle(const std::string& title) override { glfwSetWindowTitle(m_Window, title.c_str()); }
+
 			void Maximize() override;
+			bool IsMaximized() override;
+			void Minimize() override;
+			void Restore() override;
 
 			virtual void* GetNativeWindow() const { return m_Window; }
 

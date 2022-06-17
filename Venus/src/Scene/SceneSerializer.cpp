@@ -189,7 +189,7 @@ namespace Venus {
 			out << YAML::EndMap;
 		}
 
-		// SpriteRendererComponent
+		// MeshRendererComponent
 		if (entity.HasComponent<MeshRendererComponent>())
 		{
 			out << YAML::Key << "MeshRendererComponent";
@@ -259,6 +259,69 @@ namespace Venus {
 			out << YAML::Key << "RestitutionThreshold" << YAML::Value << ccComponent.RestitutionThreshold;
 			out << YAML::EndMap;
 		}
+
+		// PointLightComponent
+		if (entity.HasComponent<PointLightComponent>())
+		{
+			out << YAML::Key << "PointLightComponent";
+			out << YAML::BeginMap;
+
+			auto& plComponent = entity.GetComponent<PointLightComponent>();
+			out << YAML::Key << "Color" << YAML::Value << plComponent.Color;
+			out << YAML::Key << "Intensity" << YAML::Value << plComponent.Intensity;
+			out << YAML::Key << "LightSize" << YAML::Value << plComponent.LightSize;
+			out << YAML::Key << "MinRadius" << YAML::Value << plComponent.MinRadius;
+			out << YAML::Key << "Radius" << YAML::Value << plComponent.Radius;
+			out << YAML::Key << "CastsShadows" << YAML::Value << plComponent.CastsShadows;
+			out << YAML::Key << "SoftShadows" << YAML::Value << plComponent.SoftShadows;
+			out << YAML::Key << "Falloff" << YAML::Value << plComponent.Falloff;
+			out << YAML::EndMap;
+		}
+
+		// DirectionalLightComponent
+		if (entity.HasComponent<DirectionalLightComponent>())
+		{
+			out << YAML::Key << "DirectionalLightComponent";
+			out << YAML::BeginMap;
+
+			auto& dlComponent = entity.GetComponent<DirectionalLightComponent>();
+			out << YAML::Key << "Color" << YAML::Value << dlComponent.Color;
+			out << YAML::Key << "Intensity" << YAML::Value << dlComponent.Intensity;
+			out << YAML::Key << "CastsShadows" << YAML::Value << dlComponent.CastsShadows;
+			out << YAML::Key << "SoftShadows" << YAML::Value << dlComponent.SoftShadows;
+			out << YAML::Key << "LightSize" << YAML::Value << dlComponent.LightSize;
+			out << YAML::EndMap;
+		}
+
+		// SkyLightComponent
+		if (entity.HasComponent<SkyLightComponent>())
+		{
+			out << YAML::Key << "SkyLightComponent";
+			out << YAML::BeginMap;
+
+			auto& slComponent = entity.GetComponent<SkyLightComponent>();
+
+			if (!slComponent.EnvironmentMapPath.empty())
+			{
+				out << YAML::Key << "EnvironmentMapName" << YAML::Value << slComponent.EnvironmentMapName;
+				out << YAML::Key << "EnvironmentMapPath" << YAML::Value << slComponent.EnvironmentMapPath;
+			}
+
+			if (slComponent.EnvironmentMap)
+			{
+				out << YAML::Key << "Intensity" << YAML::Value << slComponent.Intensity;
+				out << YAML::Key << "Lod" << YAML::Value << slComponent.Lod;
+			}
+			
+			if (slComponent.DinamicSky)
+			{
+				out << YAML::Key << "DinamicSky" << YAML::Value << slComponent.DinamicSky;
+				out << YAML::Key << "TurbidityAzimuthInclination" << YAML::Value << slComponent.TurbidityAzimuthInclination;
+			}
+
+
+			out << YAML::EndMap;
+		}	
 
 		out << YAML::EndMap;   // Entity
 	}
@@ -387,10 +450,20 @@ namespace Venus {
 					if (!modelPath.empty())
 					{
 						meshRenderer.ModelPath = modelPath;
-						meshRenderer.Model = CreateRef<Model>(modelPath);
+						meshRenderer.Model = Model::Create(modelPath);
 					}
 					else if(meshRenderer.ModelName.compare("Sphere") == 0)
-						meshRenderer.Model = Factory::CreateSphere(1.0f);
+						meshRenderer.Model = Model::Create("Resources/Models/Sphere.fbx");
+					else if (meshRenderer.ModelName.compare("Plane") == 0)
+						meshRenderer.Model = Model::Create("Resources/Models/Plane.fbx");
+					else if (meshRenderer.ModelName.compare("Capsule") == 0)
+						meshRenderer.Model = Model::Create("Resources/Models/Capsule.fbx");
+					else if (meshRenderer.ModelName.compare("Torus") == 0)
+						meshRenderer.Model = Model::Create("Resources/Models/Torus.fbx");
+					else if (meshRenderer.ModelName.compare("Cone") == 0)
+						meshRenderer.Model = Model::Create("Resources/Models/Cone.fbx");
+					else if (meshRenderer.ModelName.compare("Cylinder") == 0)
+						meshRenderer.Model = Model::Create("Resources/Models/Cylinder.fbx");
 				}
 
 				// CircleRendererComponent
@@ -437,129 +510,64 @@ namespace Venus {
 					cc.Restitution = ccComponent["Restitution"].as<float>();
 					cc.RestitutionThreshold = ccComponent["RestitutionThreshold"].as<float>();
 				}
+
+				// PointLightComponent
+				auto plComponent = entity["PointLightComponent"];
+				if (plComponent)
+				{
+					auto& pl = deserializedEntity.AddComponent<PointLightComponent>();
+					pl.Color = plComponent["Color"].as<glm::vec3>();
+					pl.Intensity = plComponent["Intensity"].as<float>();
+					pl.LightSize = plComponent["LightSize"].as<float>();
+					pl.MinRadius = plComponent["MinRadius"].as<float>();
+					pl.Radius = plComponent["Radius"].as<float>();
+					pl.CastsShadows = plComponent["CastsShadows"].as<bool>();
+					pl.SoftShadows = plComponent["SoftShadows"].as<bool>();
+					pl.Falloff = plComponent["Falloff"].as<float>();
+				}
+
+				// DirectionalLightComponent
+				auto dlComponent = entity["DirectionalLightComponent"];
+				if (dlComponent)
+				{
+					auto& dl = deserializedEntity.AddComponent<DirectionalLightComponent>();
+					dl.Color = dlComponent["Color"].as<glm::vec3>();
+					dl.Intensity = dlComponent["Intensity"].as<float>();
+					dl.CastsShadows = dlComponent["CastsShadows"].as<bool>();
+					dl.SoftShadows = dlComponent["SoftShadows"].as<bool>();
+					dl.LightSize = dlComponent["LightSize"].as<float>();
+				}
+
+				// SkyLightComponent
+				auto slComponent = entity["SkyLightComponent"];
+				if (slComponent)
+				{
+					auto& sl = deserializedEntity.AddComponent<SkyLightComponent>();
+					auto path = slComponent["EnvironmentMapPath"];
+					auto dinamic = slComponent["DinamicSky"];
+
+					if (path)
+					{
+						sl.EnvironmentMapName = slComponent["EnvironmentMapName"].as<std::string>();
+						sl.EnvironmentMapPath = path.as<std::string>();
+						sl.Intensity = slComponent["Intensity"].as<float>();
+						sl.Lod = slComponent["Lod"].as<float>();
+						sl.EnvironmentMap = Renderer::CreateEnvironmentMap(sl.EnvironmentMapPath);
+					}
+					else if (dinamic)
+					{
+						sl.DinamicSky = dinamic.as<bool>();
+						sl.TurbidityAzimuthInclination = slComponent["TurbidityAzimuthInclination"].as<glm::vec3>();
+						sl.Intensity = slComponent["Intensity"].as<float>();
+						sl.Lod = slComponent["Lod"].as<float>();
+						Ref<TextureCube> preethamSky = Renderer::CreatePreethamSky(sl.TurbidityAzimuthInclination);
+						sl.EnvironmentMap = SceneEnvironment::Create(preethamSky, preethamSky);
+					}
+				}
 			}
 		}
 
 		return true;
-	}
-
-	Entity SceneSerializer::DeserializePrefab(const std::string& filepath)
-	{
-		YAML::Node data;
-		try
-		{
-			data = YAML::LoadFile(filepath);
-		}
-		catch (YAML::ParserException e)
-		{
-			return {};
-		}
-
-		if (!data["Entity"])
-			return {};
-
-		// TagComponent
-		std::string name;
-		auto tagComponent = data["TagComponent"];
-		if (tagComponent)
-			name = tagComponent["Name"].as<std::string>();
-
-		// Entity Creation
-		Entity deserializedEntity = m_Scene->CreateEntity(name);
-
-		// TransformComponent
-		auto transformComponent = data["TransformComponent"];
-		if (transformComponent)
-		{
-			auto& transform = deserializedEntity.GetComponent<TransformComponent>();
-			transform.Rotation = transformComponent["Rotation"].as<glm::vec3>();
-			transform.Scale = transformComponent["Scale"].as<glm::vec3>();
-		}
-
-		// CameraComponent
-		auto cameraComponent = data["CameraComponent"];
-		if (cameraComponent)
-		{
-			auto& cc = deserializedEntity.AddComponent<CameraComponent>();
-			auto& props = cameraComponent["Camera"];
-
-			cc.Camera.SetProjectionType((SceneCamera::ProjectionType)props["ProjectionType"].as<int>());
-
-			cc.Camera.SetPerspectiveVerticalFOV(props["PerspectiveFOV"].as<float>());
-			cc.Camera.SetPerspectiveNearClip(props["PerspectiveNear"].as<float>());
-			cc.Camera.SetPerspectiveFarClip(props["PerspectiveFar"].as<float>());
-
-			cc.Camera.SetOrthographicSize(props["OrthographicSize"].as<float>());
-			cc.Camera.SetOrthographicNearClip(props["OrthographicNear"].as<float>());
-			cc.Camera.SetOrthographicFarClip(props["OrthographicFar"].as<float>());
-
-			cc.Primary = cameraComponent["Primary"].as<bool>();
-			cc.FixedAspectRatio = cameraComponent["FixedAspectRatio"].as<bool>();
-		}
-
-		// SpriteRendererComponent
-		auto srComponent = data["SpriteRendererComponent"];
-		if (srComponent)
-		{
-			auto& src = deserializedEntity.AddComponent<SpriteRendererComponent>();
-			src.Color = srComponent["Color"].as<glm::vec4>();
-			std::string texturePath = srComponent["Texture"].as<std::string>();
-			src.TilingFactor = srComponent["TilingFactor"].as<float>();
-
-			if (!texturePath.empty())
-			{
-				src.TextureName = srComponent["TextureName"].as<std::string>();
-				src.TexturePath = texturePath;
-				src.Texture = Texture2D::Create(texturePath);
-			}
-		}
-
-		// CircleRendererComponent
-		auto circleComponent = data["CircleRendererComponent"];
-		if (circleComponent)
-		{
-			auto& cc = deserializedEntity.AddComponent<CircleRendererComponent>();
-			cc.Color = circleComponent["Color"].as<glm::vec4>();
-			cc.Thickness = circleComponent["Thickness"].as<float>();
-			cc.Fade = circleComponent["Fade"].as<float>();
-		}
-
-		// Rigidbody2DComponent 
-		auto rbComponent = data["Rigidbody2DComponent"];
-		if (rbComponent)
-		{
-			auto& rb = deserializedEntity.AddComponent<Rigidbody2DComponent>();
-			rb.Type = (Rigidbody2DComponent::BodyType)rbComponent["Type"].as<int>();
-			rb.FixedRotation = rbComponent["FixedRotation"].as<bool>();
-		}
-
-		// BoxCollider2DComponent 
-		auto bcComponent = data["BoxCollider2DComponent"];
-		if (bcComponent)
-		{
-			auto& bc = deserializedEntity.AddComponent<BoxCollider2DComponent>();
-			bc.Offset = bcComponent["Offset"].as<glm::vec2>();
-			bc.Size = bcComponent["Size"].as<glm::vec2>();
-			bc.Density = bcComponent["Density"].as<float>();
-			bc.Friction = bcComponent["Friction"].as<float>();
-			bc.Restitution = bcComponent["Restitution"].as<float>();
-			bc.RestitutionThreshold = bcComponent["RestitutionThreshold"].as<float>();
-		}
-
-		// CircleCollider2DComponent 
-		auto ccComponent = data["CircleCollider2DComponent"];
-		if (ccComponent)
-		{
-			auto& cc = deserializedEntity.AddComponent<CircleCollider2DComponent>();
-			cc.Offset = ccComponent["Offset"].as<glm::vec2>();
-			cc.Radius = ccComponent["Radius"].as<float>();
-			cc.Density = ccComponent["Density"].as<float>();
-			cc.Friction = ccComponent["Friction"].as<float>();
-			cc.Restitution = ccComponent["Restitution"].as<float>();
-			cc.RestitutionThreshold = ccComponent["RestitutionThreshold"].as<float>();
-		}
-
-		return deserializedEntity;
 	}
 
 	bool SceneSerializer::DeserializeRuntime(const std::string& filepath)

@@ -18,6 +18,8 @@ namespace Venus {
 			virtual void Bind() const override;
 			virtual void Unbind() const override;
 
+			virtual const std::string& GetName() const override { return m_Name; }
+
 			virtual void SetInt(const std::string& name, int value) override;
 			virtual void SetIntArray(const std::string& name, int* values, uint32_t count) override;
 			virtual void SetFloat(const std::string& name, float value) override;
@@ -26,8 +28,10 @@ namespace Venus {
 			virtual void SetFloat4(const std::string& name, const glm::vec4& value) override;
 			virtual void SetMat4(const std::string& name, const glm::mat4& value) override;
 
-			virtual const std::string& GetName() const override { return m_Name; }
-
+			virtual void SetTexture(const std::string& name, int binding, uint32_t texture) override;
+			virtual void SetCubeMap(const std::string& name, int binding, uint32_t texture) override;
+			virtual void SetTextureArray(const std::string& name, int binding, uint32_t texture) override;
+			
 			void UploadUniformInt(const std::string& name, int value);
 			void UploadUniformIntArray(const std::string& name, int* values, uint32_t count);
 
@@ -38,6 +42,9 @@ namespace Venus {
 
 			void UploadUniformMat3(const std::string& name, const glm::mat3& matrix);
 			void UploadUniformMat4(const std::string& name, const glm::mat4& matrix);
+
+			virtual int GetUniformLocation(const std::string& name) override;
+
 		private:
 			std::string ReadFile(const std::string& filepath);
 			std::unordered_map<GLenum, std::string> PreProcess(const std::string& source);

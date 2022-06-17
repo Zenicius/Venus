@@ -18,8 +18,8 @@ namespace Venus {
 	// Mesh /////////////////////////////////////////////////////////////////////
 	/////////////////////////////////////////////////////////////////////////////
 
-	Mesh::Mesh(std::vector<Vertex> vertices, std::vector<uint32_t> indices, std::vector<MaterialTexture> textures)
-		: m_Vertices(vertices), m_Indices(indices), m_Textures(textures)
+	Mesh::Mesh(std::vector<Vertex> vertices, std::vector<uint32_t> indices, uint32_t materialIndex)
+		: m_Vertices(vertices), m_Indices(indices), m_MaterialIndex(materialIndex)
 	{
 		InitMesh();
 	}
@@ -47,6 +47,11 @@ namespace Venus {
 	// Model ////////////////////////////////////////////////////////////////////
 	/////////////////////////////////////////////////////////////////////////////
 
+	Ref<Model> Model::Create(const std::string& path)
+	{
+		return CreateRef<Model>(path);
+	}
+
 	Model::Model()
 	{
 	}
@@ -55,7 +60,6 @@ namespace Venus {
 		: m_Path(path)
 	{
 		LoadModel();
-		Init();
 	}
 
 	void Model::LoadModel()
@@ -74,32 +78,8 @@ namespace Venus {
 		}
 
 		CORE_LOG_WARN("Model {0} loading took: {1} ms", m_Path, timer.ElapsedMillis());
-	}
 
-	void Model::Init()
-	{
-		/*
-		for (auto& mesh : m_Meshes)
-		{
-			m_ModelVertices.insert(m_ModelVertices.end(), mesh.m_Vertices.begin(), mesh.m_Vertices.end());
-			m_ModelIndices.insert(m_ModelIndices.end(), mesh.m_Indices.begin(), mesh.m_Indices.end());
-		}
-
-		CORE_LOG_TRACE("Model Vertices: {0}", m_ModelVertices.size());
-		CORE_LOG_TRACE("Model Indices: {0}", m_ModelIndices.size());
-	
-		m_VertexBuffer = VertexBuffer::Create(m_ModelVertices.size() * sizeof(Vertex));
-		m_VertexBuffer->SetLayout({
-			{ ShaderDataType::Float3, "a_Position" },
-			{ ShaderDataType::Float3, "a_Normal"   },
-			{ ShaderDataType::Float3, "a_Tangent"  },
-			{ ShaderDataType::Float3, "a_Binormal" },
-			{ ShaderDataType::Float2, "a_TexCoord" },
-		});
-		m_VertexBuffer->SetData(&m_ModelVertices[0], m_ModelVertices.size() * sizeof(Vertex));
-
-		m_IndexBuffer = IndexBuffer::Create(&m_ModelIndices[0], m_ModelIndices.size());
-		*/
+		//LogMeshStatistics(scene);
 	}
 
 	void Model::ProcessNode(aiNode* node, const aiScene* scene)
@@ -120,7 +100,6 @@ namespace Venus {
 	{
 		std::vector<Vertex> vertices;
 		std::vector<uint32_t> indices;
-		std::vector<MaterialTexture> textures;
 
 		// Vertices
 		for (uint32_t i = 0; i < mesh->mNumVertices; i++)
@@ -179,151 +158,117 @@ namespace Venus {
 			}
 		}
 
-		// Materials
-		aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];	
-		
-		std::vector<MaterialTexture> diffuseMaps = LoadMaterialTextures(material, TextureType::Diffuse);
-		textures.insert(textures.end(), diffuseMaps.begin(), diffuseMaps.end());
+		// Material
+		uint32_t materialIndex = mesh->mMaterialIndex;
+		aiMaterial* material = scene->mMaterials[materialIndex];
 
-		std::vector<MaterialTexture> specularMaps = LoadMaterialTextures(material, TextureType::Specular);
-		textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
-
-		std::vector<MaterialTexture> normalMaps = LoadMaterialTextures(material, TextureType::Normal);
-		textures.insert(textures.end(), normalMaps.begin(), normalMaps.end());
+		CORE_LOG_TRACE("---Material Used for this mesh: {0}", materialIndex);
 		
-		return Mesh(vertices, indices, textures);
+		if (m_Materials.find(materialIndex) == m_Materials.end())
+		{
+			Ref<MeshMaterial> meshMaterial = CreateRef<MeshMaterial>();
+
+			CORE_LOG_TRACE("Loading Material {0}", materialIndex);
+
+			// Albedo Color TODO: Emission
+			aiColor3D aiColor;
+			if (material->Get(AI_MATKEY_COLOR_DIFFUSE, aiColor) == AI_SUCCESS)
+			{
+				CORE_LOG_TRACE("Setting Albedo Color at Material {0} : {1},{2},{3} ", materialIndex, aiColor.r, aiColor.g, aiColor.b);
+				meshMaterial->SetAlbedoColor( { aiColor.r, aiColor.g, aiColor.b } );
+			}
+			float metalness, shininess;
+			// Metalness
+			if (material->Get(AI_MATKEY_REFLECTIVITY, metalness) == AI_SUCCESS)
+			{
+				CORE_LOG_TRACE("Setting Metalness at Material {0}: {1}", materialIndex, metalness);
+				meshMaterial->SetMetalness(metalness);
+			}
+			// Roughness
+			if (material->Get(AI_MATKEY_SHININESS, shininess) == AI_SUCCESS)
+			{
+				float roughness = 1.0f - glm::sqrt(shininess / 100.0f);
+				if (roughness < 0)
+					roughness = 0;
+				CORE_LOG_TRACE("Setting Roughness at Material {0}: {1}", materialIndex, roughness);
+				meshMaterial->SetRoughtness(roughness);
+			}
+
+			aiString aiTexPath;
+			// Albedo Map
+			bool hasAlbedoMap = material->GetTexture(aiTextureType_DIFFUSE, 0, &aiTexPath) == AI_SUCCESS;
+			if (hasAlbedoMap)
+			{
+				std::filesystem::path modelPath = std::filesystem::path(m_Path).parent_path();
+				std::string finalTexPath = modelPath.string() + "/" + aiTexPath.C_Str();
+
+				//CORE_LOG_CRITICAL("LOADING ALBEDO {0}", finalTexPath);
+				TextureProperties props;
+				props.Format = TextureFormat::SRGB;
+				auto texture = Texture2D::Create(finalTexPath, props);
+				if (texture->IsLoaded())
+					meshMaterial->SetAlbedoMap(texture);
+			}
+			// Normal Map
+			bool hasNormalMap = material->GetTexture(aiTextureType_NORMALS, 0, &aiTexPath) == AI_SUCCESS;
+			if (hasNormalMap)
+			{
+				std::filesystem::path modelPath = std::filesystem::path(m_Path).parent_path();
+				std::string finalTexPath = modelPath.string() + "/" + aiTexPath.C_Str();
+
+				//CORE_LOG_CRITICAL("LOADING NORMAL {0}", finalTexPath);
+				auto texture = Texture2D::Create(finalTexPath);
+				if (texture->IsLoaded())
+					meshMaterial->SetNormalMap(texture);
+			}
+			// Roughness Map
+			bool hasRoughnessMap = material->GetTexture(aiTextureType_SHININESS, 0, &aiTexPath) == AI_SUCCESS;
+			if (hasRoughnessMap)
+			{
+				std::filesystem::path modelPath = std::filesystem::path(m_Path).parent_path();
+				std::string finalTexPath = modelPath.string() + "/" + aiTexPath.C_Str();
+
+				//CORE_LOG_CRITICAL("LOADING ROUGHNESS {0}", finalTexPath);
+				auto texture = Texture2D::Create(finalTexPath);
+				if (texture->IsLoaded())
+					meshMaterial->SetRoughnessMap(texture);
+			}
+
+			m_Materials[materialIndex] = meshMaterial;
+			
+			//TODO: Metalness
+		}
+		else
+		{
+			CORE_LOG_TRACE("Material already loaded {0}", materialIndex);
+		}
+			
+		return Mesh(vertices, indices, materialIndex);
 	}
 
-	void Model::LogMeshStatistics()
+	void Model::LogMeshStatistics(const aiScene* scene)
 	{
 		CORE_LOG_TRACE("Total Meshs: {0}", m_Meshes.size());
 
 		uint32_t totalVertices = 0;
 		uint32_t totalIndices = 0;
-		uint32_t totalTextures = 0;
 		for (const auto& mesh : m_Meshes)
 		{
 			totalVertices += mesh.m_Vertices.size();
 			totalIndices += mesh.m_Indices.size();
-			totalTextures += mesh.m_Textures.size();
 		}
 
 		CORE_LOG_TRACE("Total Vertices: {0}", totalVertices);
 		CORE_LOG_TRACE("Total Indices: {0}", totalIndices);
-		CORE_LOG_TRACE("Total Textures: {0}", totalTextures);
-	}
 
-	static aiTextureType VenusTextureTypeToAssimType(TextureType type)
-	{
-		switch (type)
+		CORE_LOG_TRACE("Total Materials: {0}", scene->mNumMaterials);
+
+		for (uint32_t i = 0; i < scene->mNumMaterials; i++)
 		{
-			case TextureType::Diffuse:	return aiTextureType::aiTextureType_DIFFUSE;
-			case TextureType::Normal:	return aiTextureType::aiTextureType_HEIGHT;
-			case TextureType::Specular:	return aiTextureType::aiTextureType_SPECULAR;
+			CORE_LOG_TRACE("	Total Diffuse: {0}", scene->mMaterials[i]->GetTextureCount(aiTextureType_DIFFUSE));
+			CORE_LOG_TRACE("	Total Normal: {0}", scene->mMaterials[i]->GetTextureCount(aiTextureType_NORMALS));
+			CORE_LOG_TRACE("	Total Roughness: {0}", scene->mMaterials[i]->GetTextureCount(aiTextureType_SHININESS));
 		}
-
-		VS_CORE_ASSERT(false, "Unknown Material Texture Type");
-		return aiTextureType::aiTextureType_NONE;
 	}
 
-	std::vector<MaterialTexture> Model::LoadMaterialTextures(aiMaterial* material, TextureType type)
-	{
-		std::vector<MaterialTexture> textures;
-
-		aiTextureType assimpType = VenusTextureTypeToAssimType(type);
-		if (assimpType == aiTextureType::aiTextureType_NONE)
-			return textures;
-		
-		for (uint32_t i = 0; i < material->GetTextureCount(assimpType); i++)
-		{
-			MaterialTexture materialTexture;
-			materialTexture.Type = type;
-			
-			aiString texName;
-			material->GetTexture(assimpType, i, &texName);
-
-			std::filesystem::path modelPath = std::filesystem::path(m_Path).parent_path();
-			std::string finalTexPath = modelPath.string() + "/" + texName.C_Str();
-
-			switch (type)
-			{
-				case TextureType::Diffuse:
-				{
-					bool isLoaded = false;
-					for (uint32_t i = 0; i < m_DiffuseMaps.size(); i++)
-					{
-						if (std::strcmp(finalTexPath.c_str(), m_DiffuseMaps[i]->GetPath().c_str()) == 0)
-						{
-							isLoaded = true;
-							materialTexture.Index = i;
-							break;
-						}
-					}
-
-					if (!isLoaded)
-					{
-						CORE_LOG_TRACE("Loading Diffuse Map Texture: {0}", finalTexPath);
-						materialTexture.Index = m_DiffuseMaps.size();
-						m_DiffuseMaps.push_back(Texture2D::Create(finalTexPath));
-					}
-
-					textures.push_back(materialTexture);
-
-					break;
-				}
-
-				case TextureType::Specular:
-				{
-					bool isLoaded = false;
-					for (uint32_t i = 0; i < m_SpecularMaps.size(); i++)
-					{
-						if (std::strcmp(finalTexPath.c_str(), m_SpecularMaps[i]->GetPath().c_str()) == 0)
-						{
-							isLoaded = true;
-							materialTexture.Index = i;
-							break;
-						}
-					}
-
-					if (!isLoaded)
-					{
-						CORE_LOG_TRACE("Loading Specular Map Texture: {0}", finalTexPath);
-						materialTexture.Index = m_SpecularMaps.size();
-						m_SpecularMaps.push_back(Texture2D::Create(finalTexPath));
-					}
-
-					textures.push_back(materialTexture);
-
-					break;
-				}
-
-				case TextureType::Normal:
-				{
-					bool isLoaded = false;
-					for (uint32_t i = 0; i < m_NormalMaps.size(); i++)
-					{
-						if (std::strcmp(finalTexPath.c_str(), m_NormalMaps[i]->GetPath().c_str()) == 0)
-						{
-							isLoaded = true;
-							materialTexture.Index = i;
-							break;
-						}
-					}
-
-					if (!isLoaded)
-					{
-						materialTexture.Index = m_NormalMaps.size();
-						CORE_LOG_TRACE("Loading Normal Map Texture: {0}", finalTexPath);
-						m_NormalMaps.push_back(Texture2D::Create(finalTexPath));
-					}
-
-					textures.push_back(materialTexture);
-
-					break;
-				}
-			}
-		}
-
-		return textures;
-	}
 }

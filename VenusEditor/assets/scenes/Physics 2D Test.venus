@@ -1,0 +1,85 @@
+Scene: Physics 2D Test
+Entities:
+  - Entity: 14346779819812589877
+    TagComponent:
+      Name: Camera
+    TransformComponent:
+      Position: [-13.0142174, 3.05176592, 0.699344397]
+      Rotation: [0, -1.52283692, 0]
+      Scale: [1, 1, 1]
+    CameraComponent:
+      Camera:
+        ProjectionType: 0
+        PerspectiveFOV: 0.785398185
+        PerspectiveNear: 0.00999999978
+        PerspectiveFar: 1000
+        OrthographicSize: 10
+        OrthographicNear: -1
+        OrthographicFar: 1
+      Primary: true
+      FixedAspectRatio: false
+  - Entity: 8766232829582784674
+    TagComponent:
+      Name: Sphere
+    TransformComponent:
+      Position: [-2.98135561e-08, 3.09062886, -0.00291898847]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    MeshRendererComponent:
+      Name: Sphere
+      Path: ""
+    Rigidbody2DComponent:
+      Type: 1
+      FixedRotation: false
+    CircleCollider2DComponent:
+      Offset: [0, 0]
+      Radius: 1.5
+      Density: 1
+      Friction: 0.5
+      Restitution: 1
+      RestitutionThreshold: 0.5
+  - Entity: 12974145382171796076
+    TagComponent:
+      Name: Sky Light
+    TransformComponent:
+      Position: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    SkyLightComponent:
+      EnvironmentMapName: snowy_park_01_4k
+      EnvironmentMapPath: D:\DEV\Venus\VenusEditor\assets\environment maps\snowy_park_01_4k.hdr
+      Intensity: 1
+      Lod: 1
+  - Entity: 5475159986332182949
+    TagComponent:
+      Name: Directional Light
+    TransformComponent:
+      Position: [0, 0, 0]
+      Rotation: [1.39626336, 0.17453292, 0]
+      Scale: [1, 1, 1]
+    DirectionalLightComponent:
+      Color: [1, 1, 1]
+      Intensity: 1
+      CastsShadows: true
+      SoftShadows: true
+      LightSize: 0.5
+  - Entity: 2183580899513298404
+    TagComponent:
+      Name: Cube
+    TransformComponent:
+      Position: [0, -1.20252419, 0]
+      Rotation: [0, 0, 0]
+      Scale: [8.06647301, 1, 8.06090641]
+    MeshRendererComponent:
+      Name: Cube
+      Path: ""
+    Rigidbody2DComponent:
+      Type: 0
+      FixedRotation: false
+    BoxCollider2DComponent:
+      Offset: [0, 0]
+      Size: [0.5, 0.5]
+      Density: 1
+      Friction: 0.5
+      Restitution: 0
+      RestitutionThreshold: 0.5

@@ -96,10 +96,22 @@ namespace Venus {
 		glStencilFunc((GLenum)function, value, mask);
 	}
 
-	void OpenGLRendererAPI::BindTexture(int textureID)
+	void OpenGLRendererAPI::BindTexture(int location, int textureID)
 	{
-		glActiveTexture(GL_TEXTURE0);
+		glActiveTexture(GL_TEXTURE0 + location);
 		glBindTexture(GL_TEXTURE_2D, textureID);
+	}
+
+	void OpenGLRendererAPI::BindTextureCube(int location, int textureID)
+	{
+		glActiveTexture(GL_TEXTURE0 + location);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
+	}
+
+	void OpenGLRendererAPI::BindTextureArray(int location, int textureID)
+	{
+		glActiveTexture(GL_TEXTURE0 + location);
+		glBindTexture(GL_TEXTURE_2D_ARRAY, textureID);
 	}
 
 	void OpenGLRendererAPI::BindFramebuffer(int framebufferID)
@@ -112,6 +124,12 @@ namespace Venus {
 		vertexArray->Bind();
 		uint32_t count = indexCount ? indexCount : vertexArray->GetIndexBuffer()->GetCount();
 		glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_INT, nullptr);
+	}
+
+	void OpenGLRendererAPI::DrawArrays(const Ref<VertexArray>& vertexArray, uint32_t indexCount)
+	{
+		vertexArray->Bind();
+		glDrawArrays(GL_TRIANGLES, 0, indexCount);
 	}
 
 	void OpenGLRendererAPI::DrawLines(const Ref<VertexArray>& vertexArray, uint32_t vertexCount)

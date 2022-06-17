@@ -12,9 +12,6 @@
 #include "Engine/Input.h"
 #include "ImGui/ImGuiLayer.h"
 
-// Assets
-#include "Assets/AssetSerializer.h"
-
 // Events
 #include "Events/Event.h"
 #include "Events/ApplicationEvent.h"

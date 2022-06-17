@@ -30,6 +30,8 @@ namespace Venus {
 			void OnScenePlay();
 			void OnSceneStop();
 
+			bool OnManualWindowResize();
+			bool OnTitleBarHit(WindowTitleBarHitTestEvent& e);
 			bool OnKeyPressed(KeyPressedEvent& e);
 			bool OnMouseButtonPressed(MouseButtonPressedEvent& e);
 
@@ -38,10 +40,12 @@ namespace Venus {
 
 			// UI
 			void UI_ModalWelcome();
+			float UI_TitleBar();
 			void UI_MenuBar();
 			void UI_ToolBar();
 			void UI_Viewport();
 			void UI_Settings();
+			void UI_WindowBorder();
 
 		private:
 
@@ -56,9 +60,15 @@ namespace Venus {
 			AssetBrowserPanel m_AssetBrowserPanel;
 			RendererStatsPanel m_RendererStatsPanel;
 			
+			// Icons
+			Ref<Texture2D> m_VenusLogoIcon;
 			Ref<Texture2D> m_PlayIcon, m_StopIcon;
-			Ref<Texture2D> m_GizmosPositionIcon, m_GizmosRotationIcon, m_GizmosScaleIcon;
 			Ref<Texture2D> m_SceneCameraIcon;
+			Ref<Texture2D> m_EditorCameraIcon;
+			Ref<Texture2D> m_CreateIcon;
+			Ref<Texture2D> m_SaveIcon, m_UndoIcon, m_RedoIcon;
+			Ref<Texture2D> m_SettingsIcon;
+			Ref<Texture2D> m_MinimizeIcon, m_MaximizeIcon, m_RestoreIcon, m_CloseIcon;
 
 			// Scenes
 			SceneState m_SceneState = SceneState::Edit;
@@ -77,13 +87,18 @@ namespace Venus {
 			int m_GizmoType = 0;
 
 			// Viewport
-			glm::vec4 m_ClearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
 			bool m_ViewportFocused = false, m_ViewportHovered = false;
 			glm::vec2 m_ViewportSize = { 0.0f, 0.0f };
 			glm::vec2 m_ViewportBounds[2];
 
 			// Editor Settings
+			bool m_TitleBarHovered = false;
+
+			bool m_ShowAssetBrowserPanel = true;
+			bool m_ShowStatsPanel = false;
+			bool m_ShowSceneSettingsPanel = true;
 			bool m_ShowWelcomeMessage = false;
+			
 			bool m_ShowCameraIcon = true;
 	};
 }

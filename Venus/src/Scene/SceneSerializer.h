@@ -13,7 +13,6 @@ namespace Venus {
 			void SerializeRuntime(const std::string& filepath);
 
 			bool Deserialize(const std::string& filepath);
-			Entity DeserializePrefab(const std::string& filepath);
 			bool DeserializeRuntime(const std::string& filepath);
 
 		private:

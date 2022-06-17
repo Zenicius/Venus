@@ -22,11 +22,9 @@ namespace Venus {
 			static void RenderVec3Control(const std::string& label, glm::vec3& values, float resetValue = 0.0f, float columnWidth = 100.0f);
 			
 			template<typename T, typename UIFunction>
-			static void RenderComponent(const std::string& name, Entity entity, bool canDelete, UIFunction uiFunction);
+			static void RenderComponent(const std::string& name, Entity entity, bool canDelete, UIFunction uiFunction, bool separator = true);
 		private:
 			Ref<Scene> m_Context;
 			Entity m_SelectedEntity;
-
-			Ref<Texture2D> m_AddIcon;
 	};
 }

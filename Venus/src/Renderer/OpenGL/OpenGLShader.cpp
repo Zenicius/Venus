@@ -23,6 +23,10 @@ namespace Venus {
 				return GL_VERTEX_SHADER;
 			if (type == "fragment" || type == "pixel")
 				return GL_FRAGMENT_SHADER;
+			if (type == "geometry")
+				return GL_GEOMETRY_SHADER;
+			if (type == "compute")
+				return GL_COMPUTE_SHADER;
 
 			VS_CORE_ASSERT(false, "Unknown shader type!");
 			return 0;
@@ -32,8 +36,10 @@ namespace Venus {
 		{
 			switch (stage)
 			{
-				case GL_VERTEX_SHADER:   return shaderc_glsl_vertex_shader;
-				case GL_FRAGMENT_SHADER: return shaderc_glsl_fragment_shader;
+				case GL_VERTEX_SHADER:		return shaderc_glsl_vertex_shader;
+				case GL_FRAGMENT_SHADER:	return shaderc_glsl_fragment_shader;
+				case GL_GEOMETRY_SHADER:    return shaderc_glsl_geometry_shader;
+				case GL_COMPUTE_SHADER:		return shaderc_glsl_compute_shader;
 			}
 			VS_CORE_ASSERT(false);
 			return (shaderc_shader_kind)0;
@@ -43,8 +49,10 @@ namespace Venus {
 		{
 			switch (stage)
 			{
-				case GL_VERTEX_SHADER:   return "GL_VERTEX_SHADER";
-				case GL_FRAGMENT_SHADER: return "GL_FRAGMENT_SHADER";
+				case GL_VERTEX_SHADER:		return "GL_VERTEX_SHADER";
+				case GL_FRAGMENT_SHADER:	return "GL_FRAGMENT_SHADER";
+				case GL_GEOMETRY_SHADER:	return "GL_GEOMETRY_SHADER";
+				case GL_COMPUTE_SHADER:		return "GL_COMPUTE_SHADER";
 			}
 			VS_CORE_ASSERT(false);
 			return nullptr;
@@ -53,7 +61,7 @@ namespace Venus {
 		static const char* GetCacheDirectory()
 		{
 			// TODO: make sure the assets directory is valid
-			return "assets/cache/shader/opengl";
+			return "Resources/Cache/Shader/Opengl";
 		}
 
 		static void CreateCacheDirectoryIfNeeded()
@@ -67,8 +75,10 @@ namespace Venus {
 		{
 			switch (stage)
 			{
-				case GL_VERTEX_SHADER:    return ".cached_opengl.vert";
-				case GL_FRAGMENT_SHADER:  return ".cached_opengl.frag";
+				case GL_VERTEX_SHADER:		return ".cached_opengl.vert";
+				case GL_FRAGMENT_SHADER:	return ".cached_opengl.frag";
+				case GL_GEOMETRY_SHADER:	return ".cached_opengl.geo";
+				case GL_COMPUTE_SHADER:		return ".cached_opengl.comp";
 			}
 			VS_CORE_ASSERT(false);
 			return "";
@@ -78,8 +88,10 @@ namespace Venus {
 		{
 			switch (stage)
 			{
-			case GL_VERTEX_SHADER:    return ".cached_vulkan.vert";
-			case GL_FRAGMENT_SHADER:  return ".cached_vulkan.frag";
+				case GL_VERTEX_SHADER:		return ".cached_vulkan.vert";
+				case GL_FRAGMENT_SHADER:	return ".cached_vulkan.frag";
+				case GL_GEOMETRY_SHADER:	return ".cached_vulkan.geo";
+				case GL_COMPUTE_SHADER:		return ".cached_vulkan.comp";
 			}
 			VS_CORE_ASSERT(false);
 			return "";
@@ -199,7 +211,7 @@ namespace Venus {
 		shaderc::Compiler compiler;
 		shaderc::CompileOptions options;
 		options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_2);
-		const bool optimize = true;
+		const bool optimize = false;
 		if (optimize)
 			options.SetOptimizationLevel(shaderc_optimization_level_performance);
 
@@ -255,6 +267,8 @@ namespace Venus {
 
 		shaderc::Compiler compiler;
 		shaderc::CompileOptions options;
+		options.SetAutoMapLocations(true);
+	
 		options.SetTargetEnvironment(shaderc_target_env_opengl, shaderc_env_version_opengl_4_5);
 		const bool optimize = false;
 		if (optimize)
@@ -283,10 +297,13 @@ namespace Venus {
 			else
 			{
 				spirv_cross::CompilerGLSL glslCompiler(spirv);
+				
 				m_OpenGLSourceCode[stage] = glslCompiler.compile();
 				auto& source = m_OpenGLSourceCode[stage];
 
-				shaderc::SpvCompilationResult module = compiler.CompileGlslToSpv(source, Utils::GLShaderStageToShaderC(stage), m_FilePath.c_str());
+				CORE_LOG_TRACE("{0}", source);
+
+				shaderc::SpvCompilationResult module = compiler.CompileGlslToSpv(source, Utils::GLShaderStageToShaderC(stage), m_FilePath.c_str(), options);
 				if (module.GetCompilationStatus() != shaderc_compilation_status_success)
 				{
 					CORE_LOG_ERROR(module.GetErrorMessage());
@@ -346,20 +363,23 @@ namespace Venus {
 		}
 
 		m_RendererID = program;
+
+		CORE_LOG_INFO("Creating Shader {0} at program: {1}", m_FilePath, m_RendererID);
 	}
 
 	void OpenGLShader::Reflect(GLenum stage, const std::vector<uint32_t>& shaderData)
 	{
+		return;
+
 		spirv_cross::Compiler compiler(shaderData);
 		spirv_cross::ShaderResources resources = compiler.get_shader_resources();
 		
-		/*
 		CORE_LOG_TRACE("OpenGLShader::Reflect - {0} {1}", Utils::GLShaderStageToString(stage), m_FilePath);
 		CORE_LOG_TRACE("    {0} uniform buffers", resources.uniform_buffers.size());
 		CORE_LOG_TRACE("    {0} resources", resources.sampled_images.size());
 
 		CORE_LOG_TRACE("Uniform buffers:");
-		*/
+		
 
 		for (const auto& resource : resources.uniform_buffers)
 		{
@@ -368,12 +388,12 @@ namespace Venus {
 			uint32_t binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
 			int memberCount = bufferType.member_types.size();
 
-			/*
+			
 			CORE_LOG_TRACE("  {0}", resource.name);
 			CORE_LOG_TRACE("    Size = {0}", bufferSize);
 			CORE_LOG_TRACE("    Binding = {0}", binding);
 			CORE_LOG_TRACE("    Members = {0}", memberCount);
-			*/
+			
 		}
 	}
 
@@ -438,52 +458,77 @@ namespace Venus {
 		UploadUniformMat4(name, value);
 	}
 
+	void OpenGLShader::SetTexture(const std::string& name, int binding, uint32_t texture)
+	{
+		glActiveTexture(GL_TEXTURE0 + binding);
+		glBindTexture(GL_TEXTURE_2D, texture);
+	}
+
+	void OpenGLShader::SetCubeMap(const std::string& name, int binding, uint32_t texture)
+	{
+		glActiveTexture(GL_TEXTURE0 + binding);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, texture);
+	}
+
+	void OpenGLShader::SetTextureArray(const std::string& name, int binding, uint32_t texture)
+	{
+		glActiveTexture(GL_TEXTURE0 + binding);
+		glBindTexture(GL_TEXTURE_2D_ARRAY, texture);
+	}
+
 	void OpenGLShader::UploadUniformInt(const std::string& name, int value)
 	{
-		GLint location = glGetUniformLocation(m_RendererID, name.c_str());
+		GLint location = (GLint)GetUniformLocation(name);
 		glUniform1i(location, value);
 	}
 
 	void OpenGLShader::UploadUniformIntArray(const std::string& name, int* values, uint32_t count)
 	{
-		GLint location = glGetUniformLocation(m_RendererID, name.c_str());
+		GLint location = (GLint)GetUniformLocation(name);
 		glUniform1iv(location, count, values);
 	}
 
 	void OpenGLShader::UploadUniformFloat(const std::string& name, float value)
 	{
-		GLint location = glGetUniformLocation(m_RendererID, name.c_str());
+		GLint location = (GLint)GetUniformLocation(name);
 		glUniform1f(location, value);
+		//CORE_LOG_INFO("Location {0}, name {1}, value {2} in Shader {3}", location, name, value, m_FilePath);
 	}
 
 	void OpenGLShader::UploadUniformFloat2(const std::string& name, const glm::vec2& value)
 	{
-		GLint location = glGetUniformLocation(m_RendererID, name.c_str());
+		GLint location = (GLint)GetUniformLocation(name);
 		glUniform2f(location, value.x, value.y);
 	}
 
 	void OpenGLShader::UploadUniformFloat3(const std::string& name, const glm::vec3& value)
 	{
-		GLint location = glGetUniformLocation(m_RendererID, name.c_str());
+		GLint location = (GLint)GetUniformLocation(name);
 		glUniform3f(location, value.x, value.y, value.z);
 	}
 
 	void OpenGLShader::UploadUniformFloat4(const std::string& name, const glm::vec4& value)
 	{
-		GLint location = glGetUniformLocation(m_RendererID, name.c_str());
+		GLint location = (GLint)GetUniformLocation(name);
 		glUniform4f(location, value.x, value.y, value.z, value.w);
 	}
 
 	void OpenGLShader::UploadUniformMat3(const std::string& name, const glm::mat3& matrix)
 	{
-		GLint location = glGetUniformLocation(m_RendererID, name.c_str());
+		GLint location = (GLint)GetUniformLocation(name);
 		glUniformMatrix3fv(location, 1, GL_FALSE, glm::value_ptr(matrix));
 	}
 
 	void OpenGLShader::UploadUniformMat4(const std::string& name, const glm::mat4& matrix)
 	{
-		GLint location = glGetUniformLocation(m_RendererID, name.c_str());
+		GLint location = (GLint)GetUniformLocation(name);
 		glUniformMatrix4fv(location, 1, GL_FALSE, glm::value_ptr(matrix));
+	}
+
+	int OpenGLShader::GetUniformLocation(const std::string& name)
+	{
+		GLint location = glGetUniformLocation(m_RendererID, name.c_str());
+		return (int)location;
 	}
 
 }

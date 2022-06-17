@@ -32,14 +32,19 @@ namespace Venus {
 
 			virtual void SetLineWidth(float width) = 0;
 			
-			virtual void BindTexture(int textureID) = 0;
+			virtual void BindTexture(int location, int textureID) = 0;
+			virtual void BindTextureCube(int location, int textureID) = 0;
+			virtual void BindTextureArray(int location, int textureID) = 0;
 			virtual void BindFramebuffer(int framebufferID) = 0;
 
 			virtual void DrawIndexed(const Ref<VertexArray>& vertexArray, uint32_t indexCount = 0) = 0;
+			virtual void DrawArrays(const Ref<VertexArray>& vertexArray, uint32_t indexCount) = 0;
 			virtual void DrawLines(const Ref<VertexArray>& vertexArrray, uint32_t vertexCount) = 0;
 
 			static API GetAPI() { return s_API; }
 			static std::string GetAPIName();
+
+
 			static Scope<RendererAPI> Create();
 
 		private:

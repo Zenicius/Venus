@@ -1,0 +1,181 @@
+Scene: Sponza Edited
+Entities:
+  - Entity: 10307049394519029976
+    TagComponent:
+      Name: Green Light Copied Copied
+    TransformComponent:
+      Position: [25.7196522, 21.8686218, 7.36924267]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    PointLightComponent:
+      Color: [0.424710393, 1, 0]
+      Intensity: 9.30000019
+      LightSize: 0.5
+      MinRadius: 1
+      Radius: 10
+      CastsShadows: true
+      SoftShadows: true
+      Falloff: 1
+  - Entity: 7850436169737024949
+    TagComponent:
+      Name: Green Light Copied
+    TransformComponent:
+      Position: [-30.8752022, 21.8686218, 7.63542747]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    PointLightComponent:
+      Color: [0.424710393, 1, 0]
+      Intensity: 9.30000019
+      LightSize: 0.5
+      MinRadius: 1
+      Radius: 10
+      CastsShadows: true
+      SoftShadows: true
+      Falloff: 1
+  - Entity: 15027922867522019862
+    TagComponent:
+      Name: Blue Light Copied Copied
+    TransformComponent:
+      Position: [-13.0897703, 24.5386906, 6.30248117]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    PointLightComponent:
+      Color: [0, 0.293436527, 1]
+      Intensity: 9.30000019
+      LightSize: 0.5
+      MinRadius: 1
+      Radius: 10
+      CastsShadows: true
+      SoftShadows: true
+      Falloff: 1
+  - Entity: 5053240760034821283
+    TagComponent:
+      Name: Red Light Copied
+    TransformComponent:
+      Position: [3.30412054, 21.258358, 6.49675655]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    PointLightComponent:
+      Color: [1, 0, 0]
+      Intensity: 9.30000019
+      LightSize: 0.5
+      MinRadius: 1
+      Radius: 10
+      CastsShadows: true
+      SoftShadows: true
+      Falloff: 1
+  - Entity: 7362051784854992134
+    TagComponent:
+      Name: Yellow Light
+    TransformComponent:
+      Position: [60.8167686, 8.17673492, -1.7789607]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    PointLightComponent:
+      Color: [0.250965238, 0.20440191, 0.00484488159]
+      Intensity: 9.30000019
+      LightSize: 0.5
+      MinRadius: 1
+      Radius: 15.1999998
+      CastsShadows: true
+      SoftShadows: true
+      Falloff: 1
+  - Entity: 12085459827043601613
+    TagComponent:
+      Name: Blue Light Copied
+    TransformComponent:
+      Position: [-31.5128994, 21.258358, -11.5101795]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    PointLightComponent:
+      Color: [0, 0.293436527, 1]
+      Intensity: 9.30000019
+      LightSize: 0.5
+      MinRadius: 1
+      Radius: 10
+      CastsShadows: true
+      SoftShadows: true
+      Falloff: 1
+  - Entity: 7732571455742807836
+    TagComponent:
+      Name: Blue Light
+    TransformComponent:
+      Position: [25.4929047, 21.258358, -11.5101795]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    PointLightComponent:
+      Color: [0, 0.293436527, 1]
+      Intensity: 9.30000019
+      LightSize: 0.5
+      MinRadius: 1
+      Radius: 10
+      CastsShadows: true
+      SoftShadows: true
+      Falloff: 1
+  - Entity: 16499794760421606645
+    TagComponent:
+      Name: Green Light
+    TransformComponent:
+      Position: [5.5401473, 21.258358, -11.5101795]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    PointLightComponent:
+      Color: [0.424710393, 1, 0]
+      Intensity: 9.30000019
+      LightSize: 0.5
+      MinRadius: 1
+      Radius: 10
+      CastsShadows: true
+      SoftShadows: true
+      Falloff: 1
+  - Entity: 1449710696802830396
+    TagComponent:
+      Name: Red Light
+    TransformComponent:
+      Position: [-11.93894, 21.258358, -11.5101795]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    PointLightComponent:
+      Color: [1, 0, 0]
+      Intensity: 9.30000019
+      LightSize: 0.5
+      MinRadius: 1
+      Radius: 10
+      CastsShadows: true
+      SoftShadows: true
+      Falloff: 1
+  - Entity: 3796286562897017395
+    TagComponent:
+      Name: Directional Light
+    TransformComponent:
+      Position: [0, 0, 0]
+      Rotation: [2.18385291, 0.375665367, -0.287617892]
+      Scale: [1, 1.00000191, 1.00000179]
+    DirectionalLightComponent:
+      Color: [1, 1, 1]
+      Intensity: 5
+      CastsShadows: true
+      SoftShadows: true
+      LightSize: 0.5
+  - Entity: 4821596542425862396
+    TagComponent:
+      Name: Sky Light
+    TransformComponent:
+      Position: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    SkyLightComponent:
+      Intensity: 1
+      Lod: 0
+      DinamicSky: true
+      TurbidityAzimuthInclination: [2, 0, 0]
+  - Entity: 12477051534283502551
+    TagComponent:
+      Name: Sponza
+    TransformComponent:
+      Position: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [0.0500000007, 0.0500000007, 0.0500000007]
+    MeshRendererComponent:
+      Name: sponza
+      Path: assets\models\Constructions\sponza\sponza.obj

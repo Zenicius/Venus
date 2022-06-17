@@ -1,10 +1,14 @@
 #pragma once
 
+#include "Engine/Base.h"
 #include "Engine/UUID.h"
 #include "Scene/Factory.h"
 #include "Scene/SceneCamera.h"
+#include "Scene/SceneEnvironment.h"
+#include "Renderer/Renderer.h"
 #include "Renderer/Texture.h"
 #include "Renderer/Mesh.h"
+#include "Renderer/MeshMaterial.h"
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include "glm/glm.hpp"
@@ -143,9 +147,46 @@ namespace Venus {
 		std::string ModelName = "Cube"; // Editor Only
 		std::string ModelPath = std::string(); // Internal Only
 
-		Ref<Model> Model = Factory::CreateCube(glm::vec3(1.0f));
+		Ref<Model> Model = Model::Create("Resources/Models/Cube.fbx");
 
 		MeshRendererComponent() = default;
 		MeshRendererComponent(const MeshRendererComponent&) = default;
+	};
+
+	struct PointLightComponent
+	{
+		glm::vec3 Color = { 1.0f, 1.0f, 1.0f };
+		float Intensity = 1.0f;
+		float LightSize = 0.5f;
+		float MinRadius = 1.f;
+		float Radius = 10.f;
+		bool CastsShadows = true;
+		bool SoftShadows = true;
+		float Falloff = 1.f;
+	};
+
+	struct DirectionalLightComponent
+	{
+		glm::vec3 Color{ 1.0f, 1.0f, 1.0f };
+		float Intensity = 1.0f;
+		bool CastsShadows = true;
+		bool SoftShadows = true;
+		float LightSize = 0.5f;
+	};
+
+	struct SkyLightComponent
+	{
+		std::string EnvironmentMapName = "None"; // Editor Only
+		std::string EnvironmentMapPath = std::string(); // Internal Only
+		float Intensity = 1.0f;
+		float Lod = 0.0f;
+
+		bool DinamicSky = false;
+		glm::vec3 TurbidityAzimuthInclination = { 2.0f, 0.0f, 0.0f };
+
+		Ref<SceneEnvironment> EnvironmentMap = nullptr;
+		
+		SkyLightComponent() = default;
+		SkyLightComponent(const SkyLightComponent&) = default;
 	};
 }

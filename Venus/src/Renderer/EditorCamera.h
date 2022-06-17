@@ -1,47 +1,65 @@
 #pragma once
 
-#include "Camera.h"
+#include <glm/detail/type_quat.hpp>
+
+#include "Renderer/Camera.h"
 #include "Engine/Timestep.h"
-#include "Events/Event.h"
+#include "Events/KeyEvent.h"
 #include "Events/MouseEvent.h"
 
-#include <glm/glm.hpp>
-
 namespace Venus {
+
+	enum class CameraMode
+	{
+		NONE, FLYCAM, ARCBALL
+	};
 
 	class EditorCamera : public Camera
 	{
 		public:
 			EditorCamera() = default;
-			EditorCamera(float fov, float aspectRatio, float nearClip, float farClip);
+			EditorCamera(float verticalFOV, float aspectRatio, float nearClip, float farClip);
 
+			void Focus(const glm::vec3& focusPoint);
 			void OnUpdate(Timestep ts);
 			void OnEvent(Event& e);
+
+			bool IsActive() const { return m_IsActive; }
+			void SetActive(bool active) { m_IsActive = active; }
 
 			inline float GetDistance() const { return m_Distance; }
 			inline void SetDistance(float distance) { m_Distance = distance; }
 
-			inline void SetViewportSize(float width, float height) { m_ViewportWidth = width; m_ViewportHeight = height; UpdateProjection(); }
+			const glm::vec3& GetFocalPoint() const { return m_FocalPoint; }
+
+			void SetViewportSize(uint32_t width, uint32_t height);
 
 			const glm::mat4& GetViewMatrix() const { return m_ViewMatrix; }
-			glm::mat4 GetViewProjection() const { return m_Projection * m_ViewMatrix; }
+			glm::mat4 GetViewProjection() const { return m_ProjectionMatrix * m_ViewMatrix; }
 
 			glm::vec3 GetUpDirection() const;
 			glm::vec3 GetRightDirection() const;
 			glm::vec3 GetForwardDirection() const;
+
 			const glm::vec3& GetPosition() const { return m_Position; }
+
 			glm::quat GetOrientation() const;
 
 			float GetPitch() const { return m_Pitch; }
 			float GetYaw() const { return m_Yaw; }
+			float& GetCameraSpeed() { return m_Speed; }
+			float GetCameraSpeed() const { return m_Speed; }
 
-			void SetCameraLocked(bool locked) { m_IsLocked = locked; }
-
+			float GetVerticalFOV() const { return m_VerticalFOV; }
+			float GetAspectRatio() const { return m_AspectRatio; }
+			float GetNearClip() const { return m_NearClip; }
+			float GetFarClip() const { return m_FarClip; }
 		private:
-			void UpdateProjection();
-			void UpdateView();
+			void UpdateCameraView();
 
 			bool OnMouseScroll(MouseScrolledEvent& e);
+			bool OnKeyPressed(KeyPressedEvent& e);
+			bool OnKeyReleased(KeyReleasedEvent& e);
 
 			void MousePan(const glm::vec2& delta);
 			void MouseRotate(const glm::vec2& delta);
@@ -53,20 +71,32 @@ namespace Venus {
 			float RotationSpeed() const;
 			float ZoomSpeed() const;
 		private:
-			float m_FOV = 45.0f, m_AspectRatio = 1.778f, m_NearClip = 0.1f, m_FarClip = 1000.0f;
-
 			glm::mat4 m_ViewMatrix;
-			glm::vec3 m_Position = { 0.0f, 0.0f, 0.0f };
-			glm::vec3 m_FocalPoint = { 0.0f, 0.0f, 0.0f };
+			glm::vec3 m_Position, m_WorldRotation, m_FocalPoint;
 
-			glm::vec2 m_InitialMousePosition = { 0.0f, 0.0f };
+			// Perspective projection params
+			float m_VerticalFOV, m_AspectRatio, m_NearClip, m_FarClip;
 
-			float m_Distance = 10.0f;
-			float m_Pitch = 0.0f, m_Yaw = 0.0f;
+			bool m_IsActive = false;
+			bool m_Panning, m_Rotating;
+			glm::vec2 m_InitialMousePosition{};
+			glm::vec3 m_InitialFocalPoint, m_InitialRotation;
 
-			float m_ViewportWidth = 1280, m_ViewportHeight = 720;
+			float m_Distance;
+			float m_Speed{ 0.002f };
+			float m_LastSpeed = 0.f;
 
-			bool m_IsLocked = false; // Temp
+			float m_Pitch, m_Yaw;
+			float m_PitchDelta{}, m_YawDelta{};
+			glm::vec3 m_PositionDelta{};
+			glm::vec3 m_RightDirection{};
+
+			CameraMode m_CameraMode{ CameraMode::ARCBALL };
+
+			float m_MinFocusDistance = 100.0f;
+
+			uint32_t m_ViewportWidth = 1280, m_ViewportHeight = 720;
+			friend class EditorLayer;
 	};
 
 }

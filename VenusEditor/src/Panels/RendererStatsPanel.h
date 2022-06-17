@@ -9,7 +9,7 @@ namespace Venus {
 		public:
 			RendererStatsPanel() = default;
 
-			void OnImGuiRender();
+			void OnImGuiRender(bool& open);
 	};
 
 }

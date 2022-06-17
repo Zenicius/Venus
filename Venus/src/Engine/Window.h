@@ -14,18 +14,19 @@ namespace Venus {
 		uint32_t Height;
 		bool Vsync;
 		bool Fullscreen;
+		bool Decorated;
 
 		WindowProps(const std::string& title = "Venus Engine",
 			uint32_t width = 1600,
 			uint32_t height = 900,
 			bool vSync = true,
-			bool fullscreen = true)
-			: Title(title), Width(width), Height(height), Vsync(vSync), Fullscreen(fullscreen)
+			bool fullscreen = true,
+			bool decorated = true)
+			: Title(title), Width(width), Height(height), Vsync(vSync), Fullscreen(fullscreen), Decorated(decorated)
 		{
 		}
 	};
 
-	// Interface representing a desktop system based Window
 	class Window
 	{
 		public:
@@ -38,12 +39,17 @@ namespace Venus {
 			virtual uint32_t GetWidth() const = 0;
 			virtual uint32_t GetHeight() const = 0;
 
-			// Window attributes
 			virtual void SetEventCallback(const EventCallbackFn& callback) = 0;
+
 			virtual void SetVSync(bool enabled) = 0;
 			virtual bool IsVSync() const = 0;
+
 			virtual void SetWindowTitle(const std::string& title) = 0;
+
 			virtual void Maximize() = 0;
+			virtual bool IsMaximized() = 0;
+			virtual void Minimize() = 0;
+			virtual void Restore() = 0;
 
 			virtual void* GetNativeWindow() const = 0;
 

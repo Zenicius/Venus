@@ -171,9 +171,9 @@ namespace Venus {
 			samplers[i] = i;
 
 		// Shaders
-		s_2DData.QuadShader = Shader::Create("assets/shaders/Renderer2D_Quad.glsl");
-		s_2DData.CircleShader = Shader::Create("assets/shaders/Renderer2D_Circle.glsl");
-		s_2DData.LineShader = Shader::Create("assets/shaders/Renderer2D_Line.glsl");
+		s_2DData.QuadShader = Renderer::GetShaderLibrary()->Get("Renderer2D_Quad");
+		s_2DData.CircleShader = Renderer::GetShaderLibrary()->Get("Renderer2D_Circle");
+		s_2DData.LineShader = Renderer::GetShaderLibrary()->Get("Renderer2D_Line");
 
 		// Set first texture slot to 0
 		s_2DData.TextureSlots[0] = Renderer::GetDefaultTexture();

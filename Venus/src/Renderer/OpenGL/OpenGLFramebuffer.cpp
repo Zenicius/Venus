@@ -10,31 +10,42 @@ namespace Venus {
 
 	namespace Utils {
 
-		static GLenum TextureTarget(bool multisampled)
+		static GLenum TextureTarget(bool multisampled, bool layered) // Multisampled has priority
 		{
-			return multisampled ? GL_TEXTURE_2D_MULTISAMPLE : GL_TEXTURE_2D;
+			if (multisampled)
+				return GL_TEXTURE_2D_MULTISAMPLE;
+			else if (layered)
+				return GL_TEXTURE_2D_ARRAY;
+			else
+				return GL_TEXTURE_2D;
 		}
 
-		static void CreateTextures(bool multisampled, uint32_t* outID, uint32_t count)
+		static void CreateTextures(bool multisampled, bool layered, uint32_t* outID, uint32_t count)
 		{
-			glCreateTextures(TextureTarget(multisampled), count, outID);
+			glCreateTextures(TextureTarget(multisampled, layered), count, outID);
 		}
 
-		static void BindTexture(bool multisampled, uint32_t id)
+		static void BindTexture(bool multisampled, bool layerred, uint32_t id)
 		{
-			glBindTexture(TextureTarget(multisampled), id);
+			glBindTexture(TextureTarget(multisampled, layerred), id);
 		}
 
-		static void AttachColorTexture(uint32_t id, int samples, GLenum internalFormat, GLenum format, uint32_t width, uint32_t height, int index)
+		static void AttachColorTexture(uint32_t id, int samples, int layers, GLenum internalFormat, GLenum format, uint32_t width, uint32_t height, int index, GLenum type)
 		{
 			bool multisampled = samples > 1;
+			bool layered = layers > 1;
+
 			if (multisampled)
 			{
 				glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, samples, internalFormat, width, height, GL_FALSE);
 			}
+			else if (layered)
+			{
+				VS_CORE_ASSERT(false, "Not implemented!");
+			}
 			else
 			{
-				glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, GL_UNSIGNED_BYTE, nullptr);
+				glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, type, nullptr);
 
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -43,15 +54,28 @@ namespace Venus {
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 			}
 
-			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + index, TextureTarget(multisampled), id, 0);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + index, TextureTarget(multisampled, layered), id, 0);
 		}
 
-		static void AttachDepthTexture(uint32_t id, int samples, GLenum format, GLenum attachmentType, uint32_t width, uint32_t height)
+		static void AttachDepthTexture(uint32_t id, int samples, int layers, GLenum format, GLenum attachmentType, uint32_t width, uint32_t height)
 		{
 			bool multisampled = samples > 1;
+			bool layered = layers > 1;
+
 			if (multisampled)
 			{
 				glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, samples, format, width, height, GL_FALSE);
+			}
+			else if (layered)
+			{
+				glTexStorage3D(GL_TEXTURE_2D_ARRAY, 1, format, width, height, layers);
+
+				glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+				glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+				glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+				glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+				constexpr float bordercolor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+				glTexParameterfv(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_BORDER_COLOR, bordercolor);
 			}
 			else
 			{
@@ -64,14 +88,21 @@ namespace Venus {
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 			}
 
-			glFramebufferTexture2D(GL_FRAMEBUFFER, attachmentType, TextureTarget(multisampled), id, 0);
+			if(layered)
+				glFramebufferTexture(GL_FRAMEBUFFER, attachmentType, id, 0);
+			else
+				glFramebufferTexture2D(GL_FRAMEBUFFER, attachmentType, TextureTarget(multisampled, layered), id, 0);
 		}
 
 		static bool IsDepthFormat(FramebufferTextureFormat format)
 		{
 			switch (format)
 			{
-				case FramebufferTextureFormat::DEPTH24STENCIL8:  return true;
+				case FramebufferTextureFormat::DEPTH24STENCIL8:		return true;
+				case FramebufferTextureFormat::DEPTH32FSTENCIL8:	return true;
+				case FramebufferTextureFormat::DEPTH24:				return true;
+				case FramebufferTextureFormat::DEPTH32F:			return true;
+				case FramebufferTextureFormat::STENCIL8:			return true;
 			}
 
 			return false;
@@ -82,6 +113,8 @@ namespace Venus {
 			switch (format)
 			{
 				case FramebufferTextureFormat::RGBA8:       return GL_RGBA8;
+				case FramebufferTextureFormat::RGBA16F:		return GL_RGBA16F;
+				case FramebufferTextureFormat::RGBA32F:		return GL_RGBA32F;
 				case FramebufferTextureFormat::RED_INTEGER: return GL_RED_INTEGER;
 			}
 
@@ -128,23 +161,30 @@ namespace Venus {
 		glBindFramebuffer(GL_FRAMEBUFFER, m_RendererID);
 
 		bool multisample = m_Specification.Samples > 1;
+		bool layered = m_Specification.Layers > 1;
 
 		// Attachments
 		if (m_ColorAttachmentSpecifications.size())
 		{
 			m_ColorAttachments.resize(m_ColorAttachmentSpecifications.size());
-			Utils::CreateTextures(multisample, m_ColorAttachments.data(), m_ColorAttachments.size());
+			Utils::CreateTextures(multisample, layered, m_ColorAttachments.data(), m_ColorAttachments.size());
 
 			for (size_t i = 0; i < m_ColorAttachments.size(); i++)
 			{
-				Utils::BindTexture(multisample, m_ColorAttachments[i]);
+				Utils::BindTexture(multisample, layered, m_ColorAttachments[i]);
 				switch (m_ColorAttachmentSpecifications[i].TextureFormat)
 				{
 					case FramebufferTextureFormat::RGBA8:
-						Utils::AttachColorTexture(m_ColorAttachments[i], m_Specification.Samples, GL_RGBA8, GL_RGBA, m_Specification.Width, m_Specification.Height, i);
+						Utils::AttachColorTexture(m_ColorAttachments[i], m_Specification.Samples, m_Specification.Layers, GL_RGBA8, GL_RGBA, m_Specification.Width, m_Specification.Height, i, GL_UNSIGNED_BYTE);
+						break;
+					case FramebufferTextureFormat::RGBA16F:
+						Utils::AttachColorTexture(m_ColorAttachments[i], m_Specification.Samples, m_Specification.Layers, GL_RGBA16F, GL_RGBA, m_Specification.Width, m_Specification.Height, i, GL_FLOAT);
+						break;
+					case FramebufferTextureFormat::RGBA32F:
+						Utils::AttachColorTexture(m_ColorAttachments[i], m_Specification.Samples, m_Specification.Layers, GL_RGBA32F, GL_RGBA, m_Specification.Width, m_Specification.Height, i, GL_FLOAT);
 						break;
 					case FramebufferTextureFormat::RED_INTEGER:
-						Utils::AttachColorTexture(m_ColorAttachments[i], m_Specification.Samples, GL_R32I, GL_RED_INTEGER, m_Specification.Width, m_Specification.Height, i);
+						Utils::AttachColorTexture(m_ColorAttachments[i], m_Specification.Samples, m_Specification.Layers, GL_R32I, GL_RED_INTEGER, m_Specification.Width, m_Specification.Height, i, GL_UNSIGNED_BYTE);
 						break;
 				}
 			}
@@ -152,12 +192,24 @@ namespace Venus {
 
 		if (m_DepthAttachmentSpecification.TextureFormat != FramebufferTextureFormat::None)
 		{
-			Utils::CreateTextures(multisample, &m_DepthAttachment, 1);
-			Utils::BindTexture(multisample, m_DepthAttachment);
+			Utils::CreateTextures(multisample, layered, &m_DepthAttachment, 1);
+			Utils::BindTexture(multisample, layered, m_DepthAttachment);
 			switch (m_DepthAttachmentSpecification.TextureFormat)
 			{
 				case FramebufferTextureFormat::DEPTH24STENCIL8:
-					Utils::AttachDepthTexture(m_DepthAttachment, m_Specification.Samples, GL_DEPTH24_STENCIL8, GL_DEPTH_STENCIL_ATTACHMENT, m_Specification.Width, m_Specification.Height);
+					Utils::AttachDepthTexture(m_DepthAttachment, m_Specification.Samples, m_Specification.Layers, GL_DEPTH24_STENCIL8, GL_DEPTH_STENCIL_ATTACHMENT, m_Specification.Width, m_Specification.Height);
+					break;
+				case FramebufferTextureFormat::DEPTH32FSTENCIL8:
+					Utils::AttachDepthTexture(m_DepthAttachment, m_Specification.Samples, m_Specification.Layers, GL_DEPTH32F_STENCIL8, GL_DEPTH_STENCIL_ATTACHMENT, m_Specification.Width, m_Specification.Height);
+					break;
+				case FramebufferTextureFormat::DEPTH24:
+					Utils::AttachDepthTexture(m_DepthAttachment, m_Specification.Samples, m_Specification.Layers, GL_DEPTH_COMPONENT24, GL_DEPTH_ATTACHMENT, m_Specification.Width, m_Specification.Height);
+					break;
+				case FramebufferTextureFormat::DEPTH32F:
+					Utils::AttachDepthTexture(m_DepthAttachment, m_Specification.Samples, m_Specification.Layers, GL_DEPTH_COMPONENT32F, GL_DEPTH_ATTACHMENT, m_Specification.Width, m_Specification.Height);
+					break;
+				case FramebufferTextureFormat::STENCIL8:
+					Utils::AttachDepthTexture(m_DepthAttachment, m_Specification.Samples, m_Specification.Layers, GL_STENCIL_INDEX8, GL_STENCIL_ATTACHMENT, m_Specification.Width, m_Specification.Height);
 					break;
 			}
 		}
@@ -172,6 +224,7 @@ namespace Venus {
 		{
 			// Only depth-pass
 			glDrawBuffer(GL_NONE);
+			glReadBuffer(GL_NONE);
 		}
 
 		VS_CORE_ASSERT(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE, "Framebuffer is incomplete!");
@@ -203,15 +256,23 @@ namespace Venus {
 		Invalidate();
 	}
 
+	void OpenGLFramebuffer::Copy(const Ref<Framebuffer>& from, uint32_t width, uint32_t height)
+	{
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, from->GetRendererID());
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_RendererID);
+		glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+	}
+
 	int OpenGLFramebuffer::ReadPixel(uint32_t attachmentIndex, int x, int y)
 	{
 		VS_CORE_ASSERT(attachmentIndex < m_ColorAttachments.size());
 
+		glBindFramebuffer(GL_FRAMEBUFFER, m_RendererID);
 		glReadBuffer(GL_COLOR_ATTACHMENT0 + attachmentIndex);
 		int pixelData;
 		glReadPixels(x, y, 1, 1, GL_RED_INTEGER, GL_INT, &pixelData);
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		return pixelData;
-
 	}
 
 	void OpenGLFramebuffer::ClearAttachment(uint32_t attachmentIndex, int value)

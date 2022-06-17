@@ -4,9 +4,12 @@
 
 namespace Venus {
 
-	void RendererStatsPanel::OnImGuiRender()
+	void RendererStatsPanel::OnImGuiRender(bool& open)
 	{
-		ImGui::Begin(ICON_FA_SIGNAL " Statistics");
+		if (!open)
+			return;
+
+		ImGui::Begin(ICON_FA_SIGNAL " Statistics", &open);
 		ImGuiIO& io = ImGui::GetIO();
 		auto boldFont = io.Fonts->Fonts[0];
 		
@@ -22,15 +25,14 @@ namespace Venus {
 		ImGui::Text("%s", apiName.c_str());
 
 		// Frametime
-		/*
+		float frametime = Application::Get().GetFrametime();
 		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 15.0f);
 		ImGui::PushFont(boldFont);
 		ImGui::Text("Frametime:");
 		ImGui::PopFont();
 		ImGui::Separator();
-		ImGui::Text("%.3fms", Renderer::GetFrameTime());
-		*/
-
+		ImGui::Text("%.3fms", frametime);
+		
 		// Renderer
 		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 15.0f);
 		ImGui::PushFont(boldFont);

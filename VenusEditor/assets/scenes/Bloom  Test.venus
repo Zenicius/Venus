@@ -1,0 +1,25 @@
+Scene: Bloom  Test
+Entities:
+  - Entity: 9641108493717223213
+    TagComponent:
+      Name: Cube
+    TransformComponent:
+      Position: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [8.53508091, 1, 10.7882776]
+    MeshRendererComponent:
+      Name: Cube
+      Path: ""
+  - Entity: 11013139452641006994
+    TagComponent:
+      Name: Directional Light
+    TransformComponent:
+      Position: [0, 0, 0]
+      Rotation: [1.39626336, 0.17453292, 0]
+      Scale: [1, 1, 1]
+    DirectionalLightComponent:
+      Color: [1, 1, 1]
+      Intensity: 2.9000001
+      CastsShadows: true
+      SoftShadows: true
+      LightSize: 0.5

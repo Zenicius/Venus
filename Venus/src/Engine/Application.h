@@ -26,26 +26,33 @@ namespace Venus {
 		}
 	};
 
+	struct ApplicationSpecification
+	{
+		std::string Name = "Venus App";
+		uint32_t Width = 1920, Height = 1080;
+		bool Fullscreen = true;
+		bool Vsync = true;
+		bool WindowDecorated = true;
+	};
+
 	class Application
 	{
 		public:
-			Application(const std::string& name = "Venus App", ApplicationCommandLineArgs args = ApplicationCommandLineArgs());
+			Application(ApplicationSpecification spec = ApplicationSpecification(), ApplicationCommandLineArgs args = ApplicationCommandLineArgs());
 			virtual ~Application();
 
+			void Close();
 			void OnEvent(Event& e);
 
 			void PushLayer(Layer* layer);
 			void PushOverlay(Layer* layer);
 
-			Window& GetWindow() { return *m_Window; }
-
-			void Close();
-
-			ImGuiLayer* GetImGuiLayer() { return m_ImGuiLayer; }
-
 			static Application& Get() { return *s_Instance; }
-
+			Window& GetWindow() { return *m_Window; }
+			ImGuiLayer* GetImGuiLayer() { return m_ImGuiLayer; }
+			float GetFrametime() { return m_Timestep.GetMilliseconds(); }
 			ApplicationCommandLineArgs GetCommandLineArgs() const { return m_CommandLineArgs; }
+
 		private:
 			void Run();
 			bool OnWindowClose(WindowCloseEvent& e);
@@ -57,8 +64,11 @@ namespace Venus {
 			bool m_Running = true;
 			bool m_Minimized = false;
 			LayerStack m_LayerStack;
-
+			Timestep m_Timestep;
 			float m_LastFrameTime = 0.0f;
+
+
+		//--------------------------------------------------------------------------------------------
 		private:
 			static Application* s_Instance;
 			friend int ::main(int argc, char** argv);

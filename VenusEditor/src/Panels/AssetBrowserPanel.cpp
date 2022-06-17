@@ -133,15 +133,17 @@ namespace Venus {
 		// Unique ID
 		ImGui::PushID(fileNameString.c_str());
 
-		ImVec4 color;
+		ImVec4 color, hoveredColor;
 
 		if (m_SelectedAsset == path)
-			color = { 0.25f, 0.25f, 0.25f, 1.0f };
+			color = { 0.30f, 0.25f, 0.25f, 1.0f };
 		else
 			color = { 0.0f, 0.0f, 0.0f, 0.0f };
 
+		hoveredColor = { 0.2f, 0.2f, 0.2f, 1.0f };
+
 		ImGui::PushStyleColor(ImGuiCol_Button, color);
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color);
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, hoveredColor);
 
 		// File type
 		AssetType fileType = GetFileType(asset);
@@ -364,7 +366,7 @@ namespace Venus {
 					if (!CheckDirectoryHasFileNamed(parentPath, fileName))
 						std::filesystem::rename(path, renamed);
 					else
-						CORE_LOG_ERROR("Tryed to rename {0} to {1} when name is in use!", m_RenamingAsset.string(), renamed);
+						CORE_LOG_ERROR("Tried to rename {0} to {1} when name is in use!", m_RenamingAsset.string(), renamed);
 				}
 
 				m_RenamingAsset = "";
@@ -414,7 +416,7 @@ namespace Venus {
 		}
 
 		// Return button
-		if (ImGui::ImageButton((ImTextureID)m_ReturnIcon->GetRendererID(), { 16, 16 }))
+		if (ImGui::Button(ICON_FA_ARROW_LEFT))
 		{
 			if (m_CurrentPath != std::filesystem::path(g_AssetPath))
 			{
@@ -424,32 +426,25 @@ namespace Venus {
 		}
 		ImGui::SameLine();
 		// Foward Button
-		if (ImGui::ImageButton((ImTextureID)m_FowardIcon->GetRendererID(), { 16, 16 }))
+		if (ImGui::Button(ICON_FA_ARROW_RIGHT))
 		{
 			if (!m_FowardPath.empty())
 				m_CurrentPath = m_FowardPath;
 		}
 		// Current Path
 		ImGui::SameLine();
+		ImGui::PushStyleColor(ImGuiCol_Text, { 1.0, 1.0, 1.0, 0.5 });
 		ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 10.0f);
 		ImGui::Text(m_CurrentPath.string().c_str());
+		ImGui::PopStyleColor();
+
 		// Search
 		ImGui::SameLine();
-		ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - 366.0f); //286
-		ImVec4 color = { 0.0f, 0.0f, 0.0f, 0.0f };
-		ImGui::PushStyleColor(ImGuiCol_Button, color);
-		ImGui::PushStyleColor(ImGuiCol_ButtonActive, color);
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color);
-		ImGui::ImageButton((ImTextureID)m_SearchIcon->GetRendererID(), { 12, 12 });
-		ImGui::PopStyleColor(3);
+		ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - 300.0f); //286
+		ImGui::TextDisabled(ICON_FA_SEARCH);
 		ImGui::SameLine();
-		static ImGuiTextFilter filter;
-		filter.Draw("##Search", 270.0f);
-		// Settings
-		ImGui::SameLine();
-		ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - 34.0f);
-		ImGui::ImageButton((ImTextureID)m_SettingsIcon->GetRendererID(), { 16, 16 });
-
+		static ImGuiTextFilter assetFilter;
+		assetFilter.Draw("##Search", 270.0f);
 
 		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 5);
 		ImGui::Separator();
@@ -470,7 +465,7 @@ namespace Venus {
 
 		for (auto& entry : std::filesystem::directory_iterator(m_CurrentPath))
 		{
-			if (entry.path().extension().string() != ".meta" && filter.PassFilter(entry.path().string().c_str()))
+			if (assetFilter.PassFilter(entry.path().string().c_str()))
 				OnAssetRender(entry, thumbnailSize);
 
 			ImGui::TableNextColumn();
@@ -481,66 +476,12 @@ namespace Venus {
 		ImGui::EndChild();
 	}
 
-	void AssetBrowserPanel::OnAssetEditorRender()
+	void AssetBrowserPanel::OnImGuiRender(bool& show)
 	{
-		ImGui::Begin(ICON_FA_TINT " Asset Editor");
-		
-		if (!m_SelectedAsset.empty() && GetFileType(m_SelectedAsset) == AssetType::Texture)
-		{
-			// Texture 2D
-			ImGuiIO& io = ImGui::GetIO();
-			auto boldFont = io.Fonts->Fonts[0];
-			ImGui::PushFont(boldFont);
-			std::string assetName = m_SelectedAsset.filename().string();
-			std::string text = assetName + " (Texture 2D)";
-			ImGui::Text(text.c_str());
-			ImGui::PopFont();
-			ImGui::Separator();
-			ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 15.0f);
+		if (!show)
+			return;
 
-			// Filter Mode ComboBox
-			const char* filterModes[] = { "Point", "Bilinear" };
-			static int currentFilter = 1;
-			ImGui::Combo("Filter Mode", &currentFilter, filterModes, IM_ARRAYSIZE(filterModes));
-
-			// Wrap Mode Combobox
-			const char* wrapModes[] = { "Repeat", "Mirrored", "Clamp to Edge", "Clamp to Border"};
-			static int currentWrap = 0;
-			ImGui::Combo("Wrap Mode", &currentWrap, wrapModes, IM_ARRAYSIZE(wrapModes));
-
-			if (ImGui::Button("Save"))
-			{
-				AssetSerializer serializer;
-				serializer.Serialize(m_SelectedAsset.string(), currentFilter, currentWrap);
-			}
-
-			ImGui::SameLine();
-
-			if (ImGui::Button("Reset"))
-			{
-				currentFilter = 1;
-				currentWrap = 0;
-				AssetSerializer serializer;
-				serializer.Serialize(m_SelectedAsset.string(), currentFilter, currentWrap);
-			}
-
-		}
-		else
-		{
-			std::string msg = "Select a Asset to Edit.";
-			ImGui::PushStyleColor(ImGuiCol_Text, { 0.30f, 0.30f, 0.30f, 0.95f });
-			ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 10);
-			ImGui::SetCursorPosX((ImGui::GetWindowSize().x - ImGui::CalcTextSize(msg.c_str()).x) * 0.5f);
-			ImGui::Text(msg.c_str());
-			ImGui::PopStyleColor();
-		}
-
-		ImGui::End();
-	}
-
-	void AssetBrowserPanel::OnImGuiRender()
-	{
-		ImGui::Begin(ICON_FA_STAR " Asset Browser");
+		ImGui::Begin(ICON_FA_STAR " Asset Browser", &show);
 
 		ImGui::Columns(2, "outer", true);
 
@@ -593,13 +534,11 @@ namespace Venus {
 		ImGui::Columns(1);
 	
 		ImGui::End();
-
-		//OnAssetEditorRender();
 	}
 
 	AssetType AssetBrowserPanel::GetFileType(std::filesystem::path file)
 	{
-		if (file.extension().string() == ".png" || file.extension().string() == ".jpg")
+		if (file.extension().string() == ".png" || file.extension().string() == ".jpg" || file.extension().string() == ".jpeg" || file.extension().string() == ".tga")
 			return AssetType::Texture;
 
 		else if (file.extension().string() == ".ttf")
@@ -608,7 +547,7 @@ namespace Venus {
 		else if (file.extension().string() == ".venus")
 			return AssetType::Scene;
 
-		else if (file.extension().string() == ".obj" || file.extension().string() == ".fbx")
+		else if (file.extension().string() == ".obj" || file.extension().string() == ".fbx" || file.extension().string() == ".gltf")
 			return AssetType::Model;
 
 		else if (file.extension().string() == ".cs" || file.extension().string() == ".glsl")

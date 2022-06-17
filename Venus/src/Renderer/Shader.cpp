@@ -30,6 +30,11 @@ namespace Venus {
 		return nullptr;
 	}
 
+	Ref<ShaderLibrary> ShaderLibrary::Create()
+	{
+		return CreateRef<ShaderLibrary>();
+	}
+
 	void ShaderLibrary::Add(const std::string& name, const Ref<Shader>& shader)
 	{
 		VS_CORE_ASSERT(!Exists(name), "Shader already exists!");
