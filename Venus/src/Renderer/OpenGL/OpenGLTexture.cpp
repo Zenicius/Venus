@@ -21,7 +21,12 @@ namespace Venus {
 		glCreateTextures(GL_TEXTURE_2D, 1, &m_RendererID);
 		glTextureStorage2D(m_RendererID, mipmapCount, m_InternalFormat, m_Width, m_Height);
 
-		glTextureParameteri(m_RendererID, GL_TEXTURE_MIN_FILTER, OpenGLFilterMode(props.Filter));
+		GLenum minFilter = OpenGLFilterMode(props.Filter);
+		if (props.UseMipmaps && minFilter == GL_LINEAR)
+			minFilter = GL_LINEAR_MIPMAP_LINEAR;
+		else if (props.UseMipmaps && minFilter == GL_NEAREST)
+			minFilter = GL_NEAREST_MIPMAP_NEAREST;
+		glTextureParameteri(m_RendererID, GL_TEXTURE_MIN_FILTER, minFilter);
 		glTextureParameteri(m_RendererID, GL_TEXTURE_MAG_FILTER, OpenGLFilterMode(props.Filter));
 
 		glTextureParameteri(m_RendererID, GL_TEXTURE_WRAP_S, OpenGLWrapMode(props.WrapMode));
@@ -62,7 +67,12 @@ namespace Venus {
 				glCreateTextures(GL_TEXTURE_2D, 1, &m_RendererID);
 				glTextureStorage2D(m_RendererID, mipmapCount, m_InternalFormat, m_Width, m_Height);
 
-				glTextureParameteri(m_RendererID, GL_TEXTURE_MIN_FILTER, OpenGLFilterMode(props.Filter));
+				GLenum minFilter = OpenGLFilterMode(props.Filter);
+				if (props.UseMipmaps && minFilter == GL_LINEAR)
+					minFilter = GL_LINEAR_MIPMAP_LINEAR;
+				else if (props.UseMipmaps && minFilter == GL_NEAREST)
+					minFilter = GL_NEAREST_MIPMAP_NEAREST;
+				glTextureParameteri(m_RendererID, GL_TEXTURE_MIN_FILTER, minFilter);
 				glTextureParameteri(m_RendererID, GL_TEXTURE_MAG_FILTER, OpenGLFilterMode(props.Filter));
 
 				glTextureParameteri(m_RendererID, GL_TEXTURE_WRAP_S, OpenGLWrapMode(props.WrapMode));
@@ -100,7 +110,12 @@ namespace Venus {
 				glCreateTextures(GL_TEXTURE_2D, 1, &m_RendererID);
 				glTextureStorage2D(m_RendererID, mipmapCount, m_InternalFormat, m_Width, m_Height);
 
-				glTextureParameteri(m_RendererID, GL_TEXTURE_MIN_FILTER, OpenGLFilterMode(props.Filter));
+				GLenum minFilter = OpenGLFilterMode(props.Filter);
+				if (props.UseMipmaps && minFilter == GL_LINEAR)
+					minFilter = GL_LINEAR_MIPMAP_LINEAR;
+				else if (props.UseMipmaps && minFilter == GL_NEAREST)
+					minFilter = GL_NEAREST_MIPMAP_NEAREST;
+				glTextureParameteri(m_RendererID, GL_TEXTURE_MIN_FILTER, minFilter);
 				glTextureParameteri(m_RendererID, GL_TEXTURE_MAG_FILTER, OpenGLFilterMode(props.Filter));
 
 				glTextureParameteri(m_RendererID, GL_TEXTURE_WRAP_S, OpenGLWrapMode(props.WrapMode));
@@ -123,10 +138,24 @@ namespace Venus {
 		glDeleteTextures(1, &m_RendererID);
 	}
 
-	void OpenGLTexture2D::SetData(void* data, uint32_t size)
-	{uint32_t bpp = m_DataFormat == GL_RGBA ? 4 : 3;
-		VS_CORE_ASSERT(size == m_Width * m_Height * bpp, "Data must be entire texture!");
-		glTextureSubImage2D(m_RendererID, 0, 0, 0, m_Width, m_Height, m_DataFormat, GL_UNSIGNED_BYTE, data);
+	void OpenGLTexture2D::SetData(void* data, uint32_t size, uint32_t mipLevel)
+	{
+		uint32_t desiredSize;
+		uint32_t width = m_Width;
+		uint32_t height = m_Height;
+		if (mipLevel > 0)
+		{
+			auto [mipWidth, mipHeight] = GetMipSize(mipLevel);
+			desiredSize = mipWidth * mipHeight * 4;
+
+			width = mipWidth;
+			height = mipHeight;
+		}
+		else
+			desiredSize = m_Width * m_Height * 4;
+
+		VS_CORE_ASSERT(size == desiredSize, "Data must be entire texture!");
+		glTextureSubImage2D(m_RendererID, mipLevel, 0, 0, width, height, m_DataFormat, GL_UNSIGNED_BYTE, data);
 	}
 
 	void OpenGLTexture2D::GenerateMips()
@@ -178,11 +207,17 @@ namespace Venus {
 			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, m_InternalFormat, m_Width, m_Height, 0, m_DataFormat, GL_FLOAT, nullptr); // Const FLOAT?
 		}
 
+		GLenum minFilter = OpenGLFilterMode(props.Filter);
+		if (props.UseMipmaps && minFilter == GL_LINEAR)
+			minFilter = GL_LINEAR_MIPMAP_LINEAR;
+		else if (props.UseMipmaps && minFilter == GL_NEAREST)
+			minFilter = GL_NEAREST_MIPMAP_NEAREST;
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, minFilter);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
 		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); 
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
 		glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
 	}
@@ -214,8 +249,14 @@ namespace Venus {
 				CORE_LOG_ERROR("Could not find texture: {0}", paths[i]); 
 		}
 
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		GLenum minFilter = OpenGLFilterMode(props.Filter);
+		if (props.UseMipmaps && minFilter == GL_LINEAR)
+			minFilter = GL_LINEAR_MIPMAP_LINEAR;
+		else if (props.UseMipmaps && minFilter == GL_NEAREST)
+			minFilter = GL_NEAREST_MIPMAP_NEAREST;
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, minFilter);
 		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
 		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
@@ -228,8 +269,9 @@ namespace Venus {
 		glDeleteTextures(1, &m_RendererID);
 	}
 
-	void OpenGLTextureCube::SetData(void* data, uint32_t size)
+	void OpenGLTextureCube::SetData(void* data, uint32_t size, uint32_t mipLevel)
 	{
+		// TODO: Check if data is entire texture / SetData in mip levels...
 		// Same data for all faces for now...
 		glBindTexture(GL_TEXTURE_CUBE_MAP, m_RendererID);
 		for (uint32_t i = 0; i < 6; ++i)

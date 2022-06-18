@@ -174,31 +174,15 @@ namespace Venus {
 			fbSpec.Width = 1920;
 			fbSpec.Height = 1080;
 			Ref<Framebuffer> framebuffer = Framebuffer::Create(fbSpec);
-			Ref<Framebuffer> framebuffer2 = Framebuffer::Create(fbSpec);
-			Ref<Framebuffer> framebuffer3 = Framebuffer::Create(fbSpec);
 
 			PipelineSpecification pipelineSpec;
 			pipelineSpec.Shader = Renderer::GetShaderLibrary()->Get("BloomDebug");
 			pipelineSpec.Framebuffer = framebuffer;
-			pipelineSpec.DebugName = "Bloom Debug0";
+			pipelineSpec.DebugName = "Bloom Debug";
 
-			PipelineSpecification pipelineSpec2;
-			pipelineSpec2.Shader = Renderer::GetShaderLibrary()->Get("BloomDebug");
-			pipelineSpec2.Framebuffer = framebuffer2;
-			pipelineSpec2.DebugName = "Bloom Debug1";
+			m_BloomDebugPipeline = Pipeline::Create(pipelineSpec);
 
-			PipelineSpecification pipelineSpec3;
-			pipelineSpec3.Shader = Renderer::GetShaderLibrary()->Get("BloomDebug");
-			pipelineSpec3.Framebuffer = framebuffer3;
-			pipelineSpec3.DebugName = "Bloom Debug2";
-
-			m_BloomDebugPipeline[0] = Pipeline::Create(pipelineSpec);
-			m_BloomDebugPipeline[1] = Pipeline::Create(pipelineSpec2);
-			m_BloomDebugPipeline[2] = Pipeline::Create(pipelineSpec3);
-
-			m_BloomDebugMaterial[0] = Material::Create(pipelineSpec.Shader);
-			m_BloomDebugMaterial[1] = Material::Create(pipelineSpec.Shader);
-			m_BloomDebugMaterial[2] = Material::Create(pipelineSpec.Shader);
+			m_BloomDebugMaterial = Material::Create(pipelineSpec.Shader);
 		}
 
 		// Uniform Buffers
@@ -236,9 +220,24 @@ namespace Venus {
 			m_FXAAPipeline->GetFramebuffer()->Resize(m_ViewportWidth, m_ViewportHeight);
 			m_CompositePipeline->GetFramebuffer()->Resize(m_ViewportWidth, m_ViewportHeight);
 			m_TempPipeline->GetFramebuffer()->Resize(m_ViewportWidth, m_ViewportHeight);
+			m_BloomDebugPipeline->GetFramebuffer()->Resize(m_ViewportWidth, m_ViewportHeight);
 
-			m_BloomDebugPipeline[0]->GetFramebuffer()->Resize(m_ViewportWidth, m_ViewportHeight);
-			m_BloomDebugPipeline[1]->GetFramebuffer()->Resize(m_ViewportWidth, m_ViewportHeight);
+			// Bloom Textures
+			{
+				TextureProperties props;
+				props.Format = TextureFormat::RGBA32F;
+				props.WrapMode = TextureWrapMode::ClampToEdge;
+				props.UseMipmaps = true;
+
+				uint32_t viewportWidth = m_ViewportWidth / 2;
+				uint32_t viewportHeight = m_ViewportHeight / 2;
+				viewportWidth += (4 - (viewportWidth % 4)); // Workgroup size = 4
+				viewportHeight += (4 - (viewportHeight % 4));
+
+				m_BloomTextures[0] = Texture2D::Create(viewportWidth, viewportHeight, props);
+				m_BloomTextures[1] = Texture2D::Create(viewportWidth, viewportHeight, props);
+				m_BloomTextures[2] = Texture2D::Create(viewportWidth, viewportHeight, props);
+			}
 
 			m_NeedsResize = false;
 		}
@@ -251,9 +250,7 @@ namespace Venus {
 		Renderer::Clear(m_FXAAPipeline->GetFramebuffer());
 		Renderer::Clear(m_CompositePipeline->GetFramebuffer());
 		Renderer::Clear(m_TempPipeline->GetFramebuffer());
-
-		Renderer::Clear(m_BloomDebugPipeline[0]->GetFramebuffer());
-		Renderer::Clear(m_BloomDebugPipeline[1]->GetFramebuffer());
+		Renderer::Clear(m_BloomDebugPipeline->GetFramebuffer());
 
 		Renderer::ResetStats();
 
@@ -313,16 +310,14 @@ namespace Venus {
 			m_FXAAPipeline->GetFramebuffer()->Resize(m_ViewportWidth, m_ViewportHeight);
 			m_CompositePipeline->GetFramebuffer()->Resize(m_ViewportWidth, m_ViewportHeight);
 			m_TempPipeline->GetFramebuffer()->Resize(m_ViewportWidth, m_ViewportHeight);
-
-			m_BloomDebugPipeline[0]->GetFramebuffer()->Resize(m_ViewportWidth, m_ViewportHeight);
-			m_BloomDebugPipeline[1]->GetFramebuffer()->Resize(m_ViewportWidth, m_ViewportHeight);
-			m_BloomDebugPipeline[2]->GetFramebuffer()->Resize(m_ViewportWidth, m_ViewportHeight);
+			m_BloomDebugPipeline->GetFramebuffer()->Resize(m_ViewportWidth, m_ViewportHeight);
 
 			// Bloom Textures
 			{
 				TextureProperties props;
 				props.Format = TextureFormat::RGBA32F;
 				props.WrapMode = TextureWrapMode::ClampToEdge;
+				props.UseMipmaps = true;
 
 				uint32_t viewportWidth = m_ViewportWidth / 2;
 				uint32_t viewportHeight = m_ViewportHeight / 2;
@@ -345,10 +340,7 @@ namespace Venus {
 		Renderer::Clear(m_FXAAPipeline->GetFramebuffer());
 		Renderer::Clear(m_CompositePipeline->GetFramebuffer());
 		Renderer::Clear(m_TempPipeline->GetFramebuffer());
-
-		Renderer::Clear(m_BloomDebugPipeline[0]->GetFramebuffer());
-		Renderer::Clear(m_BloomDebugPipeline[1]->GetFramebuffer());
-		Renderer::Clear(m_BloomDebugPipeline[2]->GetFramebuffer());
+		Renderer::Clear(m_BloomDebugPipeline->GetFramebuffer());
 
 		Renderer::ResetStats();
 
@@ -520,8 +512,8 @@ namespace Venus {
 
 		uint32_t workGroupSize = 4;
 
-		float threshold = 1.0f;
-		float knee = 0.1;
+		float threshold = GetOptions().BloomThreshold;
+		float knee = GetOptions().BloomKnee;
 		int mode = 0;  // 0 Prefilter, 1 Downsample, 2 UpSample(1), 3 Upsample
 		float LOD = 0.0f;
 
@@ -565,7 +557,7 @@ namespace Venus {
 				m_BloomPipeline->GetShader()->SetFloat4("u_Uniforms.Params", params);
 				m_BloomPipeline->GetShader()->SetInt("u_Uniforms.Mode", mode);
 				m_BloomPipeline->GetShader()->SetFloat("u_Uniforms.LOD", LOD);
-				m_BloomPipeline->BindWriteOnlyImage(0, m_BloomTextures[1], 0);
+				m_BloomPipeline->BindWriteOnlyImage(0, m_BloomTextures[1], i);
 				m_BloomTextures[0]->Bind(1);
 				m_BloomPipeline->GetShader()->SetTexture("u_BloomTexture", 2, inputTexture);
 				m_BloomPipeline->Execute(workGroupsX, workGroupsY, 1, false);
@@ -575,7 +567,7 @@ namespace Venus {
 				m_BloomPipeline->GetShader()->SetFloat4("u_Uniforms.Params", params);
 				m_BloomPipeline->GetShader()->SetInt("u_Uniforms.Mode", mode);
 				m_BloomPipeline->GetShader()->SetFloat("u_Uniforms.LOD", LOD);
-				m_BloomPipeline->BindWriteOnlyImage(0, m_BloomTextures[0], 0);
+				m_BloomPipeline->BindWriteOnlyImage(0, m_BloomTextures[0], i);
 				m_BloomTextures[1]->Bind(1);
 				m_BloomPipeline->GetShader()->SetTexture("u_BloomTexture", 2, inputTexture);
 				m_BloomPipeline->Execute(workGroupsX, workGroupsY, 1, false);
@@ -599,7 +591,7 @@ namespace Venus {
 			m_BloomPipeline->GetShader()->SetFloat4("u_Uniforms.Params", params);
 			m_BloomPipeline->GetShader()->SetInt("u_Uniforms.Mode", mode);
 			m_BloomPipeline->GetShader()->SetFloat("u_Uniforms.LOD", LOD);
-			m_BloomPipeline->BindWriteOnlyImage(0, m_BloomTextures[2], 0);
+			m_BloomPipeline->BindWriteOnlyImage(0, m_BloomTextures[2], mipCount - 2);
 			m_BloomTextures[0]->Bind(1);
 			m_BloomPipeline->GetShader()->SetTexture("u_BloomTexture", 2, inputTexture);
 			m_BloomPipeline->Execute(workGroupsX, workGroupsY, 1, false);
@@ -620,7 +612,7 @@ namespace Venus {
 				m_BloomPipeline->GetShader()->SetFloat4("u_Uniforms.Params", params);
 				m_BloomPipeline->GetShader()->SetInt("u_Uniforms.Mode", mode);
 				m_BloomPipeline->GetShader()->SetFloat("u_Uniforms.LOD", LOD);
-				m_BloomPipeline->BindWriteOnlyImage(0, m_BloomTextures[2]);
+				m_BloomPipeline->BindWriteOnlyImage(0, m_BloomTextures[2], mip);
 				m_BloomTextures[0]->Bind(1);
 				m_BloomTextures[2]->Bind(2);
 				m_BloomPipeline->Execute(workGroupsX, workGroupsY, 1, false);
@@ -628,17 +620,9 @@ namespace Venus {
 		}
 
 		// Debug
-		m_BloomDebugMaterial[0]->SetFloat("u_Settings.Layer", (float)m_Options.Bloom0Mip);
-		m_BloomDebugMaterial[0]->SetTexture("u_Texture", 0, m_BloomTextures[0]->GetRendererID());
-		Renderer::RenderFullscreenQuad(m_BloomDebugPipeline[0], m_BloomDebugMaterial[0]);
-
-		m_BloomDebugMaterial[1]->SetFloat("u_Settings.Layer", (float)m_Options.Bloom1Mip);
-		m_BloomDebugMaterial[1]->SetTexture("u_Texture", 0, m_BloomTextures[1]->GetRendererID());
-		Renderer::RenderFullscreenQuad(m_BloomDebugPipeline[1], m_BloomDebugMaterial[1]);
-
-		m_BloomDebugMaterial[2]->SetFloat("u_Settings.Layer", (float)m_Options.Bloom2Mip);
-		m_BloomDebugMaterial[2]->SetTexture("u_Texture", 0, m_BloomTextures[2]->GetRendererID());
-		Renderer::RenderFullscreenQuad(m_BloomDebugPipeline[2], m_BloomDebugMaterial[2]);
+		m_BloomDebugMaterial->SetFloat("u_Settings.Layer", (float)m_Options.BloomDebugMip);
+		m_BloomDebugMaterial->SetTexture("u_Texture", 0, m_BloomTextures[m_Options.BloomDebugTex]->GetRendererID());
+		Renderer::RenderFullscreenQuad(m_BloomDebugPipeline, m_BloomDebugMaterial);
 	}
 
 	void SceneRenderer::CompositePass()
@@ -719,25 +703,30 @@ namespace Venus {
 
 		if (ImGui::CollapsingHeader("Bloom"))
 		{
-			ImGui::Checkbox("Enable", &options.Bloom);
+			UI::Checkbox("Enable", &options.Bloom, true);
+			UI::DragFloat("Threshold", &options.BloomThreshold, 0.1f, 0.0f, 100.0f, true);
+			UI::DragFloat("Knee", &options.BloomKnee, 0.1f, 0.0f, 100.0f, true);
 
-			ImGui::Separator();
-			uint32_t bloomDebug0 = m_BloomDebugPipeline[0]->GetFramebuffer()->GetColorAttachmentRendererID();
-			uint32_t maxMipLevel = m_BloomTextures[0]->GetMipLevelCount();
-			ImGui::SliderInt("Bloom 0 Mip", &options.Bloom0Mip, 0, maxMipLevel);
-			ImGui::Image(reinterpret_cast<void*>(bloomDebug0), ImVec2{ 256, 256 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
-			ImGui::Separator();
+			UI::SetPosX(ImGui::GetContentRegionMax().x - 70);
+			if (ImGui::Button("Reset", ImVec2{ 70, 30 }))
+			{
+				options.BloomThreshold = 1.0f;
+				options.BloomKnee = 0.1f;
+			}
 
-			uint32_t bloomDebug1 = m_BloomDebugPipeline[1]->GetFramebuffer()->GetColorAttachmentRendererID();
-			maxMipLevel = m_BloomTextures[1]->GetMipLevelCount();
-			ImGui::SliderInt("Bloom 1 Mip", &options.Bloom1Mip, 0, maxMipLevel);
-			ImGui::Image(reinterpret_cast<void*>(bloomDebug1), ImVec2{ 256, 256 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
-			ImGui::Separator();
-
-			uint32_t bloomDebug2 = m_BloomDebugPipeline[2]->GetFramebuffer()->GetColorAttachmentRendererID();
-			maxMipLevel = m_BloomTextures[2]->GetMipLevelCount();
-			ImGui::SliderInt("Bloom 2 Mip", &options.Bloom2Mip, 0, maxMipLevel);
-			ImGui::Image(reinterpret_cast<void*>(bloomDebug2), ImVec2{ 256, 256 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
+			UI::ShiftPos(20.0f, 10.0f);
+			ImGuiTreeNodeFlags treeNodeFlags = ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_FramePadding;
+			if (ImGui::TreeNodeEx("Bloom Textures", treeNodeFlags))
+			{
+				UI::SliderInt("Bloom Texture", &options.BloomDebugTex, 0, 2);
+				uint32_t bloomDebugTex = m_BloomDebugPipeline->GetFramebuffer()->GetColorAttachmentRendererID();
+				uint32_t maxMipLevel = m_BloomTextures[options.BloomDebugTex]->GetMipLevelCount();
+				UI::SliderInt("Bloom Mipmap Level", &options.BloomDebugMip, 0, maxMipLevel - 1);
+				UI::ShiftPosY(5.0f);
+				ImGui::Image(reinterpret_cast<void*>(bloomDebugTex), ImVec2{ 256, 256 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
+				
+				ImGui::TreePop();
+			}
 		}
 
 		if (ImGui::CollapsingHeader("Post-Processing"))

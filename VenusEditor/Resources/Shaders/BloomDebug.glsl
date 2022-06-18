@@ -32,7 +32,6 @@ layout (push_constant) uniform Settings
 
 void main()
 {
-	//vec4 color = textureLod(u_Texture, v_TexCoord, u_Settings.Layer);
-	vec4 color = texture(u_Texture, v_TexCoord);
+	vec4 color = textureLod(u_Texture, v_TexCoord, u_Settings.Layer);
 	o_Color = color;
 }

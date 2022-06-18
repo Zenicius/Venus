@@ -42,6 +42,7 @@ namespace Venus {
 		TextureFormat Format = TextureFormat::RGBA8;
 		bool FlipVertically = true;
 		bool GenerateMipmaps = true;
+		bool UseMipmaps = false;
 	};
 
 	class Texture
@@ -55,7 +56,7 @@ namespace Venus {
 
 			virtual std::string GetPath() const = 0;
 
-			virtual void SetData(void* data, uint32_t size) = 0;
+			virtual void SetData(void* data, uint32_t size, uint32_t mipLevel = 0) = 0;
 			virtual void GenerateMips() = 0;
 
 			virtual void Bind(uint32_t slot = 0) const = 0;

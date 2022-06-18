@@ -439,6 +439,7 @@ namespace Venus {
 		// Convert Equirectangular to Cubemap
 		TextureProperties cubeProps;
 		cubeProps.Format = TextureFormat::RGBA32F;
+		cubeProps.UseMipmaps = true;
 		Ref<TextureCube> cubeMap = TextureCube::Create(cubeMapSize, cubeMapSize, cubeProps);
 		{
 			CORE_LOG_INFO("Converting Equirectangular to Cubemap");
@@ -499,6 +500,7 @@ namespace Venus {
 
 		TextureProperties cubeProps;
 		cubeProps.Format = TextureFormat::RGBA32F;
+		cubeProps.UseMipmaps = true;
 		Ref<TextureCube> cubeMap = TextureCube::Create(cubeMapSize, cubeMapSize, cubeProps);
 
 		Ref<ComputePipeline> computePipeline = ComputePipeline::Create(Renderer::GetShaderLibrary()->Get("PreethamSky"));

@@ -50,7 +50,7 @@ namespace Venus {
 
 			virtual std::string GetPath() const override { return m_Path; }
 		
-			virtual void SetData(void* data, uint32_t size) override;
+			virtual void SetData(void* data, uint32_t size, uint32_t mipLevel = 0) override;
 			virtual void GenerateMips() override;
 
 			virtual void Bind(uint32_t slot = 0) const override;
@@ -89,7 +89,7 @@ namespace Venus {
 
 			virtual std::string GetPath() const override { return m_Path; }
 
-			virtual void SetData(void* data, uint32_t size) override;
+			virtual void SetData(void* data, uint32_t size, uint32_t mipLevel = 0) override;
 			virtual void GenerateMips() override;
 
 			virtual bool IsLoaded() const override { return m_IsLoaded; }

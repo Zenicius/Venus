@@ -37,10 +37,11 @@ namespace Venus {
 		float CascadeFarPlaneOffset = 50.0f;
 
 		// Bloom
-		bool Bloom = false;
-		int Bloom0Mip = 0;
-		int Bloom1Mip = 0;
-		int Bloom2Mip = 0;
+		bool Bloom = true;
+		float BloomThreshold = 1.0f;
+		float BloomKnee = 0.1f;
+		int BloomDebugTex = 0;
+		int BloomDebugMip = 0;
 
 		// Post
 		bool FXAA = true;
@@ -186,7 +187,7 @@ namespace Venus {
 			Ref<Pipeline> m_CompositePipeline;
 
 			Ref<Pipeline> m_TempPipeline;
-			Ref<Pipeline> m_BloomDebugPipeline[3];
+			Ref<Pipeline> m_BloomDebugPipeline;
 			//------------------------------------------------------------
 
 
@@ -198,7 +199,7 @@ namespace Venus {
 			Ref<Material> m_CompositeMaterial;
 
 			Ref<Material> m_TempMaterial;
-			Ref<Material> m_BloomDebugMaterial[3];
+			Ref<Material> m_BloomDebugMaterial;
 			//------------------------------------------------------------
 
 

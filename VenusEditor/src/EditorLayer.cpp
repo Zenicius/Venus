@@ -376,7 +376,7 @@ namespace Venus {
 
 				ImGui::Separator();
 
-				if (ImGui::MenuItem("Exit"))
+				if (ImGui::MenuItem("Exit", "Alt+F4"))
 					Application::Get().Close();
 
 
