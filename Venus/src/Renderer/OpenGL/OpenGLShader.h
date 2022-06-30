@@ -3,7 +3,6 @@
 #include "Renderer/Shader.h"
 #include <glm/glm.hpp>
 
-// TODO: REMOVE!
 typedef unsigned int GLenum;
 
 namespace Venus {
@@ -52,6 +51,11 @@ namespace Venus {
 			void CompileOrGetVulkanBinaries(const std::unordered_map<GLenum, std::string>& shaderSources);
 			void CompileOrGetOpenGLBinaries();
 			void CreateProgram();
+
+			// AMD Hack
+			void CompileOpenGLBinariesAMD(GLenum& program, std::array<uint32_t, 2>& glShadersIDs);
+			void CreateProgramAMD();
+
 			void Reflect(GLenum stage, const std::vector<uint32_t>& shaderData);
 		private:
 			uint32_t m_RendererID;

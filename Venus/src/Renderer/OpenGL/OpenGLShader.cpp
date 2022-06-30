@@ -60,7 +60,6 @@ namespace Venus {
 
 		static const char* GetCacheDirectory()
 		{
-			// TODO: make sure the assets directory is valid
 			return "Resources/Cache/Shader/Opengl";
 		}
 
@@ -97,6 +96,33 @@ namespace Venus {
 			return "";
 		}
 
+		static const bool IsAmdGPU()
+		{
+			const char* vendor = (char*)glGetString(GL_VENDOR);
+			return strstr(vendor, "ATI") != nullptr;
+		}
+
+	}
+
+	static bool VerifyProgramLink(GLenum& program)
+	{
+		int isLinked = 0;
+		glGetProgramiv(program, GL_LINK_STATUS, (int*)&isLinked);
+		if (isLinked == GL_FALSE)
+		{
+			int maxLength = 0;
+			glGetProgramiv(program, GL_INFO_LOG_LENGTH, &maxLength);
+
+			std::vector<char> infoLog(maxLength);
+			glGetProgramInfoLog(program, maxLength, &maxLength, &infoLog[0]);
+
+			glDeleteProgram(program);
+
+			CORE_LOG_ERROR("{0}", infoLog.data());
+			VS_CORE_ASSERT(false, "[OpenGL] Shader link failure!");
+			return false;
+		}
+		return true;
 	}
 
 	OpenGLShader::OpenGLShader(const std::string& filepath)
@@ -112,8 +138,18 @@ namespace Venus {
 		{
 			Timer timer;
 			CompileOrGetVulkanBinaries(shaderSources);
-			CompileOrGetOpenGLBinaries();
-			CreateProgram();
+
+			// Temp hack for AMD gpus crashing when using spirv shaders
+			if (Utils::IsAmdGPU())
+			{
+				CreateProgramAMD();
+			}
+			else
+			{
+				CompileOrGetOpenGLBinaries();
+				CreateProgram();
+			}
+
 			CORE_LOG_WARN("Shader creation took {0} ms", timer.ElapsedMillis());
 		}
 
@@ -123,8 +159,6 @@ namespace Venus {
 		auto lastDot = filepath.rfind('.');
 		auto count = lastDot == std::string::npos ? filepath.size() - lastSlash : lastDot - lastSlash;
 		m_Name = filepath.substr(lastSlash, count);
-
-		//CORE_LOG_TRACE("SHADER {0} at program {1}", m_Name, m_RendererID);
 	}
 
 	OpenGLShader::OpenGLShader(const std::string& name, const std::string& vertexSrc, const std::string& fragmentSrc)
@@ -136,9 +170,23 @@ namespace Venus {
 		sources[GL_VERTEX_SHADER] = vertexSrc;
 		sources[GL_FRAGMENT_SHADER] = fragmentSrc;
 
-		CompileOrGetVulkanBinaries(sources);
-		CompileOrGetOpenGLBinaries();
-		CreateProgram();
+		{
+			Timer timer;
+			CompileOrGetVulkanBinaries(sources);
+
+			// Temp hack for AMD gpus crashing when using spirv shaders
+			if (Utils::IsAmdGPU())
+			{
+				CreateProgramAMD();
+			}
+			else
+			{
+				CompileOrGetOpenGLBinaries();
+				CreateProgram();
+			}
+
+			CORE_LOG_WARN("Shader creation took {0} ms", timer.ElapsedMillis());
+		}
 	}
 
 	OpenGLShader::~OpenGLShader()
@@ -360,6 +408,108 @@ namespace Venus {
 		{
 			glDetachShader(program, id);
 			glDeleteShader(id);
+		}
+
+		m_RendererID = program;
+
+		CORE_LOG_INFO("Creating Shader {0} at program: {1}", m_FilePath, m_RendererID);
+	}
+
+	void OpenGLShader::CompileOpenGLBinariesAMD(GLenum& program, std::array<uint32_t, 2>& glShadersIDs)
+	{
+		int glShaderIDIndex = 0;
+		for (auto&& [stage, spirv] : m_VulkanSPIRV)
+		{
+			spirv_cross::CompilerGLSL glslCompiler(spirv);
+			std::string source = glslCompiler.compile();
+
+			uint32_t shader;
+
+			shader = glCreateShader(stage);
+
+			const GLchar* sourceCStr = source.c_str();
+			glShaderSource(shader, 1, &sourceCStr, 0);
+
+			glCompileShader(shader);
+
+			int isCompiled = 0;
+			glGetShaderiv(shader, GL_COMPILE_STATUS, &isCompiled);
+			if (isCompiled == GL_FALSE)
+			{
+				int maxLength = 0;
+				glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &maxLength);
+
+				std::vector<char> infoLog(maxLength);
+				glGetShaderInfoLog(shader, maxLength, &maxLength, &infoLog[0]);
+
+				glDeleteShader(shader);
+
+				CORE_LOG_ERROR("{0}", infoLog.data());
+				VS_CORE_ASSERT(false, "[OpenGL] Shader compilation failure!");
+				return;
+			}
+			glAttachShader(program, shader);
+			glShadersIDs[glShaderIDIndex++] = shader;
+		}
+	}
+
+	void OpenGLShader::CreateProgramAMD()
+	{
+		GLuint program = glCreateProgram();
+
+		std::filesystem::path cacheDirectory = Utils::GetCacheDirectory();
+		std::filesystem::path shaderFilePath = m_FilePath;
+		std::filesystem::path cachedPath = cacheDirectory / (shaderFilePath.filename().string() + ".cached_opengl.pgr");
+		std::ifstream in(cachedPath, std::ios::ate | std::ios::binary);
+
+		if (in.is_open())
+		{
+			auto size = in.tellg();
+			in.seekg(0);
+
+			auto data = std::vector<char>(size);
+			uint32_t format = 0;
+			in.read((char*)&format, sizeof(uint32_t));
+			in.read((char*)data.data(), size);
+			glProgramBinary(program, format, data.data(), data.size());
+
+			bool linked = VerifyProgramLink(program);
+
+			if (!linked)
+				return;
+		}
+		else
+		{
+			std::array<uint32_t, 2> glShadersIDs;
+			CompileOpenGLBinariesAMD(program, glShadersIDs);
+			glLinkProgram(program);
+
+			bool linked = VerifyProgramLink(program);
+
+			if (linked)
+			{
+				// Save program data
+				GLint formats = 0;
+				glGetIntegerv(GL_NUM_PROGRAM_BINARY_FORMATS, &formats);
+				VS_CORE_ASSERT(formats > 0, "Driver does not support binary format");
+				Utils::CreateCacheDirectoryIfNeeded();
+				GLint length = 0;
+				glGetProgramiv(program, GL_PROGRAM_BINARY_LENGTH, &length);
+				auto shaderData = std::vector<char>(length);
+				uint32_t format = 0;
+				glGetProgramBinary(program, length, nullptr, &format, shaderData.data());
+				std::ofstream out(cachedPath, std::ios::out | std::ios::binary);
+				if (out.is_open())
+				{
+					out.write((char*)&format, sizeof(uint32_t));
+					out.write(shaderData.data(), shaderData.size());
+					out.flush();
+					out.close();
+				}
+			}
+
+			for (auto& id : glShadersIDs)
+				glDetachShader(program, id);
 		}
 
 		m_RendererID = program;
