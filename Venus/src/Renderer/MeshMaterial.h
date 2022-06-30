@@ -14,6 +14,9 @@ namespace Venus {
 			glm::vec3& GetAlbedoColor();
 			void SetAlbedoColor(const glm::vec3& color);
 
+			float& GetEmission();
+			void SetEmission(float value);
+
 			int& IsUsingNormalMap();
 			void SetUseNormalMap(bool value);
 

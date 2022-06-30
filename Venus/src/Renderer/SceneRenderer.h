@@ -38,8 +38,11 @@ namespace Venus {
 
 		// Bloom
 		bool Bloom = true;
+		float BloomIntensity = 1.0f;
 		float BloomThreshold = 1.0f;
 		float BloomKnee = 0.1f;
+		Ref<Texture2D> BloomDirtMask = nullptr;
+		float BloomDirtMaskIntensity = 1.0f;
 		int BloomDebugTex = 0;
 		int BloomDebugMip = 0;
 

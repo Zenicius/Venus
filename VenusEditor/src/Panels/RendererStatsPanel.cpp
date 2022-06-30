@@ -40,6 +40,8 @@ namespace Venus {
 		ImGui::PopFont();
 		ImGui::Separator();
 		ImGui::Text("Draw Calls: %d", stats.DrawCalls);
+		ImGui::Text("Models: %d", stats.Models);
+		ImGui::Text("Meshs: %d", stats.Meshs);
 		ImGui::Text("Vertices: %d", stats.VertexCount);
 		ImGui::Text("Indices: %d", stats.IndexCount);
 

@@ -3,6 +3,7 @@
 #include <string>
 #include "imgui/imgui.h"
 #include "imgui/imgui_internal.h"
+#include "ImGui/IconsFontAwesome.h"
 #include <glm/glm/gtc/type_ptr.hpp>
 
 #define TEXT_COLOR { 1.0, 1.0, 1.0, 1.0 }
@@ -37,10 +38,16 @@ namespace Venus::UI {
 		ImGui::SetCursorPosY(pos);
 	}
 
+	static void CenterText(const std::string& text)
+	{
+		float textSizeX = ImGui::CalcTextSize(text.c_str()).x;
+		ImGui::SetCursorPosX((ImGui::GetWindowSize().x - textSizeX) * 0.5f);
+	}
+
 
 	//- Widgets--------------------------------------------------------------------------------
 
-	static void Text(const std::string& text, bool bold, bool separator = false)
+	static void Text(const std::string& text, bool bold = false, bool separator = false)
 	{
 		if (bold)
 		{
@@ -56,6 +63,33 @@ namespace Venus::UI {
 
 		if (separator)
 			ImGui::Separator();
+	}
+
+	static bool InputText(const std::string& label, std::string& value, bool separator = false)
+	{
+		std::string inputID = "##" + label;
+		bool changed = false;
+
+		ImGui::Columns(2);
+		ImGui::Text(label.c_str());
+		ImGui::SameLine();
+		ImGui::NextColumn();
+		ImGui::PushItemWidth(-1);
+		char buffer[256];
+		strcpy_s<256>(buffer, value.c_str());
+
+		if (ImGui::InputText(inputID.c_str(), buffer, 256))
+		{
+			value = buffer;
+			changed = true;
+		}
+
+		ImGui::Columns(1);
+
+		if (separator)
+			ImGui::Separator();
+
+		return changed;
 	}
 
 	static bool SliderInt(const std::string& label, int* value, int min, int max, bool separator = false)
@@ -175,19 +209,30 @@ namespace Venus::UI {
 		return changed;
 	}
 
-	static bool DropDown(const std::string& label, const char** options, int count, int* selected, bool separator = false)
+	static bool DropDown(const std::string& label, const char** options, int count, int* selected, bool separator = false, bool drawLabel = true, bool noDefaultArrow = false)
 	{
 		const char* current = options[*selected];
+		std::string preview = current;
 		std::string dropdownID = "##" + label;
 		bool changed = false;
 
-		ImGui::PushStyleColor(ImGuiCol_Text, TEXT_COLOR);
-		ImGui::Columns(2);
-		ImGui::Text(label.c_str());
-		ImGui::SameLine();
-		ImGui::NextColumn();
+		if (drawLabel)
+		{
+			ImGui::PushStyleColor(ImGuiCol_Text, TEXT_COLOR);
+			ImGui::Columns(2);
+			ImGui::Text(label.c_str());
+			ImGui::SameLine();
+			ImGui::NextColumn();
+		}
 
-		if (ImGui::BeginCombo(dropdownID.c_str(), current))
+		ImGuiComboFlags flags = 0;
+		if (noDefaultArrow)
+		{
+			flags |= ImGuiComboFlags_NoArrowButton;
+			preview += " " ICON_FA_CARET_DOWN;
+		}
+
+		if (ImGui::BeginCombo(dropdownID.c_str(), preview.c_str(), flags))
 		{
 			for (int i = 0; i < count; i++)
 			{
@@ -204,10 +249,14 @@ namespace Venus::UI {
 			ImGui::EndCombo();
 		}
 
-		ImGui::Columns(1);
+		if (drawLabel)
+		{
+			ImGui::Columns(1);
+			ImGui::PopStyleColor();
+		}
+
 		if (separator)
 			ImGui::Separator();
-		ImGui::PopStyleColor();
 
 		return changed;
 	}

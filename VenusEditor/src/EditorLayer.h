@@ -59,6 +59,7 @@ namespace Venus {
 			ObjectsPanel m_ObjectsPanel;
 			AssetBrowserPanel m_AssetBrowserPanel;
 			RendererStatsPanel m_RendererStatsPanel;
+			ConsolePanel m_ConsolePanel;
 			
 			// Icons
 			Ref<Texture2D> m_VenusLogoIcon;
@@ -96,6 +97,7 @@ namespace Venus {
 
 			bool m_ShowAssetBrowserPanel = true;
 			bool m_ShowStatsPanel = false;
+			bool m_ShowConsolePanel = true;
 			bool m_ShowSceneSettingsPanel = true;
 			bool m_ShowWelcomeMessage = false;
 			

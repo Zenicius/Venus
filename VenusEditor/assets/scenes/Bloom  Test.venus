@@ -1,25 +1,119 @@
 Scene: Bloom  Test
 Entities:
-  - Entity: 9641108493717223213
+  - Entity: 476416772588282939
     TagComponent:
-      Name: Cube
+      Name: Lights
+      Icon: 1
     TransformComponent:
       Position: [0, 0, 0]
       Rotation: [0, 0, 0]
-      Scale: [8.53508091, 1, 10.7882776]
+      Scale: [1, 1, 1]
+    RelationshipComponent:
+      Parent: 0
+      Children:
+        - ID: 1898899164225760726
+  - Entity: 311665752295356910
+    TagComponent:
+      Name: Geometry
+      Icon: 1
+    TransformComponent:
+      Position: [-0.541620493, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    RelationshipComponent:
+      Parent: 0
+      Children:
+        - ID: 7601610432366976023
+        - ID: 9089122471944295620
+        - ID: 9641108493717223213
+  - Entity: 1898899164225760726
+    TagComponent:
+      Name: Red Light
+      Icon: 5
+    TransformComponent:
+      Position: [-3.75743341, 6.44573212, -6.32609224]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    RelationshipComponent:
+      Parent: 476416772588282939
+      Children:
+        []
+    PointLightComponent:
+      Color: [1, 0, 0]
+      Intensity: 10.6999998
+      LightSize: 0.5
+      MinRadius: 1
+      Radius: 10
+      CastsShadows: true
+      SoftShadows: true
+      Falloff: 1
+  - Entity: 7601610432366976023
+    TagComponent:
+      Name: Cone
+      Icon: 3
+    TransformComponent:
+      Position: [0, 2.03272295, 5.17392635]
+      Rotation: [0, -0, 0]
+      Scale: [1, 1, 1]
+    RelationshipComponent:
+      Parent: 311665752295356910
+      Children:
+        []
+    MeshRendererComponent:
+      Name: Cone
+      Path: ""
+    ScriptComponent:
+      Module Name: Dev.EntityTest
+  - Entity: 9089122471944295620
+    TagComponent:
+      Name: Cube
+      Icon: 3
+    TransformComponent:
+      Position: [0.642658234, 3.77810907, -3.40725803]
+      Rotation: [0, -0, 0]
+      Scale: [1, 1, 1]
+    RelationshipComponent:
+      Parent: 311665752295356910
+      Children:
+        []
     MeshRendererComponent:
       Name: Cube
       Path: ""
-  - Entity: 11013139452641006994
+  - Entity: 9641108493717223213
     TagComponent:
-      Name: Directional Light
+      Name: Cube
+      Icon: 3
     TransformComponent:
       Position: [0, 0, 0]
-      Rotation: [1.39626336, 0.17453292, 0]
-      Scale: [1, 1, 1]
-    DirectionalLightComponent:
-      Color: [1, 1, 1]
-      Intensity: 2.9000001
-      CastsShadows: true
-      SoftShadows: true
-      LightSize: 0.5
+      Rotation: [0, -0, 0]
+      Scale: [8.53508091, 1, 10.7882776]
+    RelationshipComponent:
+      Parent: 311665752295356910
+      Children:
+        []
+    MeshRendererComponent:
+      Name: Cube
+      Path: ""
+  - Entity: 13562503166311975282
+    TagComponent:
+      Name: Camera
+      Icon: 2
+    TransformComponent:
+      Position: [-20, 5.05118847, 0]
+      Rotation: [-0.17453292, -1.57079637, 0]
+      Scale: [0.999966979, 0.999999404, 0.999966741]
+    RelationshipComponent:
+      Parent: 0
+      Children:
+        []
+    CameraComponent:
+      Camera:
+        ProjectionType: 0
+        PerspectiveFOV: 0.785398185
+        PerspectiveNear: 0.00999999978
+        PerspectiveFar: 1000
+        OrthographicSize: 10
+        OrthographicNear: -1
+        OrthographicFar: 1
+      Primary: true
+      FixedAspectRatio: false

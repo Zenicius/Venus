@@ -9,6 +9,8 @@
 #include "Renderer/Renderer.h"
 #include "Renderer/SceneRenderer.h"
 
+#include "Scripting/ScriptingEngine.h"
+
 #include "box2d/b2_world.h"
 #include "box2d/b2_body.h"
 #include "box2d/b2_fixture.h"
@@ -72,6 +74,8 @@ namespace Venus {
 		newScene->m_PositionIterations = other->m_PositionIterations;
 		newScene->m_VelocityIterations = other->m_VelocityIterations;
 
+		newScene->m_ReloadAssembliesOnPlay = other->m_ReloadAssembliesOnPlay;
+
 		auto& srcRegistry = other->m_Registry;
 		auto& destRegistry = newScene->m_Registry;
 
@@ -90,7 +94,9 @@ namespace Venus {
 		}
 
 		// Copy components
+		CopyComponent<TagComponent>(destRegistry, srcRegistry, enttMap);
 		CopyComponent<TransformComponent>(destRegistry, srcRegistry, enttMap);
+		CopyComponent<RelationshipComponent>(destRegistry, srcRegistry, enttMap);
 		CopyComponent<SpriteRendererComponent>(destRegistry, srcRegistry, enttMap);
 		CopyComponent<CircleRendererComponent>(destRegistry, srcRegistry, enttMap);
 		CopyComponent<CameraComponent>(destRegistry, srcRegistry, enttMap);
@@ -101,6 +107,7 @@ namespace Venus {
 		CopyComponent<PointLightComponent>(destRegistry, srcRegistry, enttMap);
 		CopyComponent<DirectionalLightComponent>(destRegistry, srcRegistry, enttMap);
 		CopyComponent<SkyLightComponent>(destRegistry, srcRegistry, enttMap);
+		CopyComponent<ScriptComponent>(destRegistry, srcRegistry, enttMap);
 
 		return newScene;
 	}
@@ -165,7 +172,28 @@ namespace Venus {
 				}
 			}
 		}
+
+		// Scripting
+		{
+			if(m_ReloadAssembliesOnPlay)
+				ScriptingEngine::Reload();
+
+			ScriptingEngine::SetContext(this);
 		
+			auto view = m_Registry.view<ScriptComponent>();
+			for (auto e : view)
+			{
+				Entity entity = { e, this };
+
+				auto& scriptComponent = entity.GetComponent<ScriptComponent>();
+
+				if (ScriptingEngine::ModuleExists(scriptComponent.ModuleName))
+				{
+					ScriptingEngine::Instantiate(entity);
+					ScriptingEngine::OnCreate(entity);
+				}
+			}
+		}
 	}
 
 	void Scene::OnRuntimeStop()
@@ -173,6 +201,9 @@ namespace Venus {
 		// Physics
 		delete m_PhysicsWorld;
 		m_PhysicsWorld = nullptr;
+
+		// Scripting
+		ScriptingEngine::ClearEntityData();
 	}
 
 	Entity Scene::CreateEntity(const std::string& name)
@@ -184,20 +215,102 @@ namespace Venus {
 	{
 		Entity entity = { m_Registry.create(), this };
 
-		entity.AddComponent<IDComponent>(uuid);
+		auto& idComponent = entity.AddComponent<IDComponent>(uuid);
 
 		auto& tagComponent = entity.AddComponent<TagComponent>();
 		tagComponent.Name = name.empty() ? "Empty Object" : name;
 
 		entity.AddComponent<TransformComponent>();
+		entity.AddComponent<RelationshipComponent>();
 
+		VS_CORE_ASSERT(m_EntityMap.find(idComponent.ID) == m_EntityMap.end(), "Duplicated Entity ID in map!");
+		m_EntityMap[idComponent.ID] = entity;
 		return entity;
+	}
+
+	Entity Scene::CreateChildEntity(Entity parent, const std::string& name)
+	{
+		Entity child = CreateEntity(name);
+		child.SetParent(parent);
+
+		return child;
+	}
+
+	void Scene::ParentEntity(Entity child, Entity parent)
+	{
+		if (parent.IsDescendantOf(child))
+		{
+			UnparentEntity(parent);
+
+			Entity newParent = TryGetEntityWithUUID(child.GetParentUUID());
+			if (newParent)
+			{
+				UnparentEntity(child);
+				ParentEntity(parent, newParent);
+			}
+		}
+		else
+		{
+			Entity previousParent = TryGetEntityWithUUID(child.GetParentUUID());
+
+			if (previousParent)
+				UnparentEntity(child);
+		}
+
+		child.SetParentUUID(parent.GetUUID());
+		parent.GetChildren().push_back(child.GetUUID());
+		
+		ConvertToLocalSpace(child);
+	}
+
+	void Scene::UnparentEntity(Entity child, bool toWorldSpace)
+	{
+		Entity parent = TryGetEntityWithUUID(child.GetParentUUID());
+		if (!parent)
+			return;
+
+		auto& parentChildren = parent.GetChildren();
+		parentChildren.erase(std::remove(parentChildren.begin(), parentChildren.end(), child.GetUUID()), parentChildren.end());
+
+		if(toWorldSpace)
+			ConvertToWorldSpace(child);
+
+		child.SetParentUUID(0);
+	}
+
+	Entity Scene::GetEntityWithUUID(UUID id) const
+	{
+		return m_EntityMap.at(id);
+	}
+
+	Entity Scene::TryGetEntityWithUUID(UUID id) const
+	{
+		if (const auto iter = m_EntityMap.find(id); iter != m_EntityMap.end())
+		{
+			return iter->second;
+		}
+
+		return Entity();
+	}
+
+	Entity Scene::TryGetEntityWithName(const std::string& name)
+	{
+		auto entities = GetAllEntitiesWith<TagComponent>();
+
+		for (auto entity : entities)
+		{
+			if (Entity{ entity, this }.GetName() == name)
+				return Entity{ entity, this };
+		}
+
+		return Entity();
 	}
 
 	Entity Scene::DuplicateEntity(Entity entity)
 	{
-		Entity newEntity = CreateEntity(entity.GetName() + " Copied");
-
+		Entity newEntity = CreateEntity();	
+		
+		CopyComponentIfExists<TagComponent>(newEntity, entity);
 		CopyComponentIfExists<TransformComponent>(newEntity, entity);
 		CopyComponentIfExists<SpriteRendererComponent>(newEntity, entity);
 		CopyComponentIfExists<CircleRendererComponent>(newEntity, entity);
@@ -209,13 +322,52 @@ namespace Venus {
 		CopyComponentIfExists<PointLightComponent>(newEntity, entity);
 		CopyComponentIfExists<DirectionalLightComponent>(newEntity, entity);
 		CopyComponentIfExists<SkyLightComponent>(newEntity, entity);
+		
+		//-- Build Relationship Component
+		auto childrenIDs = entity.GetChildren();
+		for (auto childID : childrenIDs)
+		{
+			Entity childDuplicated = DuplicateEntity(GetEntityWithUUID(childID));
+
+			UnparentEntity(childDuplicated, false);
+
+			childDuplicated.SetParentUUID(newEntity.GetUUID());
+			newEntity.GetChildren().push_back(childDuplicated.GetUUID());
+		}
+
+		if (auto parent = entity.GetParent(); parent)
+		{
+			newEntity.SetParentUUID(parent.GetUUID());
+			parent.GetChildren().push_back(newEntity.GetUUID());
+		}
 
 		return newEntity;
 	}
 
-	void Scene::DestroyEntity(Entity entity)
+	void Scene::DestroyEntity(Entity entity, bool destroyChildren, bool first)
 	{
+		if (destroyChildren)
+		{
+			for (size_t i = 0; i < entity.GetChildren().size(); i++)
+			{
+				auto childId = entity.GetChildren()[i];
+				Entity child = GetEntityWithUUID(childId);
+				DestroyEntity(child, destroyChildren, false);
+			}
+		}
+
+		if (first)
+		{
+			if (auto parent = entity.GetParent(); parent)
+				parent.RemoveChild(entity);
+		}
+
 		m_Registry.destroy(entity);
+	}
+
+	void Scene::SubmitToDestroyEntity(Entity entity)
+	{
+		SubmitPostUpdateFn([entity]() {entity.m_Scene->DestroyEntity(entity); });
 	}
 
 	void Scene::OnUpdateEditor(Ref<SceneRenderer> renderer, Timestep ts, EditorCamera& camera)
@@ -297,10 +449,12 @@ namespace Venus {
 			{
 				auto [transform, model] = view.get<TransformComponent, MeshRendererComponent>(entity);
 
+				glm::mat4 worldSpaceTransform = GetWorldSpaceTransformMatrix({ entity, this });
+
 				if (m_EditorSelectedEntity == (uint32_t)entity)
-					renderer->SubmitSelectedModel(model.Model, transform.GetTransform(), (int)entity);
+					renderer->SubmitSelectedModel(model.Model, worldSpaceTransform, (int)entity);
 				else
-					renderer->SubmitModel(model.Model, transform.GetTransform(), (int)entity);
+					renderer->SubmitModel(model.Model, worldSpaceTransform, (int)entity);
 			}
 		}
 		
@@ -335,13 +489,13 @@ namespace Venus {
 	}
 
 	void Scene::OnUpdateRuntime(Ref<SceneRenderer> renderer, Timestep ts)
-	{	
+	{
 		/////////////////////////////////////////////////////////////////////////////
 		// 2D PHYSICS ///////////////////////////////////////////////////////////////
 		/////////////////////////////////////////////////////////////////////////////
 
 		m_PhysicsWorld->Step(ts, m_VelocityIterations, m_PositionIterations);
-		
+
 		auto view = m_Registry.view<Rigidbody2DComponent>();
 		for (auto e : view)
 		{
@@ -357,6 +511,30 @@ namespace Venus {
 			transform.Position.y = position.y;
 			transform.Rotation.z = body->GetAngle();
 		}
+
+		/////////////////////////////////////////////////////////////////////////////
+		// SCRIPTING ////////////////////////////////////////////////////////////////
+		/////////////////////////////////////////////////////////////////////////////
+
+		{
+			auto view = m_Registry.view<ScriptComponent>();
+			for (auto e : view)
+			{
+				Entity entity = { e, this };
+
+				auto& scriptComponent = entity.GetComponent<ScriptComponent>();
+
+				if (ScriptingEngine::ModuleExists(scriptComponent.ModuleName))
+				{
+					ScriptingEngine::OnUpdate(ts, entity);
+				}
+			}
+
+			for (auto&& fn : m_PostUpdateQueue)
+				fn();
+			m_PostUpdateQueue.clear();
+		}
+
 	
 		/////////////////////////////////////////////////////////////////////////////
 		// LIGHTS ///////////////////////////////////////////////////////////////////
@@ -453,8 +631,10 @@ namespace Venus {
 				for (auto entity : view)
 				{
 					auto [transform, model] = view.get<TransformComponent, MeshRendererComponent>(entity);
+
+					glm::mat4 worldSpaceTransform = GetWorldSpaceTransformMatrix({ entity, this });
 						
-					renderer->SubmitModel(model.Model, transform.GetTransform(), (int)entity);
+					renderer->SubmitModel(model.Model, worldSpaceTransform, (int)entity);
 				}
 			}
 			
@@ -584,20 +764,6 @@ namespace Venus {
 		}
 	}
 
-	Entity Scene::GetEntityByUUID(UUID uuid)
-	{
-		auto view = m_Registry.view<IDComponent>();
-		for (auto entity : view)
-		{
-			const auto& id = view.get<IDComponent>(entity).ID;
-			
-			if (uuid == id)
-				return Entity{ entity, this };
-		}
-
-		return {};
-	}
-
 	Entity Scene::GetPrimaryCamera()
 	{
 		auto view = m_Registry.view<CameraComponent>();
@@ -621,6 +787,53 @@ namespace Venus {
 		return result.Position;
 	}
 
+	TransformComponent Scene::GetWorldSpaceTransform(Entity entity)
+	{
+		glm::mat4 transform = GetWorldSpaceTransformMatrix(entity);
+		
+		TransformComponent component;
+		Math::DecomposeTransform(transform, component.Position, component.Rotation, component.Scale);
+
+		return component;
+	}
+
+	glm::mat4 Scene::GetWorldSpaceTransformMatrix(Entity entity)
+	{
+		glm::mat4 transform(1.0f);
+
+		Entity parent = TryGetEntityWithUUID(entity.GetParentUUID());
+		if (parent)
+			transform = GetWorldSpaceTransformMatrix(parent);
+
+		return transform * entity.GetComponent<TransformComponent>().GetTransform();
+	}
+
+	void Scene::ConvertToLocalSpace(Entity entity)
+	{
+		Entity parent = TryGetEntityWithUUID(entity.GetParentUUID());
+
+		if (!parent)
+			return;
+
+		auto& transform = entity.GetComponent<TransformComponent>();
+		glm::mat4 parentTransform = GetWorldSpaceTransformMatrix(parent);
+
+		glm::mat4 localTransform = glm::inverse(parentTransform) * transform.GetTransform();
+		Math::DecomposeTransform(localTransform, transform.Position, transform.Rotation, transform.Scale);
+	}
+
+	void Scene::ConvertToWorldSpace(Entity entity)
+	{
+		Entity parent = TryGetEntityWithUUID(entity.GetParentUUID());
+
+		if (!parent)
+			return;
+
+		glm::mat4 transform = GetWorldSpaceTransformMatrix(entity);
+		auto& entityTransform = entity.GetComponent<TransformComponent>();
+		Math::DecomposeTransform(transform, entityTransform.Position, entityTransform.Rotation, entityTransform.Scale);
+	}
+
 	template<typename T>
 	void Scene::OnComponentAdded(Entity, T& component)
 	{
@@ -629,6 +842,11 @@ namespace Venus {
 
 	template<>
 	void Scene::OnComponentAdded<IDComponent>(Entity entity, IDComponent& component)
+	{
+	}
+
+	template<>
+	void Scene::OnComponentAdded<RelationshipComponent>(Entity entity, RelationshipComponent& component)
 	{
 	}
 
@@ -690,6 +908,11 @@ namespace Venus {
 
 	template<>
 	void Scene::OnComponentAdded<SkyLightComponent>(Entity entity, SkyLightComponent& component)
+	{
+	}
+
+	template<>
+	void Scene::OnComponentAdded<ScriptComponent>(Entity entity, ScriptComponent& component)
 	{
 	}
 }

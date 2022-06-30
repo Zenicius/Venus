@@ -10,6 +10,8 @@
 #include "Renderer/Mesh.h"
 #include "Renderer/MeshMaterial.h"
 
+#include "ImGui/IconsFontAwesome.h"
+
 #define GLM_ENABLE_EXPERIMENTAL
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
@@ -19,20 +21,67 @@ namespace Venus {
 
 	struct IDComponent
 	{
-		UUID ID;
+		UUID ID = 0;
 
 		IDComponent() = default;
 		IDComponent(const IDComponent&) = default;
 	};
 
+	enum class TagIcon
+	{
+		Empty = 0,
+		Folder = 1,
+		Camera = 2,
+		Model = 3,
+		Sprite = 4,
+		Light = 5
+	};
 	struct TagComponent 
 	{
 		std::string Name = "";
+		TagIcon Icon = TagIcon::Empty;
 
 		TagComponent() = default;
 		TagComponent(const TagComponent&) = default;
 		TagComponent(const std::string& name)
 			:Name(name) {}
+
+		std::string GetIconString()
+		{
+			switch (Icon)
+			{
+				case TagIcon::Empty:	return ICON_FA_FILE; 
+				case TagIcon::Folder:	return ICON_FA_FOLDER; 
+				case TagIcon::Camera:	return ICON_FA_VIDEO_CAMERA; 
+				case TagIcon::Model:	return ICON_FA_CUBE; 
+				case TagIcon::Sprite:	return ICON_FA_FILE_IMAGE_O; 
+				case TagIcon::Light:	return ICON_FA_LIGHTBULB_O; 
+			}
+		}
+
+		std::string ToStringIcon()
+		{
+			switch (Icon)
+			{
+				case TagIcon::Empty:	return "Empty"; 
+				case TagIcon::Folder:	return "Folder"; 
+				case TagIcon::Camera:	return "Camera"; 
+				case TagIcon::Model:	return "Model"; 
+				case TagIcon::Sprite:	return "Sprite"; 
+				case TagIcon::Light:	return "Light"; 
+			}
+		}
+	};
+
+	struct RelationshipComponent
+	{
+		UUID Parent = 0;
+		std::vector<UUID> Children;
+
+		RelationshipComponent() = default;
+		RelationshipComponent(const RelationshipComponent& other) = default;
+		RelationshipComponent(UUID parent)
+			: Parent(parent) {}
 	};
 
 	struct TransformComponent
@@ -188,5 +237,15 @@ namespace Venus {
 		
 		SkyLightComponent() = default;
 		SkyLightComponent(const SkyLightComponent&) = default;
+	};
+
+	struct ScriptComponent
+	{
+		std::string ModuleName = "";
+
+		ScriptComponent() = default;
+		ScriptComponent(const ScriptComponent& other) = default;
+		ScriptComponent(const std::string& moduleName)
+			: ModuleName(moduleName) {}
 	};
 }

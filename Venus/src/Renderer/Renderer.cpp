@@ -57,6 +57,7 @@ namespace Venus {
 
 		//-- Default Textures-----------------------
 		Ref<Texture2D> DefaultTexture;
+		Ref<Texture2D> DefaultBlackTexture;
 		Ref<TextureCube> DefaultCube;
 		Ref<Texture2D> BRDFLutTexture;
 		uint32_t DebugTexture;
@@ -188,12 +189,16 @@ namespace Venus {
 
 
 		//-- Default Textures--------------------------------------------------------------------------
-		s_Data.DefaultTexture = Texture2D::Create(1, 1);
 		uint32_t whiteTextureData = 0xffffffff;
+		uint32_t blackTextureData = 0xff000000;
+
+		s_Data.DefaultTexture = Texture2D::Create(1, 1);
 		s_Data.DefaultTexture->SetData(&whiteTextureData, sizeof(uint32_t));
 
+		s_Data.DefaultBlackTexture = Texture2D::Create(1, 1);
+		s_Data.DefaultBlackTexture->SetData(&blackTextureData, sizeof(uint32_t));
+
 		s_Data.DefaultCube = TextureCube::Create(1, 1);
-		uint32_t blackTextureData = 0xff000000;
 		s_Data.DefaultCube->SetData(&blackTextureData, sizeof(uint32_t));
 
 		TextureProperties props;
@@ -372,10 +377,12 @@ namespace Venus {
 		{
 			s_Data.Stats.VertexCount += mesh.m_Vertices.size();
 			s_Data.Stats.IndexCount += mesh.m_Indices.size();
+			s_Data.Stats.Meshs++;
 			s_Data.Stats.DrawCalls++;
 
 			RenderCommand::DrawIndexed(mesh.m_VertexArray);
 		}
+		s_Data.Stats.Models++;
 
 		pipeline->GetFramebuffer()->Unbind();
 	}
@@ -400,12 +407,14 @@ namespace Venus {
 		{
 			s_Data.Stats.VertexCount += mesh.m_Vertices.size();
 			s_Data.Stats.IndexCount += mesh.m_Indices.size();
+			s_Data.Stats.Meshs++;
 			s_Data.Stats.DrawCalls++;
 
 			materialTable[mesh.m_MaterialIndex]->GetMaterial()->Bind();
 
 			RenderCommand::DrawIndexed(mesh.m_VertexArray);
 		}
+		s_Data.Stats.Models++;
 
 		pipeline->GetFramebuffer()->Unbind();
 	}
@@ -439,6 +448,7 @@ namespace Venus {
 		// Convert Equirectangular to Cubemap
 		TextureProperties cubeProps;
 		cubeProps.Format = TextureFormat::RGBA32F;
+		cubeProps.WrapMode = TextureWrapMode::ClampToEdge;
 		cubeProps.UseMipmaps = true;
 		Ref<TextureCube> cubeMap = TextureCube::Create(cubeMapSize, cubeMapSize, cubeProps);
 		{
@@ -500,6 +510,7 @@ namespace Venus {
 
 		TextureProperties cubeProps;
 		cubeProps.Format = TextureFormat::RGBA32F;
+		cubeProps.WrapMode = TextureWrapMode::ClampToEdge;
 		cubeProps.UseMipmaps = true;
 		Ref<TextureCube> cubeMap = TextureCube::Create(cubeMapSize, cubeMapSize, cubeProps);
 
@@ -540,6 +551,11 @@ namespace Venus {
 	Ref<Texture2D> Renderer::GetDefaultTexture()
 	{
 		return s_Data.DefaultTexture;
+	}
+
+	Ref<Texture2D> Renderer::GetDefaultBlackTexture()
+	{
+		return s_Data.DefaultBlackTexture;
 	}
 
 	Ref<TextureCube> Renderer::GetDefaultTextureCube()

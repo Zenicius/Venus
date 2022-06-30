@@ -145,6 +145,7 @@ namespace Venus {
 
 		// Panels
 		m_ObjectsPanel.OnImGuiRender();
+		m_ConsolePanel.OnImGuiRender(m_ShowConsolePanel);
 		m_AssetBrowserPanel.OnImGuiRender(m_ShowAssetBrowserPanel);
 		m_RendererStatsPanel.OnImGuiRender(m_ShowStatsPanel);
 		m_SceneRenderer->OnImGuiRender(m_ShowSceneSettingsPanel);
@@ -204,7 +205,7 @@ namespace Venus {
 		ImGui::SuspendLayout();
 		ImGui::SetItemAllowOverlap();
 		const float logoOffset = 16.0f * 2.0f + 41.0f + windowPadding.x;
-		ImGui::SetCursorPos(ImVec2(logoOffset, 10.0f));
+		ImGui::SetCursorPos(ImVec2(logoOffset, 8.0f));
 		UI_MenuBar();
 		if (ImGui::IsItemHovered())
 			m_TitleBarHovered = false;
@@ -414,10 +415,32 @@ namespace Venus {
 				if (ImGui::MenuItem(ICON_FA_COGS " Scene Properties", nullptr, m_ShowSceneSettingsPanel))
 					m_ShowSceneSettingsPanel = !m_ShowSceneSettingsPanel;
 
+				if (ImGui::MenuItem(ICON_FA_TERMINAL " Console", nullptr, m_ShowConsolePanel))
+					m_ShowConsolePanel = !m_ShowConsolePanel;
+
 				if (ImGui::MenuItem(ICON_FA_SIGNAL " Statistics", nullptr, m_ShowStatsPanel))
 					m_ShowStatsPanel = !m_ShowStatsPanel;
 
 
+
+				ImGui::EndMenu();
+			}
+
+			// Scripting
+			if (ImGui::BeginMenu("Scripting"))
+			{
+				auto& scene = m_EditorScene;
+
+				if (ImGui::MenuItem(ICON_FA_CODE " Open Solution", nullptr))
+				{
+					std::string solutionPath = "assets\\scripting\\Dev.sln"; // TODO: Use Projects scripts path...
+					FileDialogs::Open(solutionPath.c_str());
+				}
+
+				if (ImGui::MenuItem(ICON_FA_SHARE " Reload Assembly on Play", nullptr, scene->m_ReloadAssembliesOnPlay))
+				{
+					scene->m_ReloadAssembliesOnPlay = !scene->m_ReloadAssembliesOnPlay;
+				}
 
 				ImGui::EndMenu();
 			}
@@ -666,6 +689,7 @@ namespace Venus {
 				if (ImGui::MenuItem("   " ICON_FA_VIDEO_CAMERA "   Create Camera"))
 				{
 					auto entity = m_ActiveScene->CreateEntity("Camera");
+					entity.GetComponent<TagComponent>().Icon = TagIcon::Camera;
 					entity.AddComponent<CameraComponent>();
 					m_ObjectsPanel.SetSelectedEntity(entity);
 					m_ActiveScene->SetEditorSelectedEntity(entity);
@@ -678,6 +702,7 @@ namespace Venus {
 					if (ImGui::MenuItem("   Cube"))
 					{
 						auto entity = m_ActiveScene->CreateEntity("Cube");
+						entity.GetComponent<TagComponent>().Icon = TagIcon::Model;
 						entity.AddComponent<MeshRendererComponent>(); // Default is cube
 						m_ObjectsPanel.SetSelectedEntity(entity);
 						m_ActiveScene->SetEditorSelectedEntity(entity);
@@ -686,6 +711,7 @@ namespace Venus {
 					if (ImGui::MenuItem("   Sphere"))
 					{
 						auto entity = m_ActiveScene->CreateEntity("Sphere");
+						entity.GetComponent<TagComponent>().Icon = TagIcon::Model;
 						auto& component = entity.AddComponent<MeshRendererComponent>();
 
 						component.Model = Model::Create("Resources/Models/Sphere.fbx");
@@ -698,6 +724,7 @@ namespace Venus {
 					if (ImGui::MenuItem("   Plane"))
 					{
 						auto entity = m_ActiveScene->CreateEntity("Plane");
+						entity.GetComponent<TagComponent>().Icon = TagIcon::Model;
 						auto& component = entity.AddComponent<MeshRendererComponent>();
 
 						component.Model = Model::Create("Resources/Models/Plane.fbx");
@@ -710,6 +737,7 @@ namespace Venus {
 					if (ImGui::MenuItem("   Capsule"))
 					{
 						auto entity = m_ActiveScene->CreateEntity("Capsule");
+						entity.GetComponent<TagComponent>().Icon = TagIcon::Model;
 						auto& component = entity.AddComponent<MeshRendererComponent>();
 
 						component.Model = Model::Create("Resources/Models/Capsule.fbx");
@@ -722,6 +750,7 @@ namespace Venus {
 					if (ImGui::MenuItem("   Torus"))
 					{
 						auto entity = m_ActiveScene->CreateEntity("Torus");
+						entity.GetComponent<TagComponent>().Icon = TagIcon::Model;
 						auto& component = entity.AddComponent<MeshRendererComponent>();
 
 						component.Model = Model::Create("Resources/Models/Torus.fbx");
@@ -734,6 +763,7 @@ namespace Venus {
 					if (ImGui::MenuItem("   Cone"))
 					{
 						auto entity = m_ActiveScene->CreateEntity("Cone");
+						entity.GetComponent<TagComponent>().Icon = TagIcon::Model;
 						auto& component = entity.AddComponent<MeshRendererComponent>();
 
 						component.Model = Model::Create("Resources/Models/Cone.fbx");
@@ -746,6 +776,7 @@ namespace Venus {
 					if (ImGui::MenuItem("   Cylinder"))
 					{
 						auto entity = m_ActiveScene->CreateEntity("Cylinder");
+						entity.GetComponent<TagComponent>().Icon = TagIcon::Model;
 						auto& component = entity.AddComponent<MeshRendererComponent>();
 
 						component.Model = Model::Create("Resources/Models/Cylinder.fbx");
@@ -763,6 +794,7 @@ namespace Venus {
 					if (ImGui::MenuItem("   Sprite"))
 					{
 						auto entity = m_ActiveScene->CreateEntity("Sprite");
+						entity.GetComponent<TagComponent>().Icon = TagIcon::Sprite;
 						entity.AddComponent<SpriteRendererComponent>(glm::vec4{ 1.0f, 1.0f, 1.0f, 1.0f });
 						m_ObjectsPanel.SetSelectedEntity(entity);
 						m_ActiveScene->SetEditorSelectedEntity(entity);
@@ -771,6 +803,7 @@ namespace Venus {
 					if (ImGui::MenuItem("   Circle"))
 					{
 						auto entity = m_ActiveScene->CreateEntity("Circle");
+						entity.GetComponent<TagComponent>().Icon = TagIcon::Sprite;
 						entity.AddComponent<CircleRendererComponent>(glm::vec4{ 1.0f, 1.0f, 1.0f, 1.0f });
 						m_ObjectsPanel.SetSelectedEntity(entity);
 						m_ActiveScene->SetEditorSelectedEntity(entity);
@@ -786,6 +819,7 @@ namespace Venus {
 					if (ImGui::MenuItem("   Sky Light"))
 					{
 						auto entity = m_ActiveScene->CreateEntity("Sky Light");
+						entity.GetComponent<TagComponent>().Icon = TagIcon::Light;
 						entity.AddComponent<SkyLightComponent>();
 						m_ObjectsPanel.SetSelectedEntity(entity);
 						m_ActiveScene->SetEditorSelectedEntity(entity);
@@ -794,6 +828,7 @@ namespace Venus {
 					if (ImGui::MenuItem("   Directional Light"))
 					{
 						auto entity = m_ActiveScene->CreateEntity("Directional Light");
+						entity.GetComponent<TagComponent>().Icon = TagIcon::Light;
 						auto& transform = entity.GetComponent<TransformComponent>();
 						transform.Rotation = glm::radians(glm::vec3({ 80.0f, 10.0f, 0.0f }));
 						entity.AddComponent<DirectionalLightComponent>();
@@ -804,6 +839,7 @@ namespace Venus {
 					if (ImGui::MenuItem("   Point Light"))
 					{
 						auto entity = m_ActiveScene->CreateEntity("Point Light");
+						entity.GetComponent<TagComponent>().Icon = TagIcon::Light;
 						entity.AddComponent<PointLightComponent>();
 						m_ObjectsPanel.SetSelectedEntity(entity);
 						m_ActiveScene->SetEditorSelectedEntity(entity);
@@ -1004,6 +1040,7 @@ namespace Venus {
 				const wchar_t* path = (const wchar_t*)payload->Data;
 				std::string name = std::filesystem::path(path).stem().string();
 				Entity entity = m_ActiveScene->CreateEntity(name);
+				entity.GetComponent<TagComponent>().Icon = TagIcon::Sprite;
 				auto& src = entity.AddComponent<SpriteRendererComponent>();
 
 				std::filesystem::path texturePath = std::filesystem::path(g_AssetPath) / path;
@@ -1019,6 +1056,7 @@ namespace Venus {
 				const wchar_t* path = (const wchar_t*)payload->Data;
 				std::string name = std::filesystem::path(path).stem().string();
 				Entity entity = m_ActiveScene->CreateEntity(name);
+				entity.GetComponent<TagComponent>().Icon = TagIcon::Model;
 				auto& meshRenderer = entity.AddComponent<MeshRendererComponent>();
 
 				std::filesystem::path modelPath = std::filesystem::path(g_AssetPath) / path;
@@ -1031,7 +1069,7 @@ namespace Venus {
 
 		}
 
-		// Gizmos TEMP
+		// Gizmos
 		Entity selectedEntity = m_ObjectsPanel.GetSelectedEntity();
 		if (m_SceneState == SceneState::Edit && selectedEntity && m_GizmoType != -1)
 		{
@@ -1047,7 +1085,8 @@ namespace Venus {
 
 			// Entity
 			auto& transformCompenent = selectedEntity.GetComponent<TransformComponent>();
-			glm::mat4 transform = transformCompenent.GetTransform();
+			//glm::mat4 transform = transformCompenent.GetTransform();
+			glm::mat4 transform = m_ActiveScene->GetWorldSpaceTransformMatrix(selectedEntity);
 
 			// Snapping 
 			bool snap = Input::IsKeyPressed(Key::LeftControl);
@@ -1063,14 +1102,31 @@ namespace Venus {
 
 			if (ImGuizmo::IsUsing())
 			{
-				glm::vec3 position, rotation, scale;
-				Math::DecomposeTransform(transform, position, rotation, scale);
+				Entity parent = m_ActiveScene->TryGetEntityWithUUID(selectedEntity.GetParentUUID());
 
-				glm::vec3 deltaRotation = rotation - transformCompenent.Rotation;
+				if (parent)
+				{
+					glm::mat4 parentTransform = m_ActiveScene->GetWorldSpaceTransformMatrix(parent);
+					transform = glm::inverse(parentTransform) * transform;
 
-				transformCompenent.Position = position;
-				transformCompenent.Rotation += deltaRotation;
-				transformCompenent.Scale = scale;
+					glm::vec3 position, rotation, scale;
+					Math::DecomposeTransform(transform, position, rotation, scale);
+
+					glm::vec3 deltaRotation = rotation - transformCompenent.Rotation;
+					transformCompenent.Position = position;
+					transformCompenent.Rotation += deltaRotation;
+					transformCompenent.Scale = scale;
+				}
+				else
+				{
+					glm::vec3 position, rotation, scale;
+					Math::DecomposeTransform(transform, position, rotation, scale);
+
+					glm::vec3 deltaRotation = rotation - transformCompenent.Rotation;
+					transformCompenent.Position = position;
+					transformCompenent.Rotation += deltaRotation;
+					transformCompenent.Scale = scale;
+				}
 			}
 		}
 
@@ -1245,6 +1301,7 @@ namespace Venus {
 
 	void EditorLayer::OnScenePlay()
 	{
+		m_ConsolePanel.OnScenePlay();
 		m_RuntimeScene = Scene::Copy(m_EditorScene);
 		m_RuntimeScene->OnRuntimeStart();
 		m_ObjectsPanel.SetContext(m_RuntimeScene);

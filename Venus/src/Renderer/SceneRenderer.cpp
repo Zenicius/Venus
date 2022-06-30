@@ -5,7 +5,6 @@
 #include "Engine/Application.h"
 
 #include "ImGui/UI.h"
-#include "ImGui/IconsFontAwesome.h"
 
 namespace Venus {
 
@@ -627,19 +626,30 @@ namespace Venus {
 
 	void SceneRenderer::CompositePass()
 	{
-		uint32_t texture;
+		uint32_t texture, bloomDirtMask;
 		if (GetOptions().FXAA)
 			texture = m_FXAAPipeline->GetFramebuffer()->GetColorAttachmentRendererID();
 		else
 			texture = m_GeometryPipeline->GetFramebuffer()->GetColorAttachmentRendererID();
 
+		if (GetOptions().BloomDirtMask)
+			bloomDirtMask = GetOptions().BloomDirtMask->GetRendererID();
+		else
+			bloomDirtMask = Renderer::GetDefaultBlackTexture()->GetRendererID();
+
+		//---
+		m_CompositeMaterial->SetTexture("u_Texture", 0, texture);
+
 		m_CompositeMaterial->SetFloat("u_Settings.Exposure", m_Options.Exposure);
 		m_CompositeMaterial->SetInt("u_Settings.Grayscale", m_Options.Grayscale);
 		m_CompositeMaterial->SetInt("u_Settings.ACESTone", m_Options.ACESTone);
 		m_CompositeMaterial->SetInt("u_Settings.GammaCorrection", m_Options.GammaCorrection);
+
 		m_CompositeMaterial->SetInt("u_Settings.Bloom", m_Options.Bloom);
-		m_CompositeMaterial->SetTexture("u_Texture", 0, texture);
 		m_CompositeMaterial->SetTexture("u_BloomTexture", 1, m_BloomTextures[2]->GetRendererID());
+		m_CompositeMaterial->SetTexture("u_BloomDirtMaskTexture", 2, bloomDirtMask);
+		m_CompositeMaterial->SetFloat("u_Settings.BloomIntensity", m_Options.BloomIntensity);
+		m_CompositeMaterial->SetFloat("u_Settings.BloomDirkMaskIntensity", m_Options.BloomDirtMaskIntensity);
 
 		Renderer::RenderFullscreenQuad(m_CompositePipeline, m_CompositeMaterial);
 	}
@@ -704,14 +714,51 @@ namespace Venus {
 		if (ImGui::CollapsingHeader("Bloom"))
 		{
 			UI::Checkbox("Enable", &options.Bloom, true);
+			UI::DragFloat("Intensity", &options.BloomIntensity, 0.1f, 0.0f, 10000.0f, true);
 			UI::DragFloat("Threshold", &options.BloomThreshold, 0.1f, 0.0f, 100.0f, true);
 			UI::DragFloat("Knee", &options.BloomKnee, 0.1f, 0.0f, 100.0f, true);
+
+			uint32_t dirtMask = options.BloomDirtMask ? options.BloomDirtMask->GetRendererID() : 
+														Renderer::GetDefaultBlackTexture()->GetRendererID();
+			ImGui::Columns(2);
+			ImGui::Text("Dirt Mask");
+			ImGui::SameLine();
+			ImGui::NextColumn();
+			ImGui::Image(reinterpret_cast<void*>(dirtMask), { 64, 64 });
+			if (ImGui::BeginDragDropTarget())
+			{
+				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_TEXTURE"))
+				{
+					const wchar_t* payloadPath = (const wchar_t*)payload->Data;
+					std::filesystem::path filePath = std::filesystem::path("assets" / std::filesystem::path(payloadPath));
+					Ref<Texture2D> texture = Texture2D::Create(filePath.string());
+					if (texture->IsLoaded())
+						options.BloomDirtMask = texture;
+				}
+
+				ImGui::EndDragDropTarget();
+			}
+			if (options.BloomDirtMask)
+			{
+				ImGui::SameLine();
+				if (ImGui::Button(ICON_FA_WINDOW_CLOSE, ImVec2(18, 18)))
+				{
+					options.BloomDirtMask = nullptr;
+				}
+			}
+			ImGui::Columns(1);
+			ImGui::Separator();
+
+			UI::DragFloat("Dirt Mask Intensity", &options.BloomDirtMaskIntensity, 0.1f, 0.0f, 1000.0f, true);
 
 			UI::SetPosX(ImGui::GetContentRegionMax().x - 70);
 			if (ImGui::Button("Reset", ImVec2{ 70, 30 }))
 			{
+				options.BloomIntensity = 1.0f;
 				options.BloomThreshold = 1.0f;
 				options.BloomKnee = 0.1f;
+				options.BloomDirtMask = nullptr;
+				options.BloomDirtMaskIntensity = 1.0f;
 			}
 
 			UI::ShiftPos(20.0f, 10.0f);

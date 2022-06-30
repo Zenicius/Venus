@@ -1,0 +1,157 @@
+Scene: Venus Logo
+Entities:
+  - Entity: 16332448209484947064
+    TagComponent:
+      Name: Env
+      Icon: 1
+    TransformComponent:
+      Position: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    RelationshipComponent:
+      Parent: 0
+      Children:
+        - ID: 8760935246777631677
+        - ID: 9719268796843282885
+  - Entity: 2897815129125579528
+    TagComponent:
+      Name: Cameras
+      Icon: 1
+    TransformComponent:
+      Position: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    RelationshipComponent:
+      Parent: 0
+      Children:
+        - ID: 12402946777395063186
+        - ID: 4897559922653410705
+  - Entity: 4897559922653410705
+    TagComponent:
+      Name: Camera
+      Icon: 2
+    TransformComponent:
+      Position: [2.0934298, 0.977024555, 13.0993109]
+      Rotation: [-0.147114143, -0, 0]
+      Scale: [1, 1, 1]
+    RelationshipComponent:
+      Parent: 2897815129125579528
+      Children:
+        []
+    CameraComponent:
+      Camera:
+        ProjectionType: 0
+        PerspectiveFOV: 0.785398185
+        PerspectiveNear: 0.00999999978
+        PerspectiveFar: 1000
+        OrthographicSize: 10
+        OrthographicNear: -1
+        OrthographicFar: 1
+      Primary: true
+      FixedAspectRatio: false
+  - Entity: 3773140988405382296
+    TagComponent:
+      Name: venus
+      Icon: 3
+    TransformComponent:
+      Position: [0, -0.344724417, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    RelationshipComponent:
+      Parent: 0
+      Children:
+        - ID: 714242232930863866
+    MeshRendererComponent:
+      Name: venus
+      Path: assets\models\venus.fbx
+  - Entity: 714242232930863866
+    TagComponent:
+      Name: RedLight
+      Icon: 5
+    TransformComponent:
+      Position: [2.37128234, 0.204549655, 1.77015448]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    RelationshipComponent:
+      Parent: 3773140988405382296
+      Children:
+        []
+    PointLightComponent:
+      Color: [1, 0, 0]
+      Intensity: 8.19999981
+      LightSize: 0.5
+      MinRadius: 1
+      Radius: 4.5999999
+      CastsShadows: true
+      SoftShadows: true
+      Falloff: 1
+  - Entity: 12402946777395063186
+    TagComponent:
+      Name: Camera2
+      Icon: 2
+    TransformComponent:
+      Position: [-1.46110189, 1.08059812, 3.45616817]
+      Rotation: [-0.279266, -0.663896322, -4.72994266e-08]
+      Scale: [1.00000012, 0.999999225, 0.999999046]
+    RelationshipComponent:
+      Parent: 2897815129125579528
+      Children:
+        []
+    CameraComponent:
+      Camera:
+        ProjectionType: 0
+        PerspectiveFOV: 0.785398185
+        PerspectiveNear: 0.00999999978
+        PerspectiveFar: 1000
+        OrthographicSize: 10
+        OrthographicNear: -1
+        OrthographicFar: 1
+      Primary: false
+      FixedAspectRatio: false
+  - Entity: 9719268796843282885
+    TagComponent:
+      Name: Cube
+      Icon: 3
+    TransformComponent:
+      Position: [0, -2.1091485, 0]
+      Rotation: [0, -0, 0]
+      Scale: [21.3563309, 1, 17.1932583]
+    RelationshipComponent:
+      Parent: 16332448209484947064
+      Children:
+        []
+    MeshRendererComponent:
+      Name: Cube
+      Path: ""
+  - Entity: 8760935246777631677
+    TagComponent:
+      Name: Directional Light
+      Icon: 5
+    TransformComponent:
+      Position: [0, 0, 0]
+      Rotation: [1.39626336, 0.174532905, -7.56551888e-09]
+      Scale: [0.999999821, 0.999999821, 1]
+    RelationshipComponent:
+      Parent: 16332448209484947064
+      Children:
+        []
+    DirectionalLightComponent:
+      Color: [1, 1, 1]
+      Intensity: 0.0500000007
+      CastsShadows: true
+      SoftShadows: true
+      LightSize: 0.5
+  - Entity: 14828896474241821748
+    TagComponent:
+      Name: Controller
+      Icon: 0
+    TransformComponent:
+      Position: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    RelationshipComponent:
+      Parent: 0
+      Children:
+        []
+    ScriptComponent:
+      Module Name: Dev.Logo

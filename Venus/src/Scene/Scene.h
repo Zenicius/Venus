@@ -64,22 +64,23 @@ namespace Venus {
 			void OnRuntimeStart();
 			void OnRuntimeStop();
 
-			Entity CreateEntity(const std::string& name = std::string());
-			Entity CreateEntityWithUUID(UUID uuid, const std::string& name = std::string());
-			Entity DuplicateEntity(Entity entity);
-			void DestroyEntity(Entity entity);
-
 			void OnUpdateEditor(Ref<SceneRenderer> renderer, Timestep ts, EditorCamera& camera);
 			void OnUpdateRuntime(Ref<SceneRenderer> renderer, Timestep ts);
+
 			void OnOverlayRender(EditorCamera& camera);
 			void OnViewportResize(uint32_t width, uint32_t height);
 
-			Entity GetEntityByUUID(UUID uuid);
-			Entity GetPrimaryCamera();
+			//--- Entity Managament--------------------------------------------------------------
+			Entity CreateEntity(const std::string& name = std::string());
+			Entity CreateEntityWithUUID(UUID uuid, const std::string& name = std::string());
+			Entity CreateChildEntity(Entity parent, const std::string& name = std::string());
 
-			void SetEditorSelectedEntity(uint32_t entity) { m_EditorSelectedEntity = entity; }
+			void ParentEntity(Entity child, Entity parent);
+			void UnparentEntity(Entity child, bool toWorldSpace = true);
 			
-			glm::vec3 GetWorldSpacePosition(Entity entity);
+			Entity GetEntityWithUUID(UUID id) const;
+			Entity TryGetEntityWithUUID(UUID id) const;
+			Entity TryGetEntityWithName(const std::string& name);
 
 			template<typename... Components>
 			auto GetAllEntitiesWith()
@@ -87,10 +88,31 @@ namespace Venus {
 				return m_Registry.view<Components...>();
 			}
 
+			Entity DuplicateEntity(Entity entity);
+			void DestroyEntity(Entity entity, bool destroyChildren = true, bool first = true);
+			void SubmitToDestroyEntity(Entity entity);
+			//-----------------------------------------------------------------------------------
+
+			void SetEditorSelectedEntity(uint32_t entity) { m_EditorSelectedEntity = entity; }
+			Entity GetPrimaryCamera();
+
+			glm::vec3 GetWorldSpacePosition(Entity entity);
+			TransformComponent GetWorldSpaceTransform(Entity entity);
+			glm::mat4 GetWorldSpaceTransformMatrix(Entity entity);
+			void ConvertToLocalSpace(Entity entity);
+			void ConvertToWorldSpace(Entity entity);
+
 		private:
 			// TODO Better way to handle this
 			template<typename T>
 			void OnComponentAdded(Entity, T& component);
+
+			std::vector<std::function<void()>> m_PostUpdateQueue;
+			template<typename Fn>
+			void SubmitPostUpdateFn(Fn&& fn)
+			{
+				m_PostUpdateQueue.emplace_back(fn);
+			}
 
 		private:
 			std::string m_SceneName = "Untitled Scene";
@@ -99,8 +121,12 @@ namespace Venus {
 			// Entities
 			entt::registry m_Registry;
 			uint32_t m_EditorSelectedEntity = -1;
+			std::unordered_map<UUID, Entity> m_EntityMap;
 
 			LightEnvironment m_LightEnvironment;
+
+			// Scripting
+			bool m_ReloadAssembliesOnPlay = true;
 
 			// Physics 2D
 			b2World* m_PhysicsWorld = nullptr;

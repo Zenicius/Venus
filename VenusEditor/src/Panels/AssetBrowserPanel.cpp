@@ -385,36 +385,6 @@ namespace Venus {
 	{
 		ImGui::BeginChild("AssetsExplorer");
 
-		// Deselect entity by clicking blank spaces
-		if (ImGui::IsMouseDown(0) && ImGui::IsWindowHovered())
-		{
-			m_SelectedAsset = "";
-		}
-
-		// Options by right clicking
-		if (ImGui::BeginPopupContextWindow(0, 1, false))
-		{
-			if (ImGui::BeginMenu("Create"))
-			{
-				if (ImGui::MenuItem("Folder"))
-				{
-					std::string finalPath = m_CurrentPath.string() + "\\New Folder";
-					std::filesystem::create_directory(finalPath);
-
-					m_RenamingAsset = finalPath;
-				}
-
-				ImGui::EndMenu();
-			}
-
-			ImGui::Separator();
-
-			if (ImGui::MenuItem("Show in Explorer"))
-				FileDialogs::Open(m_CurrentPath.string().c_str());
-
-			ImGui::EndPopup();
-		}
-
 		// Return button
 		if (ImGui::Button(ICON_FA_ARROW_LEFT))
 		{
@@ -450,28 +420,65 @@ namespace Venus {
 		ImGui::Separator();
 		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 10);
 
-		// Columns Configuration
-		float padding = 40.0f;
-		float thumbnailSize = 64.0f;
-		float cellSize = thumbnailSize + padding;
-
-		float panelWidth = ImGui::GetContentRegionAvail().x;
-		int columnCount = (int)panelWidth / cellSize;
-
-		if (columnCount == 0)
-			columnCount = 1;
-		
-		ImGui::Columns(columnCount, "AssetsExplorer", false);
-
-		for (auto& entry : std::filesystem::directory_iterator(m_CurrentPath))
+		// Asset Items 
+		ImGui::BeginChild("AssetItems");
 		{
-			if (assetFilter.PassFilter(entry.path().string().c_str()))
-				OnAssetRender(entry, thumbnailSize);
+			UI::ShiftPosY(5.0f);
 
-			ImGui::TableNextColumn();
+			// Deselect entity by clicking blank spaces
+			if (ImGui::IsMouseDown(0) && ImGui::IsWindowHovered())
+			{
+				m_SelectedAsset = "";
+			}
+
+			// Options by right clicking
+			if (ImGui::BeginPopupContextWindow(0, 1, false))
+			{
+				if (ImGui::BeginMenu("Create"))
+				{
+					if (ImGui::MenuItem("Folder"))
+					{
+						std::string finalPath = m_CurrentPath.string() + "\\New Folder";
+						std::filesystem::create_directory(finalPath);
+
+						m_RenamingAsset = finalPath;
+					}
+
+					ImGui::EndMenu();
+				}
+
+				ImGui::Separator();
+
+				if (ImGui::MenuItem("Show in Explorer"))
+					FileDialogs::Open(m_CurrentPath.string().c_str());
+
+				ImGui::EndPopup();
+			}
+
+			// Columns Configuration
+			float padding = 40.0f;
+			float thumbnailSize = 64.0f;
+			float cellSize = thumbnailSize + padding;
+
+			float panelWidth = ImGui::GetContentRegionAvail().x;
+			int columnCount = (int)panelWidth / cellSize;
+
+			if (columnCount == 0)
+				columnCount = 1;
+
+			ImGui::Columns(columnCount, "AssetsExplorer", false);
+
+			for (auto& entry : std::filesystem::directory_iterator(m_CurrentPath))
+			{
+				if (assetFilter.PassFilter(entry.path().string().c_str()))
+					OnAssetRender(entry, thumbnailSize);
+
+				ImGui::TableNextColumn();
+			}
+
+			ImGui::Columns(1);
 		}
-
-		ImGui::Columns(1);
+		ImGui::EndChild();
 
 		ImGui::EndChild();
 	}
@@ -481,58 +488,71 @@ namespace Venus {
 		if (!show)
 			return;
 
-		ImGui::Begin(ICON_FA_STAR " Asset Browser", &show);
+		ImGui::Begin(ICON_FA_STAR " Asset Browser", &show, ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoScrollbar);
 
-		ImGui::Columns(2, "outer", true);
+		ImGuiTableFlags tableFlags = ImGuiTableFlags_Resizable
+			| ImGuiTableFlags_SizingFixedFit
+			| ImGuiTableFlags_BordersInnerV;
 
-		// Assets Tree
-		ImGuiTreeNodeFlags base_flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick;
-
-		if (m_SelectedInTree == -1)
-			base_flags |= ImGuiTreeNodeFlags_Selected;
-
-		ImGui::SetNextItemOpen(m_RootTreeOpen);
-		m_RootTreeOpen = ImGui::TreeNodeEx((void*)(intptr_t)-1, base_flags, ICON_FA_FOLDER_O " Assets");
-		if (ImGui::BeginDragDropTarget())
+		if (ImGui::BeginTable("AssetBrowserTable", 2, tableFlags))
 		{
-			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_TEXTURE"))
-				MoveFileFromPayload(payload, g_AssetPath);
+			ImGui::TableSetupColumn("Tree", 0, 325.0f);
+			ImGui::TableSetupColumn("Items", ImGuiTableColumnFlags_WidthStretch);
 
-			else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_SCENE"))
-				MoveFileFromPayload(payload, g_AssetPath);
-
-			else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_FONT"))
-				MoveFileFromPayload(payload, g_AssetPath);
-
-			else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_MODEL"))
-				MoveFileFromPayload(payload, g_AssetPath);
-
-			else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_SCRIPT"))
-				MoveFileFromPayload(payload, g_AssetPath);
-
-			else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_OTHER"))
-				MoveFileFromPayload(payload, g_AssetPath);
-		}
-		if (m_RootTreeOpen)
-		{
-			if (ImGui::IsItemClicked())
-			{
-				m_SelectedInTree = -1;
-				m_CurrentPath = g_AssetPath;
-			}
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0);
 			
-			OnAssetTreeRender(g_AssetPath);
-			ImGui::TreePop();
+			ImGui::BeginChild("AssetTree");
+			{
+				// Assets Tree
+				ImGuiTreeNodeFlags base_flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick;
+
+				if (m_SelectedInTree == -1)
+					base_flags |= ImGuiTreeNodeFlags_Selected;
+
+				ImGui::SetNextItemOpen(m_RootTreeOpen);
+				m_RootTreeOpen = ImGui::TreeNodeEx((void*)std::hash<std::string>()("Asset Root"), base_flags, ICON_FA_FOLDER_O " Assets");
+				if (ImGui::BeginDragDropTarget())
+				{
+					if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_TEXTURE"))
+						MoveFileFromPayload(payload, g_AssetPath);
+
+					else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_SCENE"))
+						MoveFileFromPayload(payload, g_AssetPath);
+
+					else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_FONT"))
+						MoveFileFromPayload(payload, g_AssetPath);
+
+					else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_MODEL"))
+						MoveFileFromPayload(payload, g_AssetPath);
+
+					else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_SCRIPT"))
+						MoveFileFromPayload(payload, g_AssetPath);
+
+					else if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_OTHER"))
+						MoveFileFromPayload(payload, g_AssetPath);
+				}
+				if (m_RootTreeOpen)
+				{
+					if (ImGui::IsItemClicked())
+					{
+						m_SelectedInTree = -1;
+						m_CurrentPath = g_AssetPath;
+					}
+
+					OnAssetTreeRender(g_AssetPath);
+					ImGui::TreePop();
+				}
+			}
+			ImGui::EndChild();
+
+			ImGui::TableSetColumnIndex(1);
+
+			OnAssetsExplorerRender();
+
+			ImGui::EndTable();
 		}
 
-		ImGui::NextColumn();
-		ImGui::SetColumnOffset(ImGui::GetColumnIndex(), 325);
-
-		// Assets Explorer
-		OnAssetsExplorerRender();
-
-		ImGui::Columns(1);
-	
 		ImGui::End();
 	}
 

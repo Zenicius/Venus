@@ -28,13 +28,16 @@ layout(location = 0) out vec4 o_Color;
 // Uniforms
 layout(binding = 0) uniform sampler2D u_Texture;
 layout(binding = 1) uniform sampler2D u_BloomTexture;
-layout (push_constant) uniform Settings
+layout(binding = 2) uniform sampler2D u_BloomDirtMaskTexture;
+layout(push_constant) uniform Settings
 {
 	float Exposure;
 	int Grayscale;
 	int ACESTone;
 	int GammaCorrection;
 	int Bloom;
+	float BloomIntensity;
+	float BloomDirkMaskIntensity;
 } u_Settings;
 
 vec3 UpsampleTent9(sampler2D tex, float lod, vec2 uv, vec2 texelSize, float radius)
@@ -88,12 +91,16 @@ void main()
 
 	ivec2 texSize = textureSize(u_BloomTexture, 0);
 	vec2 fTexSize = vec2(float(texSize.x), float(texSize.y));
-	vec3 bloom = UpsampleTent9(u_BloomTexture, 0, v_TexCoord, 1.0f / fTexSize, sampleScale) * 1.0;
+	vec3 bloom = UpsampleTent9(u_BloomTexture, 0, v_TexCoord, 1.0f / fTexSize, sampleScale) * u_Settings.BloomIntensity;
+	vec3 bloomMask = texture(u_BloomDirtMaskTexture, v_TexCoord).rgb * u_Settings.BloomDirkMaskIntensity;
 
 	vec3 col = texture(u_Texture, v_TexCoord).rgb;
 	
 	if(u_Settings.Bloom == 1)
+	{
 		col += bloom;
+		col += bloom * bloomMask;
+	}
 
 	float grayscale = 0.2126 * col.r + 0.7152 * col.g + 0.0722 * col.b;
 

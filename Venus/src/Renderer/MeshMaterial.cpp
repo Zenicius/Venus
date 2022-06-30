@@ -6,6 +6,7 @@
 namespace Venus {
 
 	static const std::string s_AlbedoColorUniform = "u_MaterialUniforms.AlbedoColor";
+	static const std::string s_EmissionUniform = "u_MaterialUniforms.Emission";
 	static const std::string s_UseNormalMapUniform = "u_MaterialUniforms.UseNormalMap";
 	static const std::string s_MetalnessUniform = "u_MaterialUniforms.Metalness";
 	static const std::string s_RoughnessUniform = "u_MaterialUniforms.Roughness";
@@ -27,6 +28,7 @@ namespace Venus {
 
 		// Defaults
 		SetAlbedoColor(glm::vec3(0.972f, 0.96f, 0.915f));
+		SetEmission(0.0f);
 		SetMetalness(0.0f);
 		SetRoughtness(0.4f);
 		SetUseNormalMap(false);
@@ -49,6 +51,16 @@ namespace Venus {
 	void MeshMaterial::SetAlbedoColor(const glm::vec3& color)
 	{
 		m_Material->SetFloat3(s_AlbedoColorUniform, color);
+	}
+
+	float& MeshMaterial::GetEmission()
+	{
+		return m_Material->GetFloat(s_EmissionUniform);
+	}
+
+	void MeshMaterial::SetEmission(float value)
+	{
+		m_Material->SetFloat(s_EmissionUniform, value);
 	}
 
 	void MeshMaterial::SetUseNormalMap(bool value)

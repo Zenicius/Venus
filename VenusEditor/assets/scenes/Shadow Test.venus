@@ -1,43 +1,83 @@
 Scene: SHADOW TEST
 Entities:
-  - Entity: 14734990869999880335
+  - Entity: 4082263250657561255
     TagComponent:
-      Name: Sky Light
+      Name: Camera
+      Icon: 2
     TransformComponent:
-      Position: [0, 0, 0]
+      Position: [-0.321592152, 11.3446999, 35.0245628]
+      Rotation: [-0.062060304, 0, 0]
+      Scale: [1, 1, 1]
+    CameraComponent:
+      Camera:
+        ProjectionType: 0
+        PerspectiveFOV: 0.785398185
+        PerspectiveNear: 0.00999999978
+        PerspectiveFar: 1000
+        OrthographicSize: 10
+        OrthographicNear: -1
+        OrthographicFar: 1
+      Primary: true
+      FixedAspectRatio: false
+  - Entity: 14576494749238100236
+    TagComponent:
+      Name: Torus
+      Icon: 3
+    TransformComponent:
+      Position: [0, 11.1439981, 0]
       Rotation: [0, 0, 0]
       Scale: [1, 1, 1]
-    SkyLightComponent:
-      EnvironmentMapName: shanghai_bund_2k
-      EnvironmentMapPath: D:\DEV\Venus\VenusEditor\assets\environment maps\shanghai_bund_2k.hdr
-      Intensity: 1
-      Lod: 0
-  - Entity: 1307493682380909043
+    MeshRendererComponent:
+      Name: Torus
+      Path: ""
+  - Entity: 11036590454175420619
     TagComponent:
-      Name: Cube
+      Name: Cylinder
+      Icon: 3
     TransformComponent:
-      Position: [-1.94494128, 3.48115683, -1.2825588]
+      Position: [-11.01509, 8.79528141, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    MeshRendererComponent:
+      Name: Cylinder
+      Path: ""
+  - Entity: 1778927617461434493
+    TagComponent:
+      Name: Cone
+      Icon: 3
+    TransformComponent:
+      Position: [0, 5.89333391, -9.65292358]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    MeshRendererComponent:
+      Name: Cone
+      Path: ""
+  - Entity: 11974395031430461778
+    TagComponent:
+      Name: Cube Copied Copied
+      Icon: 3
+    TransformComponent:
+      Position: [-6.00558186, 17.46735, -8.51815033]
+      Rotation: [0.0228196438, 0.0167170949, -0.632151961]
+      Scale: [0.999999881, 0.999999821, 1]
+    MeshRendererComponent:
+      Name: Cube
+      Path: ""
+  - Entity: 15390822741864005554
+    TagComponent:
+      Name: Cube Copied
+      Icon: 3
+    TransformComponent:
+      Position: [-8.47445869, 3.48115683, -1.2825588]
       Rotation: [0, 0, 0]
       Scale: [1, 1, 1]
     MeshRendererComponent:
       Name: Cube
       Path: ""
-  - Entity: 7327128679587483235
-    TagComponent:
-      Name: Directional Light
-    TransformComponent:
-      Position: [0, 0, 0]
-      Rotation: [-1.18858635, 1.46407223, -2.7440362]
-      Scale: [1.00000346, 1.00000358, 1.00000334]
-    DirectionalLightComponent:
-      Color: [1, 1, 1]
-      Intensity: 1
-      CastsShadows: true
-      SoftShadows: true
-      LightSize: 0.5
   - Entity: 15895644778253512183
     TagComponent:
       Name: Plane
+      Icon: 3
     TransformComponent:
       Position: [0, -0.152009249, 0]
       Rotation: [0, 0, 0]
@@ -55,71 +95,41 @@ Entities:
       Friction: 0.5
       Restitution: 0
       RestitutionThreshold: 0.5
-  - Entity: 15390822741864005554
+  - Entity: 7327128679587483235
     TagComponent:
-      Name: Cube Copied
+      Name: Directional Light
+      Icon: 5
     TransformComponent:
-      Position: [-8.47445869, 3.48115683, -1.2825588]
+      Position: [0, 0, 0]
+      Rotation: [-1.18858635, 1.46407223, -2.7440362]
+      Scale: [1.00000346, 1.00000358, 1.00000334]
+    DirectionalLightComponent:
+      Color: [1, 1, 1]
+      Intensity: 1
+      CastsShadows: true
+      SoftShadows: true
+      LightSize: 0.5
+  - Entity: 1307493682380909043
+    TagComponent:
+      Name: Cube
+      Icon: 3
+    TransformComponent:
+      Position: [-1.94494128, 3.48115683, -1.2825588]
       Rotation: [0, 0, 0]
       Scale: [1, 1, 1]
     MeshRendererComponent:
       Name: Cube
       Path: ""
-  - Entity: 11974395031430461778
+  - Entity: 14734990869999880335
     TagComponent:
-      Name: Cube Copied Copied
+      Name: Sky Light
+      Icon: 5
     TransformComponent:
-      Position: [-6.00558186, 17.46735, -8.51815033]
-      Rotation: [0.0228196438, 0.0167170949, -0.632151961]
-      Scale: [0.999999881, 0.999999821, 1]
-    MeshRendererComponent:
-      Name: Cube
-      Path: ""
-  - Entity: 1778927617461434493
-    TagComponent:
-      Name: Cone
-    TransformComponent:
-      Position: [0, 5.89333391, -9.65292358]
+      Position: [0, 0, 0]
       Rotation: [0, 0, 0]
       Scale: [1, 1, 1]
-    MeshRendererComponent:
-      Name: Cone
-      Path: ""
-  - Entity: 11036590454175420619
-    TagComponent:
-      Name: Cylinder
-    TransformComponent:
-      Position: [-11.01509, 8.79528141, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    MeshRendererComponent:
-      Name: Cylinder
-      Path: ""
-  - Entity: 14576494749238100236
-    TagComponent:
-      Name: Torus
-    TransformComponent:
-      Position: [0, 11.1439981, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    MeshRendererComponent:
-      Name: Torus
-      Path: ""
-  - Entity: 4082263250657561255
-    TagComponent:
-      Name: Camera
-    TransformComponent:
-      Position: [-0.321592152, 11.3446999, 35.0245628]
-      Rotation: [-0.062060304, 0, 0]
-      Scale: [1, 1, 1]
-    CameraComponent:
-      Camera:
-        ProjectionType: 0
-        PerspectiveFOV: 0.785398185
-        PerspectiveNear: 0.00999999978
-        PerspectiveFar: 1000
-        OrthographicSize: 10
-        OrthographicNear: -1
-        OrthographicFar: 1
-      Primary: true
-      FixedAspectRatio: false
+    SkyLightComponent:
+      EnvironmentMapName: shanghai_bund_2k
+      EnvironmentMapPath: D:\DEV\Venus\VenusEditor\assets\environment maps\shanghai_bund_2k.hdr
+      Intensity: 1
+      Lod: 0

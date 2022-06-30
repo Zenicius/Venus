@@ -12,6 +12,9 @@
 #include "Engine/Input.h"
 #include "ImGui/ImGuiLayer.h"
 
+// Editor
+#include "Editor/ConsolePanel.h"
+
 // Events
 #include "Events/Event.h"
 #include "Events/ApplicationEvent.h"

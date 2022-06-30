@@ -28,23 +28,19 @@ namespace Venus {
 		//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 		io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;           // Enable Docking
 		io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;         // Enable Multi-Viewport / Platform Windows
-		//io.ConfigFlags |= ImGuiConfigFlags_ViewportsNoTaskBarIcons;
-		//io.ConfigFlags |= ImGuiConfigFlags_ViewportsNoMerge;
 
-		// Fonts TODO:FONT LIBRARY
-		io.Fonts->AddFontFromFileTTF("assets/fonts/Roboto-Bold.ttf", 18.0f);
-		io.FontDefault = io.Fonts->AddFontFromFileTTF("assets/fonts/Roboto-Regular.ttf", 18.0f);
+		// Fonts
+		io.Fonts->AddFontFromFileTTF("Resources/Fonts/Roboto-Bold.ttf", 18.0f);
+		io.FontDefault = io.Fonts->AddFontFromFileTTF("Resources/Fonts/Roboto-Regular.ttf", 18.0f);
 
 		ImFontConfig config;
 		config.MergeMode = true;
 		config.GlyphMinAdvanceX = 13.0f; // Use if you want to make the icon monospaced
 		static const ImWchar icon_ranges[] = { 0xf000, 0xf2e0, 0 };
-		io.Fonts->AddFontFromFileTTF("assets/fonts/fontawesome-webfont.ttf", 13.0f, &config, icon_ranges);
-
+		io.Fonts->AddFontFromFileTTF("Resources/Fonts/fontawesome-webfont.ttf", 13.0f, &config, icon_ranges);
 
 		// Setup Dear ImGui style
 		ImGui::StyleColorsDark();
-		//ImGui::StyleColorsClassic();
 
 		// When viewports are enabled we tweak WindowRounding/WindowBg so platform windows can look identical to regular ones.
 		ImGuiStyle& style = ImGui::GetStyle();
@@ -110,41 +106,6 @@ namespace Venus {
 
 	void ImGuiLayer::SetDarkThemeColors()
 	{
-#if old
-		auto& colors = ImGui::GetStyle().Colors;
-
-		// Headers
-		colors[ImGuiCol_Header] = ImVec4{ 0.2f, 0.205f, 0.21f, 1.0f }; 
-		colors[ImGuiCol_HeaderHovered] = ImVec4{ 0.3f, 0.305f, 0.31f, 1.0f };
-		colors[ImGuiCol_HeaderActive] = ImVec4{ 0.15f, 0.1505f, 0.151f, 1.0f };
-
-		// Buttons
-		colors[ImGuiCol_Button] = ImVec4{ 0.2f, 0.205f, 0.21f, 1.0f };
-		colors[ImGuiCol_ButtonHovered] = ImVec4{ 0.3f, 0.305f, 0.31f, 1.0f };
-		colors[ImGuiCol_ButtonActive] = ImVec4{ 0.15f, 0.1505f, 0.151f, 1.0f };
-
-		// Frame BG
-		colors[ImGuiCol_FrameBg] = ImVec4{ 0.4f, 0.35f, 0.35f, 0.27f };
-		colors[ImGuiCol_FrameBgHovered] = ImVec4{ 0.3f, 0.305f, 0.31f, 1.0f };
-		colors[ImGuiCol_FrameBgActive] = ImVec4{ 0.6f, 0.205f, 0.21f, 1.0f };
-
-		// Tabs
-		colors[ImGuiCol_Tab] = ImVec4{ 0.15f, 0.1505f, 0.151f, 1.0f };
-		colors[ImGuiCol_TabHovered] = ImVec4{ 0.38f, 0.3805f, 0.381f, 1.0f };
-		colors[ImGuiCol_TabActive] = ImVec4{ 0.28f, 0.2805f, 0.281f, 1.0f };
-
-		colors[ImGuiCol_TabUnfocused] = ImVec4{ 0.15f, 0.1505f, 0.151f, 1.0f };
-		colors[ImGuiCol_TabUnfocusedActive] = ImVec4{ 0.2f, 0.205f, 0.21f, 1.0f };
-
-		// Title
-		colors[ImGuiCol_TitleBg] = ImVec4{ 0.15f, 0.15f, 0.15f, 1.0f };
-		colors[ImGuiCol_TitleBgActive] = ImVec4{ 0.15f, 0.15f, 0.15f, 1.0f };
-		colors[ImGuiCol_TitleBgCollapsed] = ImVec4{ 0.15f, 0.15f, 0.15f, 1.0f };
-
-		// Background
-		colors[ImGuiCol_WindowBg] = ImVec4{ 0.17f, 0.17f, 0.17f, 1.0f };
-#endif
-
 		// Style by: janekb04 
 		ImVec4* colors = ImGui::GetStyle().Colors;
 		colors[ImGuiCol_Text] = ImVec4(1.00f, 1.00f, 1.00f, 1.00f);
@@ -231,6 +192,5 @@ namespace Venus {
 	void ImGuiLayer::OnImGuiRender()
 	{
 		static bool show = true;
-		//ImGui::ShowDemoWindow(&show);
 	}
 }

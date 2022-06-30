@@ -44,6 +44,7 @@ namespace Venus {
 			static Ref<TextureCube> CreatePreethamSky(glm::vec3 TurbidityAzimuthInclination = { 2.0f, 0.0f, 0.0f });
 
 			static Ref<Texture2D> GetDefaultTexture();
+			static Ref<Texture2D> GetDefaultBlackTexture();
 			static Ref<TextureCube> GetDefaultTextureCube();
 			static Ref<ShaderLibrary> GetShaderLibrary();
 
@@ -57,6 +58,8 @@ namespace Venus {
 			struct Statistics
 			{
 				uint32_t DrawCalls = 0;
+				uint32_t Models = 0;
+				uint32_t Meshs = 0;
 				uint32_t VertexCount = 0;
 				uint32_t IndexCount = 0;
 			};

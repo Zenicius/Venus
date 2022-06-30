@@ -154,6 +154,7 @@ layout(binding = 7) uniform sampler2DArray u_ShadowMapTexture;
 layout(push_constant) uniform Material
 {
 	vec3 AlbedoColor;
+	float Emission;
 	float Metalness;
 	float Roughness;
 	int UseNormalMap;
@@ -479,100 +480,6 @@ vec3 IBL(vec3 F0, vec3 Lr)
 
 //----------------------------------------------------------------------------------------------
 
-float ShadowCalculation()
-{
-    // select cascade layer
-    const uint SHADOW_MAP_CASCADE_COUNT = 4;
-	uint cascadeIndex = 0;
-	for (uint i = 0; i < SHADOW_MAP_CASCADE_COUNT - 1; i++)
-	{
-		if (Input.ViewPosition.z < u_CascadeSplits[i])
-			cascadeIndex = i + 1;
-	}
-
-    vec4 fragPosLightSpace = Input.ShadowMapCoords[cascadeIndex];
-    // perform perspective divide
-    vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
-    // transform to [0,1] range
-    projCoords = projCoords * 0.5 + 0.5;
-
-    // get depth of current fragment from light's perspective
-    float currentDepth = projCoords.z;
-
-    // keep the shadow at 0.0 when outside the far_plane region of the light's frustum.
-    if (currentDepth > 1.0)
-    {
-        return 0.0;
-    }
-
-    // calculate bias (based on depth map resolution and slope)
-    const float MINIMUM_SHADOW_BIAS = 0.002;
-	float bias = max(MINIMUM_SHADOW_BIAS * (1.0 - dot(m_Params.Normal, u_DirectionalLight.Direction)), MINIMUM_SHADOW_BIAS);
-
-    // PCF
-    float shadow = 0.0;
-    vec2 texelSize = 1.0 / vec2(textureSize(u_ShadowMapTexture, 0));
-    for(int x = -1; x <= 1; ++x)
-    {
-        for(int y = -1; y <= 1; ++y)
-        {
-            float pcfDepth = texture(u_ShadowMapTexture, vec3(projCoords.xy + vec2(x, y) * texelSize, cascadeIndex)).r;
-            shadow += (currentDepth - bias) > pcfDepth ? 0.0 : 1.0;        
-        }    
-    }
-    shadow /= 9.0;
-        
-    return shadow;
-}
-
-float myShadow()
-{
-	float shadow = 1.0;
-	float shadowMapDepth = 0;
-	vec3 projCoords = vec3(0, 0, 0);
-
-	const uint SHADOW_MAP_CASCADE_COUNT = 4;
-	uint cascadeIndex = 0;
-	for (uint i = 0; i < SHADOW_MAP_CASCADE_COUNT - 1; i++)
-	{
-		if (Input.ViewPosition.z < u_CascadeSplits[i])
-			cascadeIndex = i + 1;
-	}
-
-	if(cascadeIndex == 0)
-	{
-		vec4 lightSpacePos = Input.ShadowMapCoords[0];
-		projCoords = lightSpacePos.xyz * 0.5 + 0.5;
-		shadowMapDepth = texture(u_ShadowMapTexture, vec3(projCoords.xy, 0)).r;
-	}
-	else if(cascadeIndex == 1)
-	{
-		vec4 lightSpacePos = Input.ShadowMapCoords[1];
-		projCoords = lightSpacePos.xyz * 0.5 + 0.5;
-		shadowMapDepth = texture(u_ShadowMapTexture, vec3(projCoords.xy, 1)).r;
-	}
-	else if(cascadeIndex == 2)
-	{
-		vec4 lightSpacePos = Input.ShadowMapCoords[2];
-		projCoords = lightSpacePos.xyz * 0.5 + 0.5;
-		shadowMapDepth = texture(u_ShadowMapTexture, vec3(projCoords.xy, 2)).r;
-
-	}
-	else if(cascadeIndex == 3)
-	{
-		vec4 lightSpacePos = Input.ShadowMapCoords[3];
-		projCoords = lightSpacePos.xyz * 0.5 + 0.5;
-		shadowMapDepth = texture(u_ShadowMapTexture, vec3(projCoords.xy, 3)).r;
-	}
-
-	const float MINIMUM_SHADOW_BIAS = 0.002;
-	float bias = max(MINIMUM_SHADOW_BIAS * (1.0 - dot(m_Params.Normal, u_DirectionalLight.Direction)), MINIMUM_SHADOW_BIAS);
-
-	float currentDepth = projCoords.z;
-	shadow = currentDepth - bias > shadowMapDepth ? 0.25 : 1.0;
-	return shadow;
-}
-
 vec4 GetCascadeColor()
 {
 	const uint SHADOW_MAP_CASCADE_COUNT = 4;
@@ -701,12 +608,10 @@ void main()
 		vec3 shadowMapCoords = (Input.ShadowMapCoords[cascadeIndex].xyz / Input.ShadowMapCoords[cascadeIndex].w);
 		shadowAmount = u_SoftShadows ? PCSS_DirectionalLight(u_ShadowMapTexture, cascadeIndex, shadowMapCoords, u_LightSize) : HardShadows_DirectionalLight(u_ShadowMapTexture, cascadeIndex, shadowMapCoords);
 	}
-
-	//float shadow = myShadow();
-	//float shadow2 = ShadowCalculation();
 	
 	vec3 lightContribution = CalculateDirLight(F0) * shadowAmount;
 	lightContribution += CalculatePointLights(F0);
+	lightContribution += m_Params.Albedo * u_MaterialUniforms.Emission;
 	
 	vec3 iblContribution = IBL(F0, Lr) * u_EnvironmentMapIntensity;
 

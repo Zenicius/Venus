@@ -2,10 +2,9 @@
 #include "Engine/Application.h"
 
 #include "Engine/Log.h"
-
-#include "Renderer/Renderer.h"
-
 #include "Engine/Input.h"
+#include "Renderer/Renderer.h"
+#include "Scripting/ScriptingEngine.h"
 
 #include <GLFW/glfw3.h>
 
@@ -21,6 +20,7 @@ namespace Venus {
 
 		s_Instance = this;
 
+		// Window
 		WindowProps props;
 		props.Title = spec.Name;
 		props.Width = spec.Width;
@@ -28,12 +28,14 @@ namespace Venus {
 		props.Fullscreen = spec.Fullscreen;
 		props.Vsync = spec.Vsync;
 		props.Decorated = spec.WindowDecorated;
-
 		m_Window = Window::Create(props);
 		m_Window->SetEventCallback(VS_BIND_EVENT_FN(Application::OnEvent));
-
+	
+		// Init Engine Components
 		Renderer::Init();
+		ScriptingEngine::Init();
 
+		// ImGui
 		m_ImGuiLayer = new ImGuiLayer();
 		PushOverlay(m_ImGuiLayer);
 	}
@@ -45,6 +47,8 @@ namespace Venus {
 		m_Window->SetEventCallback([](Event& e) {});
 		
 		Renderer::Shutdown();
+		ScriptingEngine::Shutdown();
+		Log::Shutdown();
 	}
 
 	void Application::PushLayer(Layer* layer)

@@ -3,6 +3,8 @@
 #include "ImGui/UI.h"
 #include <glm/gtc/type_ptr.hpp>
 
+#include "Scripting/ScriptingEngine.h"
+
 namespace Venus {
 
 	extern const std::filesystem::path g_AssetPath;
@@ -27,26 +29,28 @@ namespace Venus {
 	{
 		// Objcts Panel
 		ImGui::Begin(ICON_FA_LIST  "  Objects");
+		ImGui::BeginChild("DragDropUnparent"); // Hack to make drag drop work on window
 
 		// Search Objects
 		ImGui::TextDisabled(ICON_FA_SEARCH);
 		ImGui::SameLine();
 		static ImGuiTextFilter objectsFilter;
-		objectsFilter.Draw("##Search", ImGui::GetWindowSize().x - 40.0f);
+		objectsFilter.Draw("##Search", ImGui::GetWindowSize().x - 35.0f);
 		ImGui::Separator();
 
 		// Render Entities
-		m_Context->m_Registry.each([&](auto entityID)
+		// TODO: FIX VECTOR CRASH AFTER Deleting Root entity with child (Maybe entt bug?)
+		auto view = m_Context->m_Registry.view<IDComponent, RelationshipComponent>();
+		for (auto entity : view)
 		{
-			Entity entity{ entityID , m_Context.get() };
-
-			std::string name = entity.GetComponent<TagComponent>().Name;
-			
-			if (objectsFilter.PassFilter(name.c_str()))
+			Entity e(entity, m_Context.get());
+			UUID parentID = e.GetParentUUID();
+			// Only Renders entities which has no parents(root entities)
+			if (parentID == 0)
 			{
-				RenderEntityNode(entity);
+				RenderEntityNode({ entity, m_Context.get() }, objectsFilter);
 			}
-		});
+		}
 
 		// Deselect entity by clicking blank spaces
 		if (ImGui::IsMouseDown(0) && ImGui::IsWindowHovered())
@@ -56,168 +60,26 @@ namespace Venus {
 		}
 
 		// Create Menu by Right-Clicking at blank spaces
-		if (ImGui::BeginPopupContextWindow(0, 1, false))
+		if (ImGui::BeginPopupContextWindow(0, 1 | ImGuiPopupFlags_NoOpenOverItems, false))
 		{
-
-			if (ImGui::MenuItem("Create Empty"))
-			{
-				auto entity = m_Context->CreateEntity();
-				m_SelectedEntity = entity;
-				m_Context->SetEditorSelectedEntity(entity);
-			}
-
-			if (ImGui::MenuItem("Create Camera"))
-			{
-				auto entity = m_Context->CreateEntity("Camera");
-				entity.AddComponent<CameraComponent>();
-				m_SelectedEntity = entity;
-				m_Context->SetEditorSelectedEntity(entity);
-			}
-
-			ImGui::Separator();
-
-			if (ImGui::BeginMenu("3D Objects"))
-			{
-				if (ImGui::MenuItem("Cube"))
-				{
-					auto entity = m_Context->CreateEntity("Cube");
-					entity.AddComponent<MeshRendererComponent>(); // Default is cube
-					m_SelectedEntity = entity;
-					m_Context->SetEditorSelectedEntity(entity);
-				}
-
-				if (ImGui::MenuItem("Sphere"))
-				{
-					auto entity = m_Context->CreateEntity("Sphere");
-					auto& component = entity.AddComponent<MeshRendererComponent>();
-
-					component.Model = Model::Create("Resources/Models/Sphere.fbx");
-					component.ModelName = "Sphere";
-
-					m_SelectedEntity = entity;
-					m_Context->SetEditorSelectedEntity(entity);
-				}
-
-				if (ImGui::MenuItem("Plane"))
-				{
-					auto entity = m_Context->CreateEntity("Plane");
-					auto& component = entity.AddComponent<MeshRendererComponent>();
-
-					component.Model = Model::Create("Resources/Models/Plane.fbx");
-					component.ModelName = "Plane";
-
-					m_SelectedEntity = entity;
-					m_Context->SetEditorSelectedEntity(entity);
-				}
-
-				if (ImGui::MenuItem("Capsule"))
-				{
-					auto entity = m_Context->CreateEntity("Capsule");
-					auto& component = entity.AddComponent<MeshRendererComponent>();
-
-					component.Model = Model::Create("Resources/Models/Capsule.fbx");
-					component.ModelName = "Capsule";
-
-					m_SelectedEntity = entity;
-					m_Context->SetEditorSelectedEntity(entity);
-				}
-
-				if (ImGui::MenuItem("Torus"))
-				{
-					auto entity = m_Context->CreateEntity("Torus");
-					auto& component = entity.AddComponent<MeshRendererComponent>();
-
-					component.Model = Model::Create("Resources/Models/Torus.fbx");
-					component.ModelName = "Torus";
-
-					m_SelectedEntity = entity;
-					m_Context->SetEditorSelectedEntity(entity);
-				}
-
-				if (ImGui::MenuItem("Cone"))
-				{
-					auto entity = m_Context->CreateEntity("Cone");
-					auto& component = entity.AddComponent<MeshRendererComponent>();
-
-					component.Model = Model::Create("Resources/Models/Cone.fbx");
-					component.ModelName = "Cone";
-
-					m_SelectedEntity = entity;
-					m_Context->SetEditorSelectedEntity(entity);
-				}
-
-				if (ImGui::MenuItem("Cylinder"))
-				{
-					auto entity = m_Context->CreateEntity("Cylinder");
-					auto& component = entity.AddComponent<MeshRendererComponent>();
-
-					component.Model = Model::Create("Resources/Models/Cylinder.fbx");
-					component.ModelName = "Cylinder";
-
-					m_SelectedEntity = entity;
-					m_Context->SetEditorSelectedEntity(entity);
-				}
-
-				ImGui::EndMenu();
-			}
-
-			if (ImGui::BeginMenu("2D Objects"))
-			{
-				if (ImGui::MenuItem("Sprite"))
-				{
-					auto entity = m_Context->CreateEntity("Sprite");
-					entity.AddComponent<SpriteRendererComponent>(glm::vec4{ 1.0f, 1.0f, 1.0f, 1.0f });
-					m_SelectedEntity = entity;
-					m_Context->SetEditorSelectedEntity(entity);
-				}
-
-				if (ImGui::MenuItem("Circle"))
-				{
-					auto entity = m_Context->CreateEntity("Circle");
-					entity.AddComponent<CircleRendererComponent>(glm::vec4{ 1.0f, 1.0f, 1.0f, 1.0f });
-					m_SelectedEntity = entity;
-					m_Context->SetEditorSelectedEntity(entity);
-				}
-
-				ImGui::EndMenu();
-			}
-
-			ImGui::Separator();
-
-			if (ImGui::BeginMenu("Light"))
-			{
-				if (ImGui::MenuItem("Sky Light"))
-				{
-					auto entity = m_Context->CreateEntity("Sky Light");
-					entity.AddComponent<SkyLightComponent>();
-					m_SelectedEntity = entity;
-					m_Context->SetEditorSelectedEntity(entity);
-				}
-
-				if (ImGui::MenuItem("Directional Light"))
-				{
-					auto entity = m_Context->CreateEntity("Directional Light");
-					auto& transform = entity.GetComponent<TransformComponent>();
-					transform.Rotation = glm::radians(glm::vec3({ 80.0f, 10.0f, 0.0f }));
-					entity.AddComponent<DirectionalLightComponent>();
-					m_SelectedEntity = entity;
-					m_Context->SetEditorSelectedEntity(entity);
-				}
-
-				if (ImGui::MenuItem("Point Light"))
-				{
-					auto entity = m_Context->CreateEntity("Point Light");
-					entity.AddComponent<PointLightComponent>();
-					m_SelectedEntity = entity;
-					m_Context->SetEditorSelectedEntity(entity);
-				}
-
-				ImGui::EndMenu();
-			}
-
+			RenderCreateOptions({});
 			ImGui::EndPopup();
 		}
 
+		ImGui::EndChild();
+		// Drag and Drop to Unparent Children
+		if (ImGui::BeginDragDropTarget())
+		{
+			const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("objectspanel_entity", ImGuiDragDropFlags_AcceptNoDrawDefaultRect);
+
+			if (payload)
+			{
+				Entity& entity = *(Entity*)payload->Data;
+				m_Context->UnparentEntity(entity);
+			}
+
+			ImGui::EndDragDropTarget();
+		}
 		ImGui::End();
 
 		// Properties Panel
@@ -239,52 +101,107 @@ namespace Venus {
 		ImGui::End();
 	}
 
-	void ObjectsPanel::RenderEntityNode(Entity entity)
+	void ObjectsPanel::RenderEntityNode(Entity entity, ImGuiTextFilter filter)
 	{
 		auto& tag = entity.GetComponent<TagComponent>();
 
-		ImGuiTreeNodeFlags flags = ((m_SelectedEntity == entity) ? ImGuiTreeNodeFlags_Selected : 0) |
-			ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_SpanAvailWidth;
-		//	ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth;
+		// Only Render entities which pass the filter or has child which passes
+		bool passFilter = filter.PassFilter(tag.Name.c_str());
+		bool childPassFilter = HasChildPassingFilter(entity, filter);
+		if (!passFilter && !childPassFilter)
+			return;
 
-		std::string nameWithIcon = ICON_FA_CUBE "   " + tag.Name;
+		// Flags Configuration
+		ImGuiTreeNodeFlags flags = ((m_SelectedEntity == entity) ? ImGuiTreeNodeFlags_Selected : 0) | ImGuiTreeNodeFlags_SpanAvailWidth;
+		if (entity.GetChildren().size() > 0)
+			flags |= ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_DefaultOpen;
+		else
+			flags |= ImGuiTreeNodeFlags_Leaf;
+
+		// Get TagIcon
+		std::string icon = tag.GetIconString();
+
+		//- Actual TreeNode-------------------------------------------------------------
+		std::string nameWithIcon = icon + "   " + tag.Name;
+		if (passFilter && filter.IsActive())
+			ImGui::PushStyleColor(ImGuiCol_Text, { 0.5f, 0.4f, 0.7f, 0.45f });
 		bool open = ImGui::TreeNodeEx((void*)(uint64_t)(uint32_t)entity, flags, nameWithIcon.c_str());
+		if (passFilter && filter.IsActive())
+			ImGui::PopStyleColor();
+		//------------------------------------------------------------------------------
+
 
 		bool deleted = false;
+
+		// Drag and Drop to Parent/Unparent
+		if (ImGui::BeginDragDropSource())
+		{
+			std::string sourceLabel = "Parent/Unparent " + tag.Name;
+			ImGui::Text(sourceLabel.c_str());
+			ImGui::SetDragDropPayload("objectspanel_entity", &entity, sizeof(Entity));
+			ImGui::EndDragDropSource();
+		}
+		if (ImGui::BeginDragDropTarget())
+		{
+			const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("objectspanel_entity");
+
+			if (payload)
+			{
+				Entity& payloadEntity = *(Entity*)payload->Data;
+				m_Context->ParentEntity(payloadEntity, entity);
+			}
+
+			ImGui::EndDragDropTarget();
+		}
 
 		// Right Click Entity Options
 		if (ImGui::BeginPopupContextItem())
 		{
-			if (ImGui::MenuItem("Duplicate Entity"))
+			bool isChild = entity.GetParentUUID() != 0;
+
+			m_SelectedEntity = entity;
+			m_Context->SetEditorSelectedEntity(m_SelectedEntity);
+
+			if (ImGui::BeginMenu("Create Child"))
+			{
+				RenderCreateOptions(entity);
+				ImGui::EndMenu();
+			}
+
+			ImGui::Separator();
+
+			if (isChild && ImGui::MenuItem("Unparent"))
+			{
+				m_Context->UnparentEntity(entity);
+			}
+
+			if (ImGui::MenuItem("Duplicate"))
 			{
 				m_SelectedEntity = m_Context->DuplicateEntity(entity);
 				m_Context->SetEditorSelectedEntity(m_SelectedEntity);
 			}
 
-			ImGui::Separator();
-
-			if (ImGui::MenuItem("Delete Entity"))
+			if (ImGui::MenuItem("Delete"))
 				deleted = true;
 
 			ImGui::EndPopup();
 		}
 
-		// Drag and Drop Source
-		if (ImGui::BeginDragDropSource())
-		{
-			uint64_t ID = entity.GetUUID();
-			ImGui::SetDragDropPayload("OBJECT_PREFAB", &ID, sizeof(uint64_t));
-			ImGui::EndDragDropSource();
-		}
-
+		// Select Entity by clicking 
 		if (ImGui::IsItemClicked())
 		{
 			m_SelectedEntity = entity;
 			m_Context->SetEditorSelectedEntity(entity);
 		}
 
+		// Render Children
 		if (open)
 		{
+			for (auto child : entity.GetChildren())
+			{
+				RenderEntityNode(m_Context->GetEntityWithUUID(child), filter);
+			}
+
 			ImGui::TreePop();
 		}
 
@@ -366,6 +283,30 @@ namespace Venus {
 		ImGui::PopID();
 	}
 
+	bool ObjectsPanel::HasChildPassingFilter(Entity entity, ImGuiTextFilter filter)
+	{
+		// Checks if entity has children which pass the search filter
+		bool childPassFilter = false;
+		if (filter.IsActive())
+		{
+			for (auto childID : entity.GetChildren())
+			{
+				Entity e = m_Context->GetEntityWithUUID(childID);
+				if (filter.PassFilter(e.GetName().c_str()))
+					childPassFilter = true;
+				else
+					childPassFilter = HasChildPassingFilter(e, filter);
+
+				if (childPassFilter)
+					break;
+			}
+		}
+		else
+			childPassFilter = true;
+
+		return childPassFilter;
+	}
+
 	template<typename T, typename UIFunction>
 	inline void ObjectsPanel::RenderComponent(const std::string& name, Entity entity, bool canDelete, UIFunction uiFunction, bool separator)
 	{
@@ -433,21 +374,38 @@ namespace Venus {
 
 	void ObjectsPanel::RenderComponents(Entity entity)
 	{
-		// Tag Component
-		ImGui::TextDisabled(ICON_FA_CUBE);
+		// Tag Component--------------------------------------------------------
+		auto& tag = entity.GetComponent<TagComponent>();
+		// Tag Icon DropDown
+		const char* icons[] =
+		{
+			ICON_FA_FILE,
+			ICON_FA_FOLDER,
+			ICON_FA_VIDEO_CAMERA,
+			ICON_FA_CUBE,
+			ICON_FA_FILE_IMAGE_O,
+			ICON_FA_LIGHTBULB_O
+		};
+		int current = (int)entity.GetComponent<TagComponent>().Icon;
+		ImGui::SetNextItemWidth(40.0f);
+		if (UI::DropDown("Icon", icons, 6, &current, false, false, true))
+		{
+			tag.Icon = (TagIcon)current;
+		}
+
+		// Tag Name
 		ImGui::SameLine();
 		if (entity.HasComponent<TagComponent>())
 		{
-			auto& tag = entity.GetComponent<TagComponent>();
-
 			char nameBuffer[256];
 			memset(nameBuffer, 0, sizeof(nameBuffer));
 			strcpy_s(nameBuffer, sizeof(nameBuffer), tag.Name.c_str());
 			if (ImGui::InputText("##Name", nameBuffer, sizeof(nameBuffer)))
 			{
-				tag = std::string(nameBuffer);
+				tag.Name = std::string(nameBuffer);
 			}
 		}
+		//----------------------------------------------------------------------
 
 		// UUID 
 		ImGui::SameLine();
@@ -476,8 +434,6 @@ namespace Venus {
 					m_SelectedEntity.AddComponent<CameraComponent>();
 					ImGui::CloseCurrentPopup();
 				}
-
-				ImGui::Separator();
 			}
 
 			if (!m_SelectedEntity.HasComponent<MeshRendererComponent>())
@@ -507,8 +463,6 @@ namespace Venus {
 				}
 			}
 
-			ImGui::Separator();
-
 			if (!m_SelectedEntity.HasComponent<Rigidbody2DComponent>())
 			{
 				if (ImGui::MenuItem("Rigidbody 2D"))
@@ -536,8 +490,6 @@ namespace Venus {
 				}
 			}
 
-			ImGui::Separator();
-
 			if (!m_SelectedEntity.HasComponent<SkyLightComponent>())
 			{
 				if (ImGui::MenuItem("Sky Light"))
@@ -561,6 +513,15 @@ namespace Venus {
 				if (ImGui::MenuItem("Directional Light"))
 				{
 					m_SelectedEntity.AddComponent<DirectionalLightComponent>();
+					ImGui::CloseCurrentPopup();
+				}
+			}
+
+			if (!m_SelectedEntity.HasComponent<ScriptComponent>())
+			{
+				if (ImGui::MenuItem("Script"))
+				{
+					m_SelectedEntity.AddComponent<ScriptComponent>();
 					ImGui::CloseCurrentPopup();
 				}
 			}
@@ -637,6 +598,7 @@ namespace Venus {
 						// Albedo
 						uint32_t albedoRenderID = material->GetAlbedoMap()->GetRendererID();
 						auto& albedoColor = material->GetAlbedoColor();
+						auto& emission = material->GetEmission();
 						bool hasAlbedoMap = albedoRenderID != Renderer::GetDefaultTexture()->GetRendererID();
 						std::string albedoLabel = "Albedo##" + std::to_string(key);
 						if (ImGui::CollapsingHeader(albedoLabel.c_str()))
@@ -675,6 +637,12 @@ namespace Venus {
 							ImGui::SameLine();
 							std::string albedoColorLabel = "Color##Albedo" + std::to_string(key);
 							ImGui::ColorEdit3(albedoColorLabel.c_str(), glm::value_ptr(albedoColor), ImGuiColorEditFlags_NoInputs);
+
+							ImGui::SameLine();
+							ImGui::SetNextItemWidth(120.0f);
+							UI::ShiftPosX(10.0f);
+							std::string emissionLabel = "Emission##Albedo" + std::to_string(key);
+							ImGui::DragFloat(emissionLabel.c_str(), &emission, 0.1f, 0.0f, 50.0f);
 
 							if (hasAlbedoMap)
 							{
@@ -1032,7 +1000,7 @@ namespace Venus {
 			RenderComponent<DirectionalLightComponent>(ICON_FA_LIGHTBULB_O  "  Directional Light", entity, true, [](auto& component)
 			{
 				UI::ColorEdit3("Color", component.Color, true);
-				UI::DragFloat("Intensity", &component.Intensity, 0.1f, 1.0f, 100.0f, true);
+				UI::DragFloat("Intensity", &component.Intensity, 0.1f, 0.0f, 100.0f, true);
 				UI::Checkbox("Casts Shadows", &component.CastsShadows);
 ;			});
 		}
@@ -1108,5 +1076,343 @@ namespace Venus {
 
 			});
 		}
+	
+		// ScriptComponent
+		if (entity.HasComponent<ScriptComponent>() && componentsFilter.PassFilter("Script"))
+		{
+			RenderComponent<ScriptComponent>(ICON_FA_CODE  "  Script", entity, true, [](auto& component)
+			{
+				bool exists = ScriptingEngine::ModuleExists(component.ModuleName, false);
+				bool subclass = ScriptingEngine::IsSubclassOfEntity(component.ModuleName);
+				bool error = !exists || !subclass;
+
+				std::string name = component.ModuleName;
+
+				bool err = (!exists || !subclass) && !name.empty();
+
+				if(err && !exists)
+					ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.65f, 0.2f, 0.2f, 1.0f));
+				else if(err && !subclass)
+					ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.65f, 0.65f, 0.2f, 1.0f));
+
+				if (UI::InputText("Module Name", name))
+				{
+					if (ScriptingEngine::ModuleExists(name, true))
+					{
+						component.ModuleName = name;
+						error = false;
+					}
+					else
+					{
+						component.ModuleName = name;
+						error = true;
+					}
+				}
+
+				if (err)
+				{
+					std::string msg;
+					if (!exists)
+						msg = "Module not found!";
+					else
+						msg = "Module is not a subclass of Entity!";
+
+					if (!ImGui::IsItemActive())
+					{
+						UI::CenterText(msg);
+						UI::ShiftPosY(15.0f);
+						UI::Text(msg.c_str());
+					}
+					ImGui::PopStyleColor();
+				}
+			});
+		}
+	}
+
+	bool ObjectsPanel::RenderCreateOptions(Entity parent)
+	{
+		bool entityCreated = false;
+
+		if (ImGui::MenuItem(ICON_FA_FILE "   Create Empty"))
+		{
+			Entity entity;
+			if (parent)
+				entity = m_Context->CreateChildEntity(parent);
+			else
+				entity = m_Context->CreateEntity();
+
+			m_SelectedEntity = entity;
+			m_Context->SetEditorSelectedEntity(entity);
+
+			entityCreated = true;
+		}
+
+		if (ImGui::MenuItem(ICON_FA_VIDEO_CAMERA "  Create Camera"))
+		{
+			Entity entity;
+			if (parent)
+				entity = m_Context->CreateChildEntity(parent, "Camera");
+			else
+				entity = m_Context->CreateEntity("Camera");
+
+			entity.GetComponent<TagComponent>().Icon = TagIcon::Camera;
+
+			entity.AddComponent<CameraComponent>();
+			m_SelectedEntity = entity;
+			m_Context->SetEditorSelectedEntity(entity);
+
+			entityCreated = true;
+		}
+
+		ImGui::Separator();
+
+		if (ImGui::BeginMenu(ICON_FA_CUBE "  3D Objects"))
+		{
+			if (ImGui::MenuItem("Cube"))
+			{
+				Entity entity;
+				if (parent)
+					entity = m_Context->CreateChildEntity(parent, "Cube");
+				else
+					entity = m_Context->CreateEntity("Cube");
+
+				entity.GetComponent<TagComponent>().Icon = TagIcon::Model;
+
+				entity.AddComponent<MeshRendererComponent>(); // Default is cube
+				m_SelectedEntity = entity;
+				m_Context->SetEditorSelectedEntity(entity);
+
+				entityCreated = true;
+			}
+
+			if (ImGui::MenuItem("Sphere"))
+			{
+				Entity entity;
+				if (parent)
+					entity = m_Context->CreateChildEntity(parent, "Sphere");
+				else
+					entity = m_Context->CreateEntity("Sphere");
+
+				entity.GetComponent<TagComponent>().Icon = TagIcon::Model;
+
+				auto& component = entity.AddComponent<MeshRendererComponent>();
+
+				component.Model = Model::Create("Resources/Models/Sphere.fbx");
+				component.ModelName = "Sphere";
+
+				m_SelectedEntity = entity;
+				m_Context->SetEditorSelectedEntity(entity);
+
+				entityCreated = true;
+			}
+
+			if (ImGui::MenuItem("Plane"))
+			{
+				Entity entity;
+				if (parent)
+					entity = m_Context->CreateChildEntity(parent, "Plane");
+				else
+					entity = m_Context->CreateEntity("Plane");
+
+				entity.GetComponent<TagComponent>().Icon = TagIcon::Model;
+
+				auto& component = entity.AddComponent<MeshRendererComponent>();
+
+				component.Model = Model::Create("Resources/Models/Plane.fbx");
+				component.ModelName = "Plane";
+
+				m_SelectedEntity = entity;
+				m_Context->SetEditorSelectedEntity(entity);
+
+				entityCreated = true;
+			}
+
+			if (ImGui::MenuItem("Capsule"))
+			{
+				Entity entity;
+				if (parent)
+					entity = m_Context->CreateChildEntity(parent, "Capsule");
+				else
+					entity = m_Context->CreateEntity("Capsule");
+
+				entity.GetComponent<TagComponent>().Icon = TagIcon::Model;
+
+				auto& component = entity.AddComponent<MeshRendererComponent>();
+
+				component.Model = Model::Create("Resources/Models/Capsule.fbx");
+				component.ModelName = "Capsule";
+
+				m_SelectedEntity = entity;
+				m_Context->SetEditorSelectedEntity(entity);
+
+				entityCreated = true;
+			}
+
+			if (ImGui::MenuItem("Torus"))
+			{
+				Entity entity;
+				if (parent)
+					entity = m_Context->CreateChildEntity(parent, "Torus");
+				else
+					entity = m_Context->CreateEntity("Torus");
+
+				entity.GetComponent<TagComponent>().Icon = TagIcon::Model;
+
+				auto& component = entity.AddComponent<MeshRendererComponent>();
+
+				component.Model = Model::Create("Resources/Models/Torus.fbx");
+				component.ModelName = "Torus";
+
+				m_SelectedEntity = entity;
+				m_Context->SetEditorSelectedEntity(entity);
+
+				entityCreated = true;
+			}
+
+			if (ImGui::MenuItem("Cone"))
+			{
+				Entity entity;
+				if (parent)
+					entity = m_Context->CreateChildEntity(parent, "Cone");
+				else
+					entity = m_Context->CreateEntity("Cone");
+
+				entity.GetComponent<TagComponent>().Icon = TagIcon::Model;
+
+				auto& component = entity.AddComponent<MeshRendererComponent>();
+
+				component.Model = Model::Create("Resources/Models/Cone.fbx");
+				component.ModelName = "Cone";
+
+				m_SelectedEntity = entity;
+				m_Context->SetEditorSelectedEntity(entity);
+
+				entityCreated = true;
+			}
+
+			if (ImGui::MenuItem("Cylinder"))
+			{
+				Entity entity;
+				if (parent)
+					entity = m_Context->CreateChildEntity(parent, "Cylinder");
+				else
+					entity = m_Context->CreateEntity("Cylinder");
+
+				entity.GetComponent<TagComponent>().Icon = TagIcon::Model;
+
+				auto& component = entity.AddComponent<MeshRendererComponent>();
+
+				component.Model = Model::Create("Resources/Models/Cylinder.fbx");
+				component.ModelName = "Cylinder";
+
+				m_SelectedEntity = entity;
+				m_Context->SetEditorSelectedEntity(entity);
+
+				entityCreated = true;
+			}
+
+			ImGui::EndMenu();
+		}
+
+		if (ImGui::BeginMenu(ICON_FA_FILE_IMAGE_O "  2D Objects"))
+		{
+			if (ImGui::MenuItem("Sprite"))
+			{
+				Entity entity;
+				if (parent)
+					entity = m_Context->CreateChildEntity(parent, "Sprite");
+				else
+					entity = m_Context->CreateEntity("Sprite");
+
+				entity.GetComponent<TagComponent>().Icon = TagIcon::Sprite;
+
+				entity.AddComponent<SpriteRendererComponent>(glm::vec4{ 1.0f, 1.0f, 1.0f, 1.0f });
+				m_SelectedEntity = entity;
+				m_Context->SetEditorSelectedEntity(entity);
+
+				entityCreated = true;
+			}
+
+			if (ImGui::MenuItem("Circle"))
+			{
+				Entity entity;
+				if (parent)
+					entity = m_Context->CreateChildEntity(parent, "Circle");
+				else
+					entity = m_Context->CreateEntity("Circle");
+
+				entity.GetComponent<TagComponent>().Icon = TagIcon::Sprite;
+
+				entity.AddComponent<CircleRendererComponent>(glm::vec4{ 1.0f, 1.0f, 1.0f, 1.0f });
+				m_SelectedEntity = entity;
+				m_Context->SetEditorSelectedEntity(entity);
+
+				entityCreated = true;
+			}
+
+			ImGui::EndMenu();
+		}
+
+		ImGui::Separator();
+
+		if (ImGui::BeginMenu(ICON_FA_LIGHTBULB_O "  Light"))
+		{
+			if (ImGui::MenuItem("Sky Light"))
+			{
+				Entity entity;
+				if (parent)
+					entity = m_Context->CreateChildEntity(parent, "Sky Light");
+				else
+					entity = m_Context->CreateEntity("Sky Light");
+
+				entity.GetComponent<TagComponent>().Icon = TagIcon::Light;
+
+				entity.AddComponent<SkyLightComponent>();
+				m_SelectedEntity = entity;
+				m_Context->SetEditorSelectedEntity(entity);
+
+				entityCreated = true;
+			}
+
+			if (ImGui::MenuItem("Directional Light"))
+			{
+				Entity entity;
+				if (parent)
+					entity = m_Context->CreateChildEntity(parent, "Directional Light");
+				else
+					entity = m_Context->CreateEntity("Directional Light");
+
+				entity.GetComponent<TagComponent>().Icon = TagIcon::Light;
+
+				auto& transform = entity.GetComponent<TransformComponent>();
+				transform.Rotation = glm::radians(glm::vec3({ 80.0f, 10.0f, 0.0f }));
+				entity.AddComponent<DirectionalLightComponent>();
+				m_SelectedEntity = entity;
+				m_Context->SetEditorSelectedEntity(entity);
+
+				entityCreated = true;
+			}
+
+			if (ImGui::MenuItem("Point Light"))
+			{
+				Entity entity;
+				if (parent)
+					entity = m_Context->CreateChildEntity(parent, "Point Light");
+				else
+					entity = m_Context->CreateEntity("Point Light");
+
+				entity.GetComponent<TagComponent>().Icon = TagIcon::Light;
+
+				entity.AddComponent<PointLightComponent>();
+				m_SelectedEntity = entity;
+				m_Context->SetEditorSelectedEntity(entity);
+
+				entityCreated = true;
+			}
+
+			ImGui::EndMenu();
+		}
+
+		return entityCreated;
 	}
 }

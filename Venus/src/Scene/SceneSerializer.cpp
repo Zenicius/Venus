@@ -129,7 +129,9 @@ namespace Venus {
 			out << YAML::BeginMap;
 
 			auto& name = entity.GetComponent<TagComponent>().Name;
+			auto& icon = entity.GetComponent<TagComponent>().Icon;
 			out << YAML::Key << "Name" << YAML::Value << name;
+			out << YAML::Key << "Icon" << YAML::Value << (int)icon;
 
 			out << YAML::EndMap;
 		}
@@ -144,6 +146,28 @@ namespace Venus {
 			out << YAML::Key << "Position" << YAML::Value << transformComponent.Position;
 			out << YAML::Key << "Rotation" << YAML::Value << transformComponent.Rotation;
 			out << YAML::Key << "Scale" << YAML::Value << transformComponent.Scale;
+
+			out << YAML::EndMap;
+		}
+
+		// RelationshipComponent
+		if (entity.HasComponent<RelationshipComponent>())
+		{
+			out << YAML::Key << "RelationshipComponent";
+			out << YAML::BeginMap;
+
+			auto& relationshipComponent = entity.GetComponent<RelationshipComponent>();
+			out << YAML::Key << "Parent" << YAML::Value << relationshipComponent.Parent;
+			out << YAML::Key << "Children";
+			out << YAML::Value << YAML::BeginSeq;
+			for (auto child : relationshipComponent.Children)
+			{
+				out << YAML::BeginMap;
+				out << YAML::Key << "ID" << YAML::Value << child;
+				out << YAML::EndMap;
+			}
+			out << YAML::EndSeq;
+
 
 			out << YAML::EndMap;
 		}
@@ -321,7 +345,18 @@ namespace Venus {
 
 
 			out << YAML::EndMap;
-		}	
+		}
+
+		// ScriptComponent
+		if (entity.HasComponent<ScriptComponent>())
+		{
+			out << YAML::Key << "ScriptComponent";
+			out << YAML::BeginMap;
+
+			auto& scriptComponent = entity.GetComponent<ScriptComponent>();
+			out << YAML::Key << "Module Name" << YAML::Value << scriptComponent.ModuleName;
+			out << YAML::EndMap;
+		}
 
 		out << YAML::EndMap;   // Entity
 	}
@@ -385,11 +420,20 @@ namespace Venus {
 				// TagComponent
 				std::string name;
 				auto tagComponent = entity["TagComponent"];
+				int tagIcon = 0;
 				if (tagComponent)
+				{
 					name = tagComponent["Name"].as<std::string>();
+						
+					auto tagIconComponent = tagComponent["Icon"];
+					if (tagIconComponent)
+						tagIcon = tagIconComponent.as<int>();
+				}
 
 				// Entity Creation
 				Entity deserializedEntity = m_Scene->CreateEntityWithUUID(uuid, name);
+
+				deserializedEntity.GetComponent<TagComponent>().Icon = (TagIcon)tagIcon;
 
 				// TransformComponent
 				auto transformComponent = entity["TransformComponent"];
@@ -399,6 +443,24 @@ namespace Venus {
 					transform.Position = transformComponent["Position"].as<glm::vec3>();
 					transform.Rotation = transformComponent["Rotation"].as<glm::vec3>();
 					transform.Scale = transformComponent["Scale"].as<glm::vec3>();
+				}
+
+				// RelationshipComponent
+				auto relationshipComponent = entity["RelationshipComponent"];
+				if (relationshipComponent)
+				{
+					auto& relationship = deserializedEntity.GetComponent<RelationshipComponent>();
+					relationship.Parent = relationshipComponent["Parent"].as<uint64_t>();
+
+					auto children = relationshipComponent["Children"];
+					if (children)
+					{
+						for (auto child : children)
+						{
+							uint64_t uuid = child["ID"].as<uint64_t>();
+							relationship.Children.push_back(uuid);
+						}
+					}
 				}
 
 				// CameraComponent
@@ -563,6 +625,15 @@ namespace Venus {
 						Ref<TextureCube> preethamSky = Renderer::CreatePreethamSky(sl.TurbidityAzimuthInclination);
 						sl.EnvironmentMap = SceneEnvironment::Create(preethamSky, preethamSky);
 					}
+				}
+				
+				// ScriptComponent
+				auto scriptComponent = entity["ScriptComponent"];
+				if (scriptComponent)
+				{
+					auto& component = deserializedEntity.AddComponent<ScriptComponent>();
+					std::string moduleName = scriptComponent["Module Name"].as<std::string>();
+					component.ModuleName = moduleName;
 				}
 			}
 		}
