@@ -7,7 +7,7 @@
 
 namespace Venus {
 
-	extern const std::filesystem::path g_AssetPath;
+	extern const std::filesystem::path g_AssetsPath;
 
 	ObjectsPanel::ObjectsPanel()
 	{
@@ -559,271 +559,96 @@ namespace Venus {
 		{
 			RenderComponent<MeshRendererComponent>(ICON_FA_CUBES  "  Mesh Renderer", entity, true, [](auto& component)
 			{
-				// Texture
 				ImGui::Columns(2);
 				ImGui::Text("Model");
 				ImGui::NextColumn();
 
-				// Model Open Dialog
-				if (ImGui::Button(component.ModelName.c_str(), ImVec2(100.0f, 0.0f)))
+				ImGui::PushStyleColor(ImGuiCol_ButtonActive, { 0.05f, 0.05f, 0.05f, 0.54f });
+				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, { 0.05f, 0.05f, 0.05f, 0.54f });
+
+				// Model Name
+				std::string name = AssetManager::GetPath(component.Model).stem().string();
+				name = name.empty() ? "Missing Asset" : name;
+				float width = ImGui::GetContentRegionAvail().x;
+				ImGui::Button(name.c_str(), { width , 20.0f });
+				UI::SetTooltip(std::to_string(component.Model));
+				// Model Drag and Drop
+				if (ImGui::BeginDragDropTarget())
 				{
-					std::string filePath = FileDialogs::OpenFile("3D Object (*.obj, *.fbx)\0*.obj;*.fbx\0");
-					if (!filePath.empty())
+					if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_MODEL"))
 					{
-						std::filesystem::path modelPath = filePath;
-						component.Model = Model::Create(modelPath.string());
-						component.ModelName = modelPath.stem().string();
-						component.ModelPath = modelPath.string();
+						const wchar_t* path = (const wchar_t*)payload->Data;
+						AssetHandle handle = AssetManager::GetHandle(path);
+						component.Model = handle;
 					}
 				}
 
+				ImGui::PopStyleColor(2);
+
 				ImGui::Columns(1);
-
-				ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 5.0f);
 				ImGui::Separator();
-				ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 5.0f);
-
-				for (const auto& [key, material] : component.Model->GetMaterials())
+				
+				// Draws Material if valid Model
+				if (AssetManager::IsAssetHandleValid(component.Model))
 				{
-					float nextCursorPos = ImGui::GetCursorPosX() + 20.0f;
-
-					ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 10.0f);
-
-					std::string label = ICON_FA_TINT " Material " + std::to_string(key);
-					if (ImGui::CollapsingHeader(label.c_str()))
+					auto& materialTable = component.MaterialTable;
+					for (uint32_t i = 0; i < materialTable->GetMaterialCount(); i++)
 					{
-						ImGui::SetCursorPosX(nextCursorPos);
-						ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 7.0f);
+						std::string label = fmt::format("Material {0}", i);
+						bool hasMaterial = materialTable->HasMaterial(i);
+						auto& defaultMaterialTable = AssetManager::GetAsset<Model>(component.Model)->GetMaterialTable();
+						std::string materialName = "Default Material";
 
-						// Albedo
-						uint32_t albedoRenderID = material->GetAlbedoMap()->GetRendererID();
-						auto& albedoColor = material->GetAlbedoColor();
-						auto& emission = material->GetEmission();
-						bool hasAlbedoMap = albedoRenderID != Renderer::GetDefaultTexture()->GetRendererID();
-						std::string albedoLabel = "Albedo##" + std::to_string(key);
-						if (ImGui::CollapsingHeader(albedoLabel.c_str()))
+						if (hasMaterial)
+							materialName = materialTable->GetMaterial(i)->GetName();
+						else if(defaultMaterialTable->HasMaterial(i))
+							materialName = defaultMaterialTable->GetMaterial(i)->GetName();
+
+						ImGui::Columns(2);
+						ImGui::Text(label.c_str());
+						ImGui::NextColumn();
+
+						float width = ImGui::GetContentRegionAvail().x;
+						ImGui::PushStyleColor(ImGuiCol_ButtonActive, { 0.05f, 0.05f, 0.05f, 0.54f });
+						ImGui::PushStyleColor(ImGuiCol_ButtonHovered, { 0.05f, 0.05f, 0.05f, 0.54f });
+						if (!hasMaterial)
+							ImGui::PushStyleColor(ImGuiCol_Text, { 1.0f, 1.0f, 1.0f, 0.5f });
+						else
+							width -= 25.0f;
+
+						ImGui::Button(materialName.c_str(), { width, 20.0f });
+						// Material Drag and Drop
+						if (ImGui::BeginDragDropTarget())
 						{
-							ImGui::SetCursorPosX(nextCursorPos + 5.0f);
-							ImGui::Image(reinterpret_cast<void*>(albedoRenderID), ImVec2(64, 64));
-
-							if (ImGui::BeginDragDropTarget())
+							if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_MATERIAL"))
 							{
-								if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_TEXTURE"))
-								{
-									const wchar_t* payloadPath = (const wchar_t*)payload->Data;
-									std::filesystem::path filePath = std::filesystem::path(g_AssetPath / std::filesystem::path(payloadPath));
-									TextureProperties props;
-									props.Format = TextureFormat::SRGB;
-									Ref<Texture2D> texture = Texture2D::Create(filePath.string(), props);
-									if (texture->IsLoaded())
-										material->SetAlbedoMap(texture);
-								}
+								const wchar_t* path = (const wchar_t*)payload->Data;
 
-								ImGui::EndDragDropTarget();
-							}
-
-							if (ImGui::IsItemHovered())
-							{
-								if (hasAlbedoMap)
-								{
-									ImGui::BeginTooltip();
-									ImGui::Image(reinterpret_cast<void*>(albedoRenderID), ImVec2(384, 384));
-									std::string path = material->GetAlbedoMap()->GetPath();
-									ImGui::Text(path.c_str());
-									ImGui::EndTooltip();
-								}
-							}
-
-							ImGui::SameLine();
-							std::string albedoColorLabel = "Color##Albedo" + std::to_string(key);
-							ImGui::ColorEdit3(albedoColorLabel.c_str(), glm::value_ptr(albedoColor), ImGuiColorEditFlags_NoInputs);
-
-							ImGui::SameLine();
-							ImGui::SetNextItemWidth(120.0f);
-							UI::ShiftPosX(10.0f);
-							std::string emissionLabel = "Emission##Albedo" + std::to_string(key);
-							ImGui::DragFloat(emissionLabel.c_str(), &emission, 0.1f, 0.0f, 50.0f);
-
-							if (hasAlbedoMap)
-							{
-								std::string buttonLabel = ICON_FA_WINDOW_CLOSE "##ResetAlbedo" + std::to_string(key);
-								ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 70.0f);
-								if (ImGui::Button(buttonLabel.c_str(), ImVec2(18, 18)))
-								{
-									material->ClearAlbedoMap();
-								}
+								Ref<MeshMaterial> material = AssetManager::GetAsset<MeshMaterial>(path);
+								materialTable->SetMaterial(i, material);
 							}
 						}
+						ImGui::PopStyleColor(2);
 
-						ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 20.0f);
-						ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 5.0f);
-
-						// Normal
-						uint32_t normalRenderID = material->GetNormalMap()->GetRendererID();
-						auto& useNormalMap = material->IsUsingNormalMap();
-						bool hasNormalMap = normalRenderID != Renderer::GetDefaultTexture()->GetRendererID();
-						std::string normalLabel = "Normal##" + std::to_string(key);
-						if (ImGui::CollapsingHeader(normalLabel.c_str()))
+						if (hasMaterial)
 						{
-							ImGui::SetCursorPosX(nextCursorPos + 5.0f);
-							ImGui::Image(reinterpret_cast<void*>(normalRenderID), ImVec2(64, 64));
-
-							if (ImGui::BeginDragDropTarget())
-							{
-								if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_TEXTURE"))
-								{
-									const wchar_t* payloadPath = (const wchar_t*)payload->Data;
-									std::filesystem::path filePath = std::filesystem::path(g_AssetPath / std::filesystem::path(payloadPath));
-									Ref<Texture2D> texture = Texture2D::Create(filePath.string());
-									if (texture->IsLoaded())
-										material->SetNormalMap(texture);
-								}
-
-								ImGui::EndDragDropTarget();
-							}
-
-							if (ImGui::IsItemHovered())
-							{
-								if (hasNormalMap)
-								{
-									ImGui::BeginTooltip();
-									ImGui::Image(reinterpret_cast<void*>(normalRenderID), ImVec2(384, 384));
-									std::string path = material->GetNormalMap()->GetPath();
-									ImGui::Text(path.c_str());
-									ImGui::EndTooltip();
-								}
-							}
-
 							ImGui::SameLine();
-							std::string useNormalMapLabel = "Use##UseNormalCheck" + std::to_string(key);
-							bool checkBox = useNormalMap;
-							if (ImGui::Checkbox(useNormalMapLabel.c_str(), &checkBox))
+							std::string removeButton = fmt::format(ICON_FA_WINDOW_CLOSE "##{0}", i);
+							if (ImGui::Button(removeButton.c_str(), ImVec2(18, 18)))
 							{
-								material->SetUseNormalMap(checkBox);
-							}
-
-							if (hasNormalMap)
-							{
-								std::string buttonLabel = ICON_FA_WINDOW_CLOSE "##ResetNormal" + std::to_string(key);
-								ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 70.0f);
-								if (ImGui::Button(buttonLabel.c_str(), ImVec2(18, 18)))
-								{
-									material->ClearNormalMap();
-								}
+								materialTable->ClearMaterial(i);
 							}
 						}
-
-						ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 20.0f);
-						ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 5.0f);
-
-						// Metalness
-						uint32_t metalnessRenderID = material->GetMetalnessMap()->GetRendererID();
-						float& metalnessValue = material->GetMetalness();
-						bool hasMetalnessMap = metalnessRenderID != Renderer::GetDefaultTexture()->GetRendererID();
-						std::string metalnessLabel = "Metalness##" + std::to_string(key);
-						if (ImGui::CollapsingHeader(metalnessLabel.c_str()))
-						{
-							ImGui::SetCursorPosX(nextCursorPos + 5.0f);
-							ImGui::Image(reinterpret_cast<void*>(metalnessRenderID), ImVec2(64, 64));
-
-							if (ImGui::BeginDragDropTarget())
-							{
-								if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_TEXTURE"))
-								{
-									const wchar_t* payloadPath = (const wchar_t*)payload->Data;
-									std::filesystem::path filePath = std::filesystem::path(g_AssetPath / std::filesystem::path(payloadPath));
-									Ref<Texture2D> texture = Texture2D::Create(filePath.string());
-									if (texture->IsLoaded())
-										material->SetMetalnessMap(texture);
-								}
-
-								ImGui::EndDragDropTarget();
-							}
-
-							if (ImGui::IsItemHovered())
-							{
-								if (hasMetalnessMap)
-								{
-									ImGui::BeginTooltip();
-									ImGui::Image(reinterpret_cast<void*>(metalnessRenderID), ImVec2(384, 384));
-									std::string path = material->GetMetalnessMap()->GetPath();
-									ImGui::Text(path.c_str());
-									ImGui::EndTooltip();
-								}
-							}
-
-							ImGui::SameLine();
-							std::string metalnessValueLabel = "##ValueMetalness" + std::to_string(key);
-							ImGui::SliderFloat(metalnessValueLabel.c_str(), &metalnessValue, 0.0f, 1.0f);
-
-							if (hasMetalnessMap)
-							{
-								std::string buttonLabel = ICON_FA_WINDOW_CLOSE "##ResetMetalness" + std::to_string(key);
-								ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 70.0f);
-								if (ImGui::Button(buttonLabel.c_str(), ImVec2(18, 18)))
-								{
-									material->ClearMetalnessMap();
-								}
-							}
-						}
-
-						ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 20.0f);
-						ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 5.0f);
-
-						// Roughness
-						uint32_t roughnessRenderID = material->GetRoughnessMap()->GetRendererID();
-						float& roughnessValue = material->GetRoughness();
-						bool hasRoughnessMap = roughnessRenderID != Renderer::GetDefaultTexture()->GetRendererID();
-						std::string roughnessLabel = "Roughness##" + std::to_string(key);
-						if (ImGui::CollapsingHeader(roughnessLabel.c_str()))
-						{
-							ImGui::SetCursorPosX(nextCursorPos + 5.0f);
-							ImGui::Image(reinterpret_cast<void*>(roughnessRenderID), ImVec2(64, 64));
-
-							if (ImGui::BeginDragDropTarget())
-							{
-								if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_TEXTURE"))
-								{
-									const wchar_t* payloadPath = (const wchar_t*)payload->Data;
-									std::filesystem::path filePath = std::filesystem::path(g_AssetPath / std::filesystem::path(payloadPath));
-									Ref<Texture2D> texture = Texture2D::Create(filePath.string());
-									if (texture->IsLoaded())
-										material->SetRoughnessMap(texture);
-								}
-
-								ImGui::EndDragDropTarget();
-							}
-
-							if (ImGui::IsItemHovered())
-							{
-								if (hasRoughnessMap)
-								{
-									ImGui::BeginTooltip();
-									ImGui::Image(reinterpret_cast<void*>(roughnessRenderID), ImVec2(384, 384));
-									std::string path = material->GetRoughnessMap()->GetPath();
-									ImGui::Text(path.c_str());
-									ImGui::EndTooltip();
-								}
-							}
-
-							ImGui::SameLine();
-							std::string roughnessValueLabel = "##ValueRoughness" + std::to_string(key);
-							ImGui::SliderFloat(roughnessValueLabel.c_str(), &roughnessValue, 0.0f, 1.0f);
-
-							if (hasRoughnessMap)
-							{
-								std::string buttonLabel = ICON_FA_WINDOW_CLOSE "##ResetRoughness" + std::to_string(key);
-								ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 70.0f);
-								if (ImGui::Button(buttonLabel.c_str(), ImVec2(18, 18)))
-								{
-									material->ClearRoughnessMap();
-								}
-							}
-						}
+						else
+							ImGui::PopStyleColor();
+						;
+						if (i + 1 < materialTable->GetMaterialCount())
+							ImGui::Separator();
+						ImGui::Columns(1);
 					}
 				}
 			});
-					}
+		}
 
 		// Sprite Renderer Component
 		if (entity.HasComponent<SpriteRendererComponent>() && componentsFilter.PassFilter("Sprite Renderer"))
@@ -835,37 +660,67 @@ namespace Venus {
 				ImGui::Text("Texture");
 				ImGui::NextColumn();
 
-				// Texture Open Dialog
-				if (ImGui::Button(component.TextureName.c_str(), ImVec2(100.0f, 0.0f)))
-				{
-					std::string filePath = FileDialogs::OpenFile("Images (*.png, *.jpg)\0*.png;*.jpg\0");
-					if (!filePath.empty())
-					{
-						std::filesystem::path texturePath = filePath;
-						component.Texture = Texture2D::Create(texturePath.string());
-						component.TextureName = texturePath.stem().string();
-						component.TexturePath = texturePath.string();
-					}
-				}
-
+				// Texture Display
+				Ref<Texture2D> texture = Renderer::GetDefaultTexture();
+				bool validTexture = AssetManager::IsAssetHandleValid(component.Texture);
+				texture = validTexture ? AssetManager::GetAsset<Texture2D>(component.Texture) : texture;
+				ImGui::Image(reinterpret_cast<void*>(texture->GetRendererID()), { 64, 64 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
 				// Texture Drag and Drop
 				if (ImGui::BeginDragDropTarget())
 				{
 					if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_TEXTURE"))
 					{
 						const wchar_t* path = (const wchar_t*)payload->Data;
-						std::filesystem::path texturePath = std::filesystem::path(g_AssetPath) / path;
 
-						component.Texture = Texture2D::Create(texturePath.string());
-						component.TextureName = texturePath.stem().string();
-						component.TexturePath = texturePath.string();
+						AssetHandle handle = AssetManager::GetHandle(path);
+						component.Texture = handle;
+					}
+				}
+				if (validTexture)
+				{
+					ImGui::SameLine();
+					if (ImGui::Button(ICON_FA_WINDOW_CLOSE, ImVec2(18, 18)))
+					{
+						component.Texture = 0;
 					}
 				}
 				ImGui::Columns(1);
 				ImGui::Separator();
 
-				UI::ColorEdit4("Color", component.Color, true);
-				UI::DragFloat("Tiling Factor", &component.TilingFactor, 0.1f, 1.0f, 100.0f);
+
+				// Texture Properties
+				if (validTexture)
+				{
+					UI::ColorEdit4("Tint Color", component.Color, true);
+					UI::DragFloat("Tiling Factor", &component.TilingFactor, 0.1f, 1.0f, 100.0f, true);
+
+					TextureProperties& props = component.TextureProperties;
+
+					const char* filterTypes[] = { "Point", "Bilinear" };
+					int currentFilter = (int)props.Filter;
+					if (UI::DropDown("Filter", filterTypes, 2, &currentFilter, true))
+					{
+						if ((TextureFilterMode)currentFilter != props.Filter)
+						{
+							props.Filter = (TextureFilterMode)currentFilter;
+						}
+					}
+
+					const char* wrapTypes[] = { "Repeat", "Mirror", "Clamp to Edge", "Clamp to Border"};
+					int currentWrap = (int)props.WrapMode;
+					if (UI::DropDown("Wrap", wrapTypes, 4, &currentWrap, true))
+					{
+						if ((TextureWrapMode)currentWrap != props.WrapMode)
+						{
+							props.WrapMode = (TextureWrapMode)currentWrap;
+						}
+					}
+
+					UI::Checkbox("Flip Vertically", &props.FlipVertically, true);
+					UI::Checkbox("Use Mipmaps", &props.UseMipmaps, false);
+				}
+				else
+					UI::ColorEdit4("Color", component.Color);
 			});
 		}
 
@@ -890,6 +745,7 @@ namespace Venus {
 				// Checkboxes
 				UI::Checkbox("Primary Camera", &component.Primary, true);
 				UI::Checkbox("Fixed Aspect Ratio", &component.FixedAspectRatio, true);
+				UI::ColorEdit4("Background Color", component.BackgroundColor, true);
 
 				// Projection Type ComboBox
 				const char* projectionType[] = { "Perspective", "Orthographic" };
@@ -927,8 +783,64 @@ namespace Venus {
 						camera.SetPerspectiveNearClip(perspectiveNear);
 
 					float perspectiveFar = camera.GetPerspectiveFarClip();
-					if (UI::DragFloat("Far Clip", &perspectiveFar, 0.1f, 0.1f, 1000.0f))
+					if (UI::DragFloat("Far Clip", &perspectiveFar, 0.1f, 0.1f, 1000.0f, true))
 						camera.SetPerspectiveFarClip(perspectiveFar);
+				}
+
+				// Post Effect Settings
+				UI::ShiftPos(-30.0f, 15.0f);
+				ImGuiTreeNodeFlags treeNodeFlags = ImGuiTreeNodeFlags_SpanAvailWidth;
+				if (ImGui::TreeNodeEx("Post-Effects", treeNodeFlags))
+				{
+					UI::ShiftPosY(8.0f);
+					UI::Checkbox("Use Renderer Settings", &component.UseRendererSettings, true);
+
+					ImGui::BeginDisabled(component.UseRendererSettings);
+					UI::Checkbox("Bloom", &component.Bloom, true);
+					if (component.Bloom)
+					{
+						UI::DragFloat("Bloom Intensity", &component.BloomIntensity, 0.1f, 0.0f, 100000.0f, true);
+
+						Ref<Texture2D> texture = Renderer::GetDefaultTexture();
+						bool validTexture = AssetManager::IsAssetHandleValid(component.BloomDirtMask);
+						texture = validTexture ? AssetManager::GetAsset<Texture2D>(component.BloomDirtMask) : texture;
+						ImGui::Columns(2);
+						ImGui::Text("Dirt Mask");
+						ImGui::SameLine();
+						ImGui::NextColumn();
+						ImGui::Image(reinterpret_cast<void*>(texture->GetRendererID()), { 64, 64 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
+						if (!component.UseRendererSettings && ImGui::BeginDragDropTarget())
+						{
+							if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_TEXTURE"))
+							{
+								const wchar_t* path = (const wchar_t*)payload->Data;
+
+								AssetHandle handle = AssetManager::GetHandle(path);
+								component.BloomDirtMask = handle;
+							}
+
+							ImGui::EndDragDropTarget();
+						}
+						if (validTexture)
+						{
+							ImGui::SameLine();
+							if (ImGui::Button(ICON_FA_WINDOW_CLOSE, ImVec2(18, 18)))
+							{
+								component.BloomDirtMask = 0;
+							}
+						}
+						ImGui::Columns(1);
+						ImGui::Separator();
+						UI::DragFloat("Dirt Mask Intensity", &component.BloomDirtMaskIntensity, 0.1f, 0.0f, 100000.0f, true);
+					}
+
+					UI::DragFloat("Exposure", &component.Exposure, 0.1f, 0.0f, 100000.0f, true);
+					UI::Checkbox("ACES Tone Mapping", &component.ACESTone, true);
+					UI::Checkbox("Gamma Correction", &component.GammaCorrection, true);
+					UI::Checkbox("Grayscale", &component.Grayscale, false);
+					ImGui::EndDisabled();
+
+					ImGui::TreePop();
 				}
 			});
 		}
@@ -957,13 +869,12 @@ namespace Venus {
 		{
 			RenderComponent<BoxCollider2DComponent>(ICON_FA_DROPBOX  " Box Collider 2D", entity, true, [](auto& component)
 			{
-				UI::DragFloat2("Offset", component.Offset, 0.1f, 0.1f, 100000.0f, true);
+				UI::DragFloat2("Offset", component.Offset, 0.01f, -100000.0f, 100000.0f, true);
 				UI::DragFloat2("Size", component.Size, 0.1f, 0.1f, 100000.0f, true);
 				UI::DragFloat("Density", &component.Density, 0.01f, 0.0f, 1.0f, true);
 				UI::DragFloat("Friction", &component.Friction, 0.01f, 0.0f, 1.0f, true);
 				UI::DragFloat("Restitution", &component.Restitution, 0.01f, 0.0f, 1.0f, true);
 				UI::DragFloat("Threshold", &component.RestitutionThreshold, 0.01f, 0.0f, 10.0f, true);
-				UI::Checkbox("Show Area", &component.ShowArea);
 			});
 		}
 		
@@ -978,7 +889,6 @@ namespace Venus {
 				UI::DragFloat("Friction", &component.Friction, 0.01f, 0.0f, 1.0f, true);
 				UI::DragFloat("Restitution", &component.Restitution, 0.01f, 0.0f, 1.0f, true);
 				UI::DragFloat("Threshold", &component.RestitutionThreshold, 0.01f, 0.0f, 10.0f, true);
-				UI::Checkbox("Show Area", &component.ShowArea);
 			});
 		}
 		
@@ -988,7 +898,7 @@ namespace Venus {
 			RenderComponent<PointLightComponent>(ICON_FA_LIGHTBULB_O  "  Point Light", entity, true, [](auto& component)
 			{
 				UI::ColorEdit3("Color", component.Color, true);
-				UI::DragFloat("Intensity", &component.Intensity, 0.1f, 1.0f, 100.0f, true);
+				UI::DragFloat("Intensity", &component.Intensity, 0.1f, 0.0f, 100.0f, true);
 				UI::DragFloat("Radius", &component.Radius, 0.1f, 0.1f, 100.0f, true);
 				UI::DragFloat("Falloff", &component.Falloff, 0.1f, 0.1f, 100.0f);
 			});
@@ -1015,34 +925,56 @@ namespace Venus {
 				ImGui::Text("Environment Map");
 				ImGui::NextColumn();
 
-				// EnvMap Open Dialog
-				if (ImGui::Button(component.EnvironmentMapName.c_str(), ImVec2(200.0f, 0.0f)))
-				{
-					std::string filePath = FileDialogs::OpenFile("HDR Environment Map(*.hdr)\0*.hdr\0");
-					if (!filePath.empty())
-					{
-						std::filesystem::path envPath = filePath;
-						component.EnvironmentMap = Renderer::CreateEnvironmentMap(envPath.string());
-						component.EnvironmentMapName = envPath.stem().string();
-						component.EnvironmentMapPath = envPath.string();
+				ImGui::PushStyleColor(ImGuiCol_ButtonActive, { 0.05f, 0.05f, 0.05f, 0.54f });
+				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, { 0.05f, 0.05f, 0.05f, 0.54f });
+				float width = ImGui::GetContentRegionAvail().x;
+				// EnvMap Name
+				bool hasEnvMap = true;
+				AssetMetadata envMapMetadata = AssetManager::GetMetadata(component.Environment);
+				if (!envMapMetadata.IsValid())
+					hasEnvMap = false;
+				else
+					width -= 25.0f;
 
-						component.DinamicSky = false;
+				std::string name = envMapMetadata.FilePath.stem().string();
+				name = name.empty() ? "None" : name;
+				ImGui::Button(name.c_str(), { width , 20.0f });
+				UI::SetTooltip(std::to_string(component.Environment));
+				// EnvMap Drag and Drop
+				if (ImGui::BeginDragDropTarget())
+				{
+					if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_ENVMAP"))
+					{
+						const wchar_t* path = (const wchar_t*)payload->Data;
+						AssetHandle handle = AssetManager::GetHandle(path);
+						component.Environment = handle;
 					}
 				}
+				if (hasEnvMap)
+				{
+					ImGui::SameLine();
+					if (ImGui::Button(ICON_FA_WINDOW_CLOSE, ImVec2(18, 18)))
+					{
+						component.Environment = 0;
+					}
+				}
+
+				ImGui::PopStyleColor(2);
 				ImGui::Columns(1);
 				ImGui::Separator();
 
-				if (component.EnvironmentMap)
+				if (AssetManager::IsAssetHandleValid(component.Environment))
 				{
 					// Intensity
 					UI::DragFloat("Intensity", &component.Intensity, 0.01f, 0.0f, 100.0f, true);
 
 					// Lod
-					float maxLodLevel = static_cast<float>(component.EnvironmentMap->GetRadianceMap()->GetMipLevelCount());
+					auto envMap = AssetManager::GetAsset<SceneEnvironment>(component.Environment);
+					float maxLodLevel = static_cast<float>(envMap->GetRadianceMap()->GetMipLevelCount());
 					UI::DragFloat("LOD", &component.Lod, 0.01f, 0.0f, maxLodLevel, true);
 				}
 
-				// Dinamic Sky
+				// Dinamic Sky 
 				bool changedDS = UI::Checkbox("Dinamic Sky", &component.DinamicSky, component.DinamicSky);
 				if (component.DinamicSky)
 				{
@@ -1052,28 +984,28 @@ namespace Venus {
 
 					if (changed)
 					{
-						Ref<TextureCube> preethamSky = Renderer::CreatePreethamSky(component.TurbidityAzimuthInclination);
-						component.EnvironmentMap = SceneEnvironment::Create(preethamSky, preethamSky);
-					}
-				}
-
-				if (changedDS)
-				{
-					if (component.DinamicSky)
-					{
-						Ref<TextureCube> preethamSky = Renderer::CreatePreethamSky(component.TurbidityAzimuthInclination);
-						component.EnvironmentMap = SceneEnvironment::Create(preethamSky, preethamSky);
-
-						if (!component.EnvironmentMapPath.empty())
+						if (AssetManager::IsMemoryAsset(component.Environment))
 						{
-							component.EnvironmentMapName = "None";
-							component.EnvironmentMapPath = std::string();
+							Ref<TextureCube> preethamSky = Renderer::CreatePreethamSky(component.TurbidityAzimuthInclination);
+							Ref<SceneEnvironment> envMap = AssetManager::GetAsset<SceneEnvironment>(component.Environment);
+							if (envMap)
+							{
+								envMap->SetRadianceMap(preethamSky);
+								envMap->SetIrradianceMap(preethamSky);
+							}
+						}
+						else
+						{
+							Ref<TextureCube> preethamSky = Renderer::CreatePreethamSky(component.TurbidityAzimuthInclination);
+							component.Environment = AssetManager::CreateMemoryOnlyAsset<SceneEnvironment>(preethamSky, preethamSky);
 						}
 					}
-					else
-						component.EnvironmentMap = nullptr;
 				}
 
+				if (changedDS && !component.DinamicSky && AssetManager::IsMemoryAsset(component.Environment))
+				{
+					component.Environment = 0;
+				}
 			});
 		}
 	
@@ -1177,11 +1109,12 @@ namespace Venus {
 					entity = m_Context->CreateEntity("Cube");
 
 				entity.GetComponent<TagComponent>().Icon = TagIcon::Model;
+				auto& meshComponent = entity.AddComponent<MeshRendererComponent>();
 
-				entity.AddComponent<MeshRendererComponent>(); // Default is cube
+				meshComponent.Model = AssetManager::GetMetadata("Models/Default/Cube.fbx").Handle;
+
 				m_SelectedEntity = entity;
 				m_Context->SetEditorSelectedEntity(entity);
-
 				entityCreated = true;
 			}
 
@@ -1194,11 +1127,9 @@ namespace Venus {
 					entity = m_Context->CreateEntity("Sphere");
 
 				entity.GetComponent<TagComponent>().Icon = TagIcon::Model;
+				auto& meshComponent = entity.AddComponent<MeshRendererComponent>();
 
-				auto& component = entity.AddComponent<MeshRendererComponent>();
-
-				component.Model = Model::Create("Resources/Models/Sphere.fbx");
-				component.ModelName = "Sphere";
+				meshComponent.Model = AssetManager::GetMetadata("Models/Default/Sphere.fbx").Handle;
 
 				m_SelectedEntity = entity;
 				m_Context->SetEditorSelectedEntity(entity);
@@ -1215,11 +1146,9 @@ namespace Venus {
 					entity = m_Context->CreateEntity("Plane");
 
 				entity.GetComponent<TagComponent>().Icon = TagIcon::Model;
+				auto& meshComponent = entity.AddComponent<MeshRendererComponent>();
 
-				auto& component = entity.AddComponent<MeshRendererComponent>();
-
-				component.Model = Model::Create("Resources/Models/Plane.fbx");
-				component.ModelName = "Plane";
+				meshComponent.Model = AssetManager::GetMetadata("Models/Default/Plane.fbx").Handle;
 
 				m_SelectedEntity = entity;
 				m_Context->SetEditorSelectedEntity(entity);
@@ -1236,11 +1165,9 @@ namespace Venus {
 					entity = m_Context->CreateEntity("Capsule");
 
 				entity.GetComponent<TagComponent>().Icon = TagIcon::Model;
+				auto& meshComponent = entity.AddComponent<MeshRendererComponent>();
 
-				auto& component = entity.AddComponent<MeshRendererComponent>();
-
-				component.Model = Model::Create("Resources/Models/Capsule.fbx");
-				component.ModelName = "Capsule";
+				meshComponent.Model = AssetManager::GetMetadata("Models/Default/Capsule.fbx").Handle;
 
 				m_SelectedEntity = entity;
 				m_Context->SetEditorSelectedEntity(entity);
@@ -1257,11 +1184,9 @@ namespace Venus {
 					entity = m_Context->CreateEntity("Torus");
 
 				entity.GetComponent<TagComponent>().Icon = TagIcon::Model;
+				auto& meshComponent = entity.AddComponent<MeshRendererComponent>();
 
-				auto& component = entity.AddComponent<MeshRendererComponent>();
-
-				component.Model = Model::Create("Resources/Models/Torus.fbx");
-				component.ModelName = "Torus";
+				meshComponent.Model = AssetManager::GetMetadata("Models/Default/Torus.fbx").Handle;
 
 				m_SelectedEntity = entity;
 				m_Context->SetEditorSelectedEntity(entity);
@@ -1278,11 +1203,9 @@ namespace Venus {
 					entity = m_Context->CreateEntity("Cone");
 
 				entity.GetComponent<TagComponent>().Icon = TagIcon::Model;
+				auto& meshComponent = entity.AddComponent<MeshRendererComponent>();
 
-				auto& component = entity.AddComponent<MeshRendererComponent>();
-
-				component.Model = Model::Create("Resources/Models/Cone.fbx");
-				component.ModelName = "Cone";
+				meshComponent.Model = AssetManager::GetMetadata("Models/Default/Cone.fbx").Handle;
 
 				m_SelectedEntity = entity;
 				m_Context->SetEditorSelectedEntity(entity);
@@ -1299,11 +1222,9 @@ namespace Venus {
 					entity = m_Context->CreateEntity("Cylinder");
 
 				entity.GetComponent<TagComponent>().Icon = TagIcon::Model;
+				auto& meshComponent = entity.AddComponent<MeshRendererComponent>();
 
-				auto& component = entity.AddComponent<MeshRendererComponent>();
-
-				component.Model = Model::Create("Resources/Models/Cylinder.fbx");
-				component.ModelName = "Cylinder";
+				meshComponent.Model = AssetManager::GetMetadata("Models/Default/Cylinder.fbx").Handle;
 
 				m_SelectedEntity = entity;
 				m_Context->SetEditorSelectedEntity(entity);

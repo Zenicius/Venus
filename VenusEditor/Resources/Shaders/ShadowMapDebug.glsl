@@ -35,7 +35,7 @@ void main()
 	float depthValue = texture(u_Texture, vec3(v_TexCoord, u_Settings.Layer)).r;
 
 	if(u_Settings.Layer == 0)
-		o_Color = vec4(depthValue, 0.0, 0.0, 1.0);
+		o_Color = vec4(depthValue, depthValue, depthValue, depthValue);
 	else if(u_Settings.Layer == 1)
 		o_Color = vec4(0.0, depthValue, 0.0, 1.0);
 	else if(u_Settings.Layer == 2)

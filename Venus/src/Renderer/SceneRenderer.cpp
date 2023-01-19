@@ -2,7 +2,9 @@
 #include "SceneRenderer.h"
 
 #include "Renderer.h"
+#include "Renderer2D.h"
 #include "Engine/Application.h"
+#include "Assets/AssetManager.h"
 
 #include "ImGui/UI.h"
 
@@ -184,6 +186,21 @@ namespace Venus {
 			m_BloomDebugMaterial = Material::Create(pipelineSpec.Shader);
 		}
 
+		// 2D
+		{
+			FramebufferSpecification fbSpec;
+			fbSpec.SwapChainTarget = false;
+			fbSpec.Attachments = { FramebufferTextureFormat::RGBA8, FramebufferTextureFormat::DEPTH24STENCIL8 };
+			fbSpec.Width = 1920;
+			fbSpec.Height = 1080;
+			fbSpec.ExistingColorTextures.push_back(m_CompositePipeline->GetFramebuffer()->GetColorAttachmentRendererID());
+			fbSpec.ExistingDepthTexture = m_GeometryPipeline->GetFramebuffer()->GetDepthAttachmentRendererID();
+
+			m_2DFramebuffer = Framebuffer::Create(fbSpec);
+
+			Renderer2D::SetRenderTarget(m_2DFramebuffer);
+		}
+
 		// Uniform Buffers
 		m_ShadowDataBuffer = UniformBuffer::Create(sizeof(ShadowData), 2);
 		m_SceneDataBuffer = UniformBuffer::Create(sizeof(SceneData), 3);
@@ -206,10 +223,11 @@ namespace Venus {
 			m_ViewportWidth = width;
 			m_ViewportHeight = height;
 			m_NeedsResize = true;
+
 		}
 	}
 
-	void SceneRenderer::BeginScene(SceneCamera& camera, const glm::mat4& transform)
+	void SceneRenderer::BeginScene(CameraComponent& cameraComponent, const glm::mat4& transform)
 	{
 		// Resizes if needed
 		if (m_NeedsResize)
@@ -220,6 +238,18 @@ namespace Venus {
 			m_CompositePipeline->GetFramebuffer()->Resize(m_ViewportWidth, m_ViewportHeight);
 			m_TempPipeline->GetFramebuffer()->Resize(m_ViewportWidth, m_ViewportHeight);
 			m_BloomDebugPipeline->GetFramebuffer()->Resize(m_ViewportWidth, m_ViewportHeight);
+
+			// Update Existing Textures Renderer2D framebuffer
+			{
+				uint32_t colorTexture = m_CompositePipeline->GetFramebuffer()->GetColorAttachmentRendererID();
+				uint32_t depthTexture = m_GeometryPipeline->GetFramebuffer()->GetDepthAttachmentRendererID();
+
+				m_2DFramebuffer->GetSpecification().ExistingColorTextures.clear();
+				m_2DFramebuffer->GetSpecification().ExistingColorTextures.push_back(colorTexture);
+				m_2DFramebuffer->GetSpecification().ExistingDepthTexture = depthTexture;
+
+				m_2DFramebuffer->Resize(m_ViewportWidth, m_ViewportHeight);
+			}
 
 			// Bloom Textures
 			{
@@ -243,7 +273,7 @@ namespace Venus {
 
 		// Clear buffers
 		Renderer::Clear(m_ShadowPipeline->GetFramebuffer());
-		Renderer::Clear(m_GeometryPipeline->GetFramebuffer());
+		Renderer::Clear(m_GeometryPipeline->GetFramebuffer(), cameraComponent.BackgroundColor);
 		m_GeometryPipeline->GetFramebuffer()->ClearAttachment(1, -1);
 		Renderer::Clear(m_SelectedGeometryPipeline->GetFramebuffer());
 		Renderer::Clear(m_FXAAPipeline->GetFramebuffer());
@@ -254,8 +284,11 @@ namespace Venus {
 		Renderer::ResetStats();
 
 		// Begin scene at Renderer
+		const SceneCamera& camera = cameraComponent.Camera;
 		Renderer::BeginScene(camera, transform);
 		glm::mat4 cameraViewMatrix = glm::inverse(transform);
+		m_IsRuntime = true;
+		m_RuntimeCamera = &cameraComponent;
 
 		// Set Uniform Buffers
 		const auto& dirLight = m_Scene->m_LightEnvironment.DirectionalLight;
@@ -311,6 +344,18 @@ namespace Venus {
 			m_TempPipeline->GetFramebuffer()->Resize(m_ViewportWidth, m_ViewportHeight);
 			m_BloomDebugPipeline->GetFramebuffer()->Resize(m_ViewportWidth, m_ViewportHeight);
 
+			// Update Existing Textures Renderer2D framebuffer
+			{
+				uint32_t colorTexture = m_CompositePipeline->GetFramebuffer()->GetColorAttachmentRendererID();
+				uint32_t depthTexture = m_GeometryPipeline->GetFramebuffer()->GetDepthAttachmentRendererID();
+
+				m_2DFramebuffer->GetSpecification().ExistingColorTextures.clear();
+				m_2DFramebuffer->GetSpecification().ExistingColorTextures.push_back(colorTexture);
+				m_2DFramebuffer->GetSpecification().ExistingDepthTexture = depthTexture;
+
+				m_2DFramebuffer->Resize(m_ViewportWidth, m_ViewportHeight);
+			}
+
 			// Bloom Textures
 			{
 				TextureProperties props;
@@ -333,18 +378,19 @@ namespace Venus {
 
 		// Clear buffers
 		Renderer::Clear(m_ShadowPipeline->GetFramebuffer());
-		Renderer::Clear(m_GeometryPipeline->GetFramebuffer());
+		Renderer::Clear(m_GeometryPipeline->GetFramebuffer(), m_EditorBackgroundColor);
 		m_GeometryPipeline->GetFramebuffer()->ClearAttachment(1, -1);
 		Renderer::Clear(m_SelectedGeometryPipeline->GetFramebuffer());
 		Renderer::Clear(m_FXAAPipeline->GetFramebuffer());
 		Renderer::Clear(m_CompositePipeline->GetFramebuffer());
 		Renderer::Clear(m_TempPipeline->GetFramebuffer());
 		Renderer::Clear(m_BloomDebugPipeline->GetFramebuffer());
-
+		
 		Renderer::ResetStats();
 
 		// Begin scene at Renderer
 		Renderer::BeginScene(camera);
+		m_IsRuntime = false;
 
 		// Set Uniform Buffers
 		const auto& dirLight = m_Scene->m_LightEnvironment.DirectionalLight;
@@ -398,10 +444,11 @@ namespace Venus {
 		m_Rendering = false;
 	}
 
-	void SceneRenderer::SubmitModel(Ref<Model> model, const glm::mat4& transform, int entityID)
+	void SceneRenderer::SubmitModel(const Ref<Model>& model, const Ref<MaterialTable>& materialTable, const glm::mat4& transform, int entityID)
 	{
 		DrawCmd drawCmd;
 		drawCmd.Model = model;
+		drawCmd.MaterialTable = materialTable;
 		drawCmd.Transform = transform;
 		drawCmd.ID = entityID;
 
@@ -409,16 +456,63 @@ namespace Venus {
 		m_ShadowDrawList.push_back(drawCmd);
 	}
 
-	void SceneRenderer::SubmitSelectedModel(Ref<Model> model, const glm::mat4& transform, int entityID)
+	void SceneRenderer::SubmitSelectedModel(const Ref<Model>& model, const Ref<MaterialTable>& materialTable, const glm::mat4& transform, int entityID)
 	{
 		DrawCmd drawCmd;
 		drawCmd.Model = model;
+		drawCmd.MaterialTable = materialTable;
 		drawCmd.Transform = transform;
 		drawCmd.ID = entityID;
 
 		m_DrawList.push_back(drawCmd);
 		m_ShadowDrawList.push_back(drawCmd);
 		//m_SelectedDrawList.push_back(drawCmd);
+	}
+
+	void SceneRenderer::SubmitQuad(const glm::mat4& transform, const Ref<Texture2D>& texture, float tilingFactor, const glm::vec4& tintColor, int entityID)
+	{
+		QuadDrawCmd drawCmd;
+		drawCmd.Transform = transform;
+		drawCmd.Texture = texture;
+		drawCmd.TilingFactor = tilingFactor;
+		drawCmd.TintColor = tintColor;
+		drawCmd.ID = entityID;
+
+		m_QuadDrawList.push_back(drawCmd);
+	}
+
+	void SceneRenderer::SubmitCircle(const glm::mat4& transform, const glm::vec4& color, float thickness, float fade, int entityID)
+	{
+		CircleDrawCmd drawCmd;
+		drawCmd.Transform = transform;
+		drawCmd.Color = color;
+		drawCmd.Thickness = thickness;
+		drawCmd.Fade = fade;
+		drawCmd.ID = entityID;
+
+		m_CircleDrawList.push_back(drawCmd);
+	}
+
+	void SceneRenderer::SubmitRect(const glm::mat4& transform, const glm::vec4 color, int entityID)
+	{
+		RectDrawCmd drawCmd;
+		drawCmd.Transform = transform;
+		drawCmd.Color = color;
+		drawCmd.ID = entityID;
+
+		m_RectDrawList.push_back(drawCmd);
+	}
+
+	void SceneRenderer::SubmitBillboard(const glm::vec3& position, const glm::vec2& size, const Ref<Texture2D>& texture, float tilingFactor, const glm::vec4& tintColor)
+	{
+		BillboardDrawCmd drawCmd;
+		drawCmd.Position = position;
+		drawCmd.Size = size;
+		drawCmd.Texture = texture;
+		drawCmd.TilingFactor = tilingFactor;
+		drawCmd.TintColor = tintColor;
+
+		m_BillboardDrawList.push_back(drawCmd);
 	}
 
 	void SceneRenderer::Flush()
@@ -428,10 +522,16 @@ namespace Venus {
 		FXAAPass();
 		BloomPass();
 		CompositePass();
+		Render2DPass();
 
 		m_DrawList.clear();
 		m_SelectedDrawList.clear();
 		m_ShadowDrawList.clear();
+
+		m_QuadDrawList.clear();
+		m_CircleDrawList.clear();
+		m_RectDrawList.clear();
+		m_BillboardDrawList.clear();
 	}
 
 	void SceneRenderer::ShadowMapPass()
@@ -475,13 +575,13 @@ namespace Venus {
 		{
 			for (auto& cmd : m_DrawList)
 			{
-				Renderer::RenderModelWithMaterial(m_GeometryPipeline, cmd.Model, cmd.Transform, cmd.ID);
+				Renderer::RenderModelWithMaterial(m_GeometryPipeline, cmd.Model, cmd.MaterialTable, cmd.Transform, cmd.ID);
 			}
 		}
 
 		// Grid
 		{
-			if (GetOptions().ShowGrid)
+			if (GetOptions().ShowGrid && !m_IsRuntime)
 			{
 				const glm::mat4 transform = glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f)) * glm::scale(glm::mat4(1.0f), glm::vec3(8.0f));
 				Renderer::RenderQuadWithMaterial(m_GridPipeline, transform, m_GridMaterial);
@@ -497,8 +597,12 @@ namespace Venus {
 		auto& geoFramebuffer = m_GeometryPipeline->GetFramebuffer();
 		uint32_t texture = geoFramebuffer->GetColorAttachmentRendererID();
 
-		m_FXAAMaterial->SetInt("u_ViewportSize.Width", m_ViewportWidth);
-		m_FXAAMaterial->SetInt("u_ViewportSize.Height", m_ViewportHeight);
+		m_FXAAMaterial->SetInt("u_Settings.ViewportWidth", m_ViewportWidth);
+		m_FXAAMaterial->SetInt("u_Settings.ViewportHeight", m_ViewportHeight);
+		m_FXAAMaterial->SetFloat("u_Settings.ThresholdMin", GetOptions().FXAAThresholdMin);
+		m_FXAAMaterial->SetFloat("u_Settings.ThresholdMax", GetOptions().FXAAThresholdMax);
+		m_FXAAMaterial->SetInt("u_Settings.Iterations", GetOptions().FXAAIterations);
+		m_FXAAMaterial->SetFloat("u_Settings.SubpixelQuality", GetOptions().FXAASubPixelQuality);
 		m_FXAAMaterial->SetTexture("u_Texture", 0, texture);
 
 		Renderer::RenderFullscreenQuad(m_FXAAPipeline, m_FXAAMaterial);
@@ -506,7 +610,9 @@ namespace Venus {
 
 	void SceneRenderer::BloomPass()
 	{
-		if (!GetOptions().Bloom)
+		if (m_IsRuntime && !m_RuntimeCamera->UseRendererSettings && !m_RuntimeCamera->Bloom)
+			return;
+		else if (!GetOptions().Bloom)
 			return;
 
 		uint32_t workGroupSize = 4;
@@ -626,32 +732,79 @@ namespace Venus {
 
 	void SceneRenderer::CompositePass()
 	{
-		uint32_t texture, bloomDirtMask;
+		uint32_t texture;
 		if (GetOptions().FXAA)
 			texture = m_FXAAPipeline->GetFramebuffer()->GetColorAttachmentRendererID();
 		else
 			texture = m_GeometryPipeline->GetFramebuffer()->GetColorAttachmentRendererID();
 
-		if (GetOptions().BloomDirtMask)
-			bloomDirtMask = GetOptions().BloomDirtMask->GetRendererID();
-		else
-			bloomDirtMask = Renderer::GetDefaultBlackTexture()->GetRendererID();
+		Ref<Texture2D> bloomDirtMask = Renderer::GetDefaultTexture();
+		bool isDirtMaskValid = AssetManager::IsAssetHandleValid(GetOptions().BloomDirtMask);
+		bloomDirtMask = isDirtMaskValid ? AssetManager::GetAsset<Texture2D>(GetOptions().BloomDirtMask) : bloomDirtMask;
 
 		//---
+		float exposure = GetOptions().Exposure;
+		bool useACESTone = GetOptions().ACESTone;
+		bool gamaCorrection = GetOptions().GammaCorrection;
+		bool bloom = GetOptions().Bloom;
+		float bloomIntensity = GetOptions().BloomIntensity;
+		float bloomDirtMaskIntensity = GetOptions().BloomDirtMaskIntensity;
+		bool grayscale = GetOptions().Grayscale;
+		if (m_IsRuntime && !m_RuntimeCamera->UseRendererSettings)
+		{
+			exposure = m_RuntimeCamera->Exposure;
+			useACESTone = m_RuntimeCamera->ACESTone;
+			gamaCorrection = m_RuntimeCamera->GammaCorrection;
+			bloom = m_RuntimeCamera->Bloom;
+			bloomIntensity = m_RuntimeCamera->BloomIntensity;
+			bloomDirtMaskIntensity = m_RuntimeCamera->BloomDirtMaskIntensity;
+			grayscale = m_RuntimeCamera->Grayscale;
+
+			bloomDirtMask = Renderer::GetDefaultTexture();
+			isDirtMaskValid = AssetManager::IsAssetHandleValid(m_RuntimeCamera->BloomDirtMask);
+			bloomDirtMask = isDirtMaskValid ? AssetManager::GetAsset<Texture2D>(m_RuntimeCamera->BloomDirtMask) : bloomDirtMask;
+		}
+
 		m_CompositeMaterial->SetTexture("u_Texture", 0, texture);
 
-		m_CompositeMaterial->SetFloat("u_Settings.Exposure", m_Options.Exposure);
-		m_CompositeMaterial->SetInt("u_Settings.Grayscale", m_Options.Grayscale);
-		m_CompositeMaterial->SetInt("u_Settings.ACESTone", m_Options.ACESTone);
-		m_CompositeMaterial->SetInt("u_Settings.GammaCorrection", m_Options.GammaCorrection);
+		m_CompositeMaterial->SetFloat("u_Settings.Exposure", exposure);
+		m_CompositeMaterial->SetInt("u_Settings.Grayscale", grayscale);
+		m_CompositeMaterial->SetInt("u_Settings.ACESTone", useACESTone);
+		m_CompositeMaterial->SetInt("u_Settings.GammaCorrection", gamaCorrection);
 
-		m_CompositeMaterial->SetInt("u_Settings.Bloom", m_Options.Bloom);
+		m_CompositeMaterial->SetInt("u_Settings.Bloom", bloom);
 		m_CompositeMaterial->SetTexture("u_BloomTexture", 1, m_BloomTextures[2]->GetRendererID());
-		m_CompositeMaterial->SetTexture("u_BloomDirtMaskTexture", 2, bloomDirtMask);
-		m_CompositeMaterial->SetFloat("u_Settings.BloomIntensity", m_Options.BloomIntensity);
-		m_CompositeMaterial->SetFloat("u_Settings.BloomDirkMaskIntensity", m_Options.BloomDirtMaskIntensity);
+		m_CompositeMaterial->SetTexture("u_BloomDirtMaskTexture", 2, bloomDirtMask->GetRendererID());
+		m_CompositeMaterial->SetFloat("u_Settings.BloomIntensity", bloomIntensity);
+		m_CompositeMaterial->SetFloat("u_Settings.BloomDirkMaskIntensity", bloomDirtMaskIntensity);
 
 		Renderer::RenderFullscreenQuad(m_CompositePipeline, m_CompositeMaterial);
+	}
+
+	void SceneRenderer::Render2DPass()
+	{
+		for (auto& cmd : m_QuadDrawList)
+		{
+			if (cmd.Texture)
+				Renderer2D::DrawQuad(cmd.Transform, cmd.Texture, cmd.TilingFactor, cmd.TintColor, cmd.ID);
+			else
+				Renderer2D::DrawQuad(cmd.Transform, cmd.TintColor, cmd.ID);
+		}
+
+		for (auto& cmd : m_CircleDrawList)
+		{
+			Renderer2D::DrawCircle(cmd.Transform, cmd.Color, cmd.Thickness, cmd.Fade, cmd.ID);
+		}
+
+		for (auto& cmd : m_RectDrawList)
+		{
+			Renderer2D::DrawRect(cmd.Transform, cmd.Color, cmd.ID);
+		}
+
+		for (auto& cmd : m_BillboardDrawList)
+		{
+			Renderer2D::DrawQuadBillboard(cmd.Position, cmd.Size, cmd.Texture, cmd.TilingFactor, cmd.TintColor);
+		}
 	}
 
 	void SceneRenderer::OnImGuiRender(bool& show)
@@ -662,7 +815,10 @@ namespace Venus {
 		SceneRendererOptions& options = GetOptions();
 		auto& window = Application::Get().GetWindow();
 
-		ImGui::Begin(ICON_FA_COGS " Scene Properties", &show);
+		ImGuiIO& io = ImGui::GetIO();
+		auto boldFont = io.Fonts->Fonts[0];
+
+		ImGui::Begin(ICON_FA_SLIDERS " Renderer Properties", &show);
 
 		if (ImGui::CollapsingHeader("Geral"))
 		{
@@ -670,7 +826,16 @@ namespace Venus {
 			if(UI::Checkbox("Vsync", &vsync, true))
 				window.SetVSync(vsync);
 
-			UI::Checkbox("Show Grid", &options.ShowGrid);
+			UI::Checkbox("Show Grid", &options.ShowGrid, true);
+			UI::ColorEdit4("Editor Background Color", m_EditorBackgroundColor);
+		}
+
+		if (ImGui::CollapsingHeader("Color and Lightning"))
+		{
+			UI::DragFloat("Exposure", &options.Exposure, 0.01f, 0.1f, 100.0f, true);
+			UI::Checkbox("Grayscale", &options.Grayscale, true);
+			UI::Checkbox("ACES Tone Mapping", &options.ACESTone, true);
+			UI::Checkbox("Gamma Correction", &options.GammaCorrection);
 		}
 
 		if (ImGui::CollapsingHeader("Shadows"))
@@ -718,32 +883,32 @@ namespace Venus {
 			UI::DragFloat("Threshold", &options.BloomThreshold, 0.1f, 0.0f, 100.0f, true);
 			UI::DragFloat("Knee", &options.BloomKnee, 0.1f, 0.0f, 100.0f, true);
 
-			uint32_t dirtMask = options.BloomDirtMask ? options.BloomDirtMask->GetRendererID() : 
-														Renderer::GetDefaultBlackTexture()->GetRendererID();
+			Ref<Texture2D> dirtMask = Renderer::GetDefaultTexture();
+			bool isMaskValid = AssetManager::IsAssetHandleValid(options.BloomDirtMask);
+			dirtMask = isMaskValid ? AssetManager::GetAsset<Texture2D>(options.BloomDirtMask) : dirtMask;
 			ImGui::Columns(2);
 			ImGui::Text("Dirt Mask");
 			ImGui::SameLine();
 			ImGui::NextColumn();
-			ImGui::Image(reinterpret_cast<void*>(dirtMask), { 64, 64 });
+			ImGui::Image(reinterpret_cast<void*>(dirtMask->GetRendererID()), { 64, 64 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
 			if (ImGui::BeginDragDropTarget())
 			{
 				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_TEXTURE"))
 				{
-					const wchar_t* payloadPath = (const wchar_t*)payload->Data;
-					std::filesystem::path filePath = std::filesystem::path("assets" / std::filesystem::path(payloadPath));
-					Ref<Texture2D> texture = Texture2D::Create(filePath.string());
-					if (texture->IsLoaded())
-						options.BloomDirtMask = texture;
+					const wchar_t* path = (const wchar_t*)payload->Data;
+
+					AssetHandle handle = AssetManager::GetHandle(path);
+					options.BloomDirtMask = handle;
 				}
 
 				ImGui::EndDragDropTarget();
 			}
-			if (options.BloomDirtMask)
+			if (isMaskValid)
 			{
 				ImGui::SameLine();
 				if (ImGui::Button(ICON_FA_WINDOW_CLOSE, ImVec2(18, 18)))
 				{
-					options.BloomDirtMask = nullptr;
+					options.BloomDirtMask = 0;
 				}
 			}
 			ImGui::Columns(1);
@@ -757,7 +922,7 @@ namespace Venus {
 				options.BloomIntensity = 1.0f;
 				options.BloomThreshold = 1.0f;
 				options.BloomKnee = 0.1f;
-				options.BloomDirtMask = nullptr;
+				options.BloomDirtMask = 0;
 				options.BloomDirtMaskIntensity = 1.0f;
 			}
 
@@ -771,18 +936,26 @@ namespace Venus {
 				UI::SliderInt("Bloom Mipmap Level", &options.BloomDebugMip, 0, maxMipLevel - 1);
 				UI::ShiftPosY(5.0f);
 				ImGui::Image(reinterpret_cast<void*>(bloomDebugTex), ImVec2{ 256, 256 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
-				
+				Renderer::SetDebugTexture(bloomDebugTex);
 				ImGui::TreePop();
 			}
 		}
 
-		if (ImGui::CollapsingHeader("Post-Processing"))
+		if (ImGui::CollapsingHeader("Anti-Aliasing"))
 		{
-			UI::DragFloat("Exposure", &options.Exposure, 0.01f, 0.1f, 100.0f, true);
 			UI::Checkbox("FXAA", &options.FXAA, true);
-			UI::Checkbox("Grayscale", &options.Grayscale, true);
-			UI::Checkbox("ACES Tone Mapping", &options.ACESTone, true);
-			UI::Checkbox("Gamma Correction", &options.GammaCorrection);
+
+			UI::ShiftPos(20.0f, 10.0f);
+			ImGuiTreeNodeFlags treeNodeFlags = ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_FramePadding;
+			if (ImGui::TreeNodeEx("Advanced", treeNodeFlags))
+			{
+				UI::DragFloat("Threshold Min", &options.FXAAThresholdMin, 1.0f, 1.0f, 256.0f, false);
+				UI::DragFloat("Threshold Max", &options.FXAAThresholdMax, 1.0f, 1.0f, 256.0f, false);
+				UI::SliderInt("Iterations", &options.FXAAIterations, 1, 48, false);
+				UI::DragFloat("Sub-pixel Quality", &options.FXAASubPixelQuality, 0.1f, 0.1f, 10.0f, false);
+
+				ImGui::TreePop();
+			}
 		}
 
 		ImGui::End();

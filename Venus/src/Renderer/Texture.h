@@ -3,6 +3,7 @@
 #include <string>
 
 #include "Engine/Base.h"
+#include "Assets/Asset.h"
 
 namespace Venus {
 
@@ -43,9 +44,23 @@ namespace Venus {
 		bool FlipVertically = true;
 		bool GenerateMipmaps = true;
 		bool UseMipmaps = false;
+
+		bool operator==(const TextureProperties& other)
+		{
+			bool isEqual = Filter == other.Filter && WrapMode == other.WrapMode && Format == other.Format
+							&& FlipVertically == other.FlipVertically && GenerateMipmaps == other.GenerateMipmaps 
+							&& UseMipmaps == other.UseMipmaps;
+
+			return isEqual;
+		}
+
+		bool operator!=(const TextureProperties& other)
+		{
+			return !operator==(other);
+		}
 	};
 
-	class Texture
+	class Texture : public Asset
 	{
 		public:
 			virtual ~Texture() = default;
@@ -56,13 +71,15 @@ namespace Venus {
 
 			virtual std::string GetPath() const = 0;
 
+			virtual void Reload() = 0;
 			virtual void SetData(void* data, uint32_t size, uint32_t mipLevel = 0) = 0;
 			virtual void GenerateMips() = 0;
 
 			virtual void Bind(uint32_t slot = 0) const = 0;
 
 			virtual bool IsLoaded() const = 0;
-			virtual TextureProperties GetProperties() const = 0;
+			virtual TextureProperties GetProperties() = 0;
+			virtual void SetProperties(TextureProperties props, bool reload) = 0;
 			virtual TextureType GetType() const = 0;
 			virtual uint32_t GetMipLevelCount() const = 0;
 			virtual std::pair<uint32_t, uint32_t> GetMipSize(uint32_t mip) const = 0;

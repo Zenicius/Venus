@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Engine/Base.h"
+#include "Renderer/Texture.h"
 
 namespace Venus {
 
@@ -23,7 +24,7 @@ namespace Venus {
 
 
 		// Defaults
-		Depth = DEPTH24STENCIL8
+		DEPTH = DEPTH24STENCIL8
 	};
 
 	struct FramebufferTextureSpecification
@@ -33,7 +34,6 @@ namespace Venus {
 			: TextureFormat(format) {}
 
 		FramebufferTextureFormat TextureFormat = FramebufferTextureFormat::None;
-		// TODO: filtering/wrap
 	};
 
 	struct FramebufferAttachmentSpecification
@@ -49,8 +49,17 @@ namespace Venus {
 	{
 		uint32_t Width = 0, Height = 0;
 		FramebufferAttachmentSpecification Attachments;
+
+		TextureFilterMode ColorTextureFilter = TextureFilterMode::Bilinear;
+		TextureWrapMode ColorWrapMode = TextureWrapMode::ClampToEdge; 
+		TextureFilterMode DepthTextureFilter = TextureFilterMode::Bilinear;
+		TextureWrapMode DepthWrapMode = TextureWrapMode::ClampToEdge;
+		
 		uint32_t Samples = 1;
 		uint32_t Layers = 1;
+
+		std::vector<uint32_t> ExistingColorTextures;
+		uint32_t ExistingDepthTexture = 0;
 
 		bool SwapChainTarget = false;
 	};
@@ -73,7 +82,7 @@ namespace Venus {
 			virtual uint32_t GetColorAttachmentRendererID(uint32_t index = 0) const = 0;
 			virtual uint32_t GetDepthAttachmentRendererID() const = 0;
 
-			virtual const FramebufferSpecification& GetSpecification() const = 0;
+			virtual FramebufferSpecification& GetSpecification() = 0;
 			virtual const uint32_t GetRendererID() const = 0;
 
 			static Ref<Framebuffer> Create(const FramebufferSpecification& spec);

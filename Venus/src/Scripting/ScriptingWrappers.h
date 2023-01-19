@@ -44,6 +44,7 @@ namespace Venus::ScriptingWrapper {
 	MonoString* GetEntityName(uint64_t entityID);
 	void SetEntityName(uint64_t entityID, MonoString* name);
 
+	// Transform
 	void GetTransform(uint64_t entityID, TransformComponent* transform);
 	void SetTransform(uint64_t entityID, TransformComponent* transform);
 	void GetWorldTransform(uint64_t entityID, TransformComponent* transform);
@@ -55,13 +56,21 @@ namespace Venus::ScriptingWrapper {
 	void GetScale(uint64_t entityID, glm::vec3* scale);
 	void SetScale(uint64_t entityID, glm::vec3* scale);
 
+	// Camera
 	bool GetIsPrimary(uint64_t entityID);
 	void SetIsPrimary(uint64_t entityID, bool value);
 
+	// PointLight
 	void GetColor(uint64_t entityID, glm::vec3* color);
 	void SetColor(uint64_t entityID, glm::vec3* color);
 	float GetIntensity(uint64_t entityID);
 	void SetIntensity(uint64_t entityID, float intensity);
 
+	// RigidBody2D
+	void GetRb2DPosition(uint64_t entityID, glm::vec2* position);
+	void SetRb2DPosition(uint64_t entityID, glm::vec2* position);
+	void GetRb2DVelocity(uint64_t entityID, glm::vec2* velocity);
+	void SetRb2DVelocity(uint64_t entityID, glm::vec2* velocity);
+	void ApplyLinearImpulse(uint64_t entityID, glm::vec2* impulse, bool wake);
 }
 

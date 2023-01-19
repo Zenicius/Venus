@@ -40,7 +40,7 @@ namespace Venus {
 		MonoMethod* CreateMethod = nullptr;
 		MonoMethod* UpdateMethod = nullptr;
 	};
-	static std::unordered_map<UUID, EntityScriptingData> s_EntityDataMap;
+	static std::unordered_map<UUID, Ref<EntityScriptingData>> s_EntityDataMap;
 
 	// Component Functions
 	static std::unordered_map<MonoType*, std::function<void(Entity&)>> s_CreateComponentFunctions;
@@ -110,7 +110,7 @@ namespace Venus {
 	{
 		MonoObject* exception = nullptr;
 		MonoObject* result = mono_runtime_invoke(method, object, params, &exception);
-		
+
 		if (exception)
 		{
 			void* args[1];
@@ -283,26 +283,32 @@ namespace Venus {
 		namespaceName = moduleName.substr(0, moduleName.find_last_of('.'));
 		className = moduleName.substr(moduleName.find_last_of('.') + 1);
 
-		EntityScriptingData data;
-		data.Class = mono_class_from_name(s_ClientImage, namespaceName.c_str(), className.c_str());
-		data.Instance = mono_object_new(s_MonoDomain, data.Class);
+		Ref<EntityScriptingData> data = CreateRef<EntityScriptingData>();
+		data->Class = mono_class_from_name(s_ClientImage, namespaceName.c_str(), className.c_str());
+		data->Instance = mono_object_new(s_MonoDomain, data->Class);
 
 		std::string constructorDesc = "Venus.Entity:.ctor(ulong)";
 		std::string createDesc = moduleName + ":Start()";
 		std::string updateDesc = moduleName + ":Update(single)";
-		data.ConstructorMethod = GetMethod(constructorDesc, s_VenusImage);
+		data->ConstructorMethod = GetMethod(constructorDesc, s_VenusImage);
 		// Instantiate and construct
 		{
-			mono_runtime_object_init(data.Instance);
+			mono_runtime_object_init(data->Instance);
 			
 			void* args[1];
 			args[0] = &entity.GetUUID();
 
-			InvokeMethod(data.Instance, data.ConstructorMethod, args);
+			InvokeMethod(data->Instance, data->ConstructorMethod, args);
 		}
 
-		data.CreateMethod = GetMethod(createDesc, s_ClientImage);
-		data.UpdateMethod = GetMethod(updateDesc, s_ClientImage);
+		data->CreateMethod = GetMethod(createDesc, s_ClientImage);
+		data->UpdateMethod = GetMethod(updateDesc, s_ClientImage);
+
+		if (!data->CreateMethod)
+			LOG_WARN("Could not find Start Method in: {0}", className);
+
+		if(!data->UpdateMethod)
+			LOG_WARN("Could not find Update Method in: {0}", className);
 
 		auto id = entity.GetUUID();
 		
@@ -317,25 +323,27 @@ namespace Venus {
 	void ScriptingEngine::OnCreate(Entity entity)
 	{
 		auto id = entity.GetUUID();
-		auto& data = s_EntityDataMap.at(id);
 
-		if (data.CreateMethod)
+		auto& data = s_EntityDataMap[id];
+
+		if (data->CreateMethod)
 		{
-			MonoObject* result = InvokeMethod(data.Instance, data.CreateMethod);
+			MonoObject* result = InvokeMethod(data->Instance, data->CreateMethod);
 		}
 	}
 
 	void ScriptingEngine::OnUpdate(float Timestep, Entity entity)
 	{
 		auto id = entity.GetUUID();
-		auto& data = s_EntityDataMap.at(id);
 
-		if (data.UpdateMethod)
+		auto& data = s_EntityDataMap[id];
+
+		if (data->UpdateMethod)
 		{
 			void* args[1];
 			args[0] = &Timestep;
 
-			MonoObject* result = InvokeMethod(data.Instance, data.UpdateMethod, args);
+			MonoObject* result = InvokeMethod(data->Instance, data->UpdateMethod, args);
 		}
 	}
 
@@ -357,6 +365,10 @@ namespace Venus {
 		type = mono_reflection_type_from_name("Venus.PointLightComponent", s_VenusImage);
 		s_CreateComponentFunctions[type] = [](Entity& entity) { return entity.AddComponent<PointLightComponent>(); };
 		s_HasComponentFunctions[type] = [](Entity& entity) { return entity.HasComponent<PointLightComponent>(); };
+
+		type = mono_reflection_type_from_name("Venus.RigidBody2DComponent", s_VenusImage);
+		s_CreateComponentFunctions[type] = [](Entity& entity) { return entity.AddComponent<Rigidbody2DComponent>(); };
+		s_HasComponentFunctions[type] = [](Entity& entity) { return entity.HasComponent<Rigidbody2DComponent>(); };
 
 		//--------------------------------------------------------------------------------------------------------
 
@@ -406,6 +418,12 @@ namespace Venus {
 		mono_add_internal_call("Venus.PointLightComponent::GetIntensity_VenusEngine", ScriptingWrapper::GetIntensity);
 		mono_add_internal_call("Venus.PointLightComponent::SetIntensity_VenusEngine", ScriptingWrapper::SetIntensity);
 
+		// RigidBody2D
+		mono_add_internal_call("Venus.RigidBody2DComponent::ApplyLinearImpulse_VenusEngine", ScriptingWrapper::ApplyLinearImpulse);
+		mono_add_internal_call("Venus.RigidBody2DComponent::GetRb2DPosition_VenusEngine", ScriptingWrapper::GetRb2DPosition);
+		mono_add_internal_call("Venus.RigidBody2DComponent::SetRb2DPosition_VenusEngine", ScriptingWrapper::SetRb2DPosition);
+		mono_add_internal_call("Venus.RigidBody2DComponent::GetRb2DVelocity_VenusEngine", ScriptingWrapper::GetRb2DVelocity);
+		mono_add_internal_call("Venus.RigidBody2DComponent::SetRb2DVelocity_VenusEngine", ScriptingWrapper::SetRb2DVelocity);
 
 		/////////////////////////////////////////////////////////////////////////////
 		// Log //////////////////////////////////////////////////////////////////////

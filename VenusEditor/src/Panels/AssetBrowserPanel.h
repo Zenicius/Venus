@@ -7,40 +7,53 @@
 
 namespace Venus {
 
-	enum class AssetType
-	{
-		Texture,
-		Font,
-		Scene,
-		Model,
-		Script,
-		Other
-	};
-
 	class AssetBrowserPanel
 	{
 		public:
 			AssetBrowserPanel();
 			
-			AssetType GetFileType(std::filesystem::path file);
 			void SetContext(const Ref<Scene>& context);
-			std::filesystem::path GetSelectedAsset() { return m_SelectedAsset; }
-			void SetSelectedAsset(std::filesystem::path asset);
+			void OnImGuiRender(bool& show);
 
+			const std::filesystem::path& GetSelectedAsset() { return m_SelectedAsset; }
+			void SetSelectedAsset(const std::filesystem::path& asset);
+
+			void SetAssetOpenCallback(const std::function<void(AssetType, const std::filesystem::path&)>& func)
+			{
+				m_AssetOpenCallback = func;
+			}
+
+		private:
 			// Assets Browser
-			void OnAssetTreeRender(std::filesystem::path path);
+			void OnAssetTreeRender(const std::filesystem::path& path);
 			void OnAssetRender(std::filesystem::directory_entry asset, float size);
 			void OnAssetsExplorerRender();
 
-			void OnImGuiRender(bool& show);
+			// Utils
+			template<typename T, typename... Args>
+			Ref<T> CreateAsset(const std::string& name, Args&&... args)
+			{
+				Ref<T> asset = AssetManager::CreateNewAsset<T>(name, m_CurrentPath.string(), std::forward<Args>(args)...);
+				if (!asset)
+					return nullptr;
+				
+				std::filesystem::path createdPath = AssetManager::GetMetadata(asset->Handle).FilePath;
+				m_RenamingAsset = g_AssetsPath / createdPath;
 
-		private:
-			bool CheckDirectoryHasFolders(std::filesystem::path path);
-			bool CheckDirectoryHasFileNamed(std::filesystem::path path, std::string name);
+				return asset;
+			}
 
-			void MoveFileFromPayload(const ImGuiPayload* payload, std::filesystem::path path);
+			bool CheckDirectoryHasFolders(const std::filesystem::path& path);
+			bool CheckDirectoryHasFileNamed(const std::filesystem::path& path, const std::string& name);
+			std::string GetAssetTypeDragDropString(AssetType type);
+			Ref<Texture2D> GetAssetIcon(AssetType type, const std::filesystem::path& path);
 
-			bool ExistsInAssetMap(std::filesystem::path path) { return m_AssetsMap.find(path.string()) != m_AssetsMap.end(); }
+			const ImGuiPayload* AssetDragDropTarget() const;
+			void AssetDragDropSource(const std::filesystem::path& relativePath, AssetType type);
+			void MoveFileFromPayload(const ImGuiPayload* payload, const std::filesystem::path& dest);
+
+			bool ExistsInAssetMap(const std::filesystem::path& path) { return m_AssetsMap.find(path.string()) != m_AssetsMap.end(); }
+			Ref<Texture2D> GetTexturePreview(const std::filesystem::path& path);
 
 		private:
 			std::filesystem::path m_CurrentPath;
@@ -54,19 +67,17 @@ namespace Venus {
 			bool m_RootTreeOpen = true;
 
 			Ref<Scene> m_Context;
+			std::function<void(AssetType, const std::filesystem::path&)> m_AssetOpenCallback;
 
-			Ref<Texture2D> m_ReturnIcon;
-			Ref<Texture2D> m_FowardIcon;
-			Ref<Texture2D> m_SearchIcon;
-			Ref<Texture2D> m_SettingsIcon;
 			Ref<Texture2D> m_FolderIcon;
-
 			Ref<Texture2D> m_FileIcon;
 			Ref<Texture2D> m_TextureIcon;
 			Ref<Texture2D> m_SceneIcon;
 			Ref<Texture2D> m_FontIcon;
 		    Ref<Texture2D> m_ModelIcon;
 		    Ref<Texture2D> m_ScriptIcon;
+			Ref<Texture2D> m_EnvMapIcon;
+			Ref<Texture2D> m_MaterialIcon;
 	};
 
 }

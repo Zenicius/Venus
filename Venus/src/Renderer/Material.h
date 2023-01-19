@@ -53,6 +53,8 @@ namespace Venus {
 			void SetTextureArray(const std::string& name, int binding, uint32_t texture);
 
 			bool Exists(const std::string& name);
+			
+			std::string GetShaderName() { return m_Shader->GetName(); }
 
 		private:
 			Ref<Shader> m_Shader;

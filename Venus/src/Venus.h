@@ -12,6 +12,11 @@
 #include "Engine/Input.h"
 #include "ImGui/ImGuiLayer.h"
 
+// Asset
+#include "Assets/Asset.h"
+#include "Assets/AssetExtensions.h"
+#include "Assets/AssetManager.h"
+
 // Editor
 #include "Editor/ConsolePanel.h"
 

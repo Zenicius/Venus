@@ -43,6 +43,8 @@ namespace Venus {
 			OpenGLTexture2D(uint32_t width, uint32_t height, TextureProperties props = TextureProperties());
 			OpenGLTexture2D(const std::string& path, TextureProperties props = TextureProperties());
 			virtual ~OpenGLTexture2D();
+			
+			void Invalidate();
 
 			virtual uint32_t GetWidth() const override { return m_Width;  }
 			virtual uint32_t GetHeight() const override { return m_Height; }
@@ -50,16 +52,21 @@ namespace Venus {
 
 			virtual std::string GetPath() const override { return m_Path; }
 		
+			virtual void Reload() override;
 			virtual void SetData(void* data, uint32_t size, uint32_t mipLevel = 0) override;
 			virtual void GenerateMips() override;
 
 			virtual void Bind(uint32_t slot = 0) const override;
 
 			virtual bool IsLoaded() const override { return m_IsLoaded; }
-			virtual TextureProperties GetProperties() const override { return m_Properties; }
+			virtual TextureProperties GetProperties() override { return m_Properties; }
+			virtual void SetProperties(TextureProperties props, bool reload = true);
 			virtual TextureType GetType() const override { return TextureType::Texture2D; }
 			virtual uint32_t GetMipLevelCount() const override;
 			virtual std::pair<uint32_t, uint32_t> GetMipSize(uint32_t mip) const override;
+
+			static AssetType GetStaticType() { return AssetType::Texture; }
+			virtual AssetType GetAssetType() const override { return GetStaticType(); }
 
 			virtual bool operator==(const Texture& other) const override
 			{
@@ -89,16 +96,22 @@ namespace Venus {
 
 			virtual std::string GetPath() const override { return m_Path; }
 
+			virtual void Reload() override;
 			virtual void SetData(void* data, uint32_t size, uint32_t mipLevel = 0) override;
 			virtual void GenerateMips() override;
 
+			virtual void Bind(uint32_t slot = 0) const override;
+
 			virtual bool IsLoaded() const override { return m_IsLoaded; }
-			virtual TextureProperties GetProperties() const override { return m_Properties; }
+			virtual TextureProperties GetProperties() override { return m_Properties; }
+			virtual void SetProperties(TextureProperties props, bool reload = true);
 			virtual TextureType GetType() const override { return TextureType::TextureCube; }
 			virtual uint32_t GetMipLevelCount() const override;
 			virtual std::pair<uint32_t, uint32_t> GetMipSize(uint32_t mip) const override;
 
-			virtual void Bind(uint32_t slot = 0) const override;
+			static AssetType GetStaticType() { return AssetType::Texture; }
+			virtual AssetType GetAssetType() const override { return GetStaticType(); }
+
 
 			virtual bool operator==(const Texture& other) const override
 			{

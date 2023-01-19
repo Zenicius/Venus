@@ -105,10 +105,9 @@ namespace Venus {
 
 	struct SpriteRendererComponent
 	{
+		AssetHandle Texture;
+		TextureProperties TextureProperties;
 		glm::vec4 Color = { 1.0f, 1.0f, 1.0f, 1.0f };
-		Ref<Texture2D> Texture;
-		std::string TextureName = "None";  // Editor only
-		std::string TexturePath = std::string(); // Internal Only
 		float TilingFactor = 1.0f;
 
 		SpriteRendererComponent() = default;
@@ -134,6 +133,21 @@ namespace Venus {
 		SceneCamera Camera;
 		bool Primary = true;
 		bool FixedAspectRatio = false;
+		glm::vec4 BackgroundColor = { 0.0f, 0.0f, 0.0f, 1.0f };
+
+		// Post
+		bool UseRendererSettings = true;
+
+		bool Bloom = true;
+		float BloomIntensity = 1.0f;
+		AssetHandle BloomDirtMask;
+		float BloomDirtMaskIntensity = 1.0f;
+
+		float Exposure = 1.0f;
+		bool ACESTone = true;
+		bool GammaCorrection = true;
+		bool Grayscale = false;
+
 
 		CameraComponent() = default;
 		CameraComponent(const CameraComponent&) = default;
@@ -167,7 +181,6 @@ namespace Venus {
 		float Restitution = 0.0f;
 		float RestitutionThreshold = 0.5f;	
 
-		bool ShowArea = false; // Editor Only
 		void* RuntimeFixture = nullptr; // Runtime Only
 
 		BoxCollider2DComponent() = default;
@@ -184,7 +197,6 @@ namespace Venus {
 		float Restitution = 0.0f;
 		float RestitutionThreshold = 0.5f;
 
-		bool ShowArea = false; // Editor Only
 		void* RuntimeFixture = nullptr; // Runtime Only
 
 		CircleCollider2DComponent() = default;
@@ -193,13 +205,14 @@ namespace Venus {
 
 	struct MeshRendererComponent 
 	{
-		std::string ModelName = "Cube"; // Editor Only
-		std::string ModelPath = std::string(); // Internal Only
-
-		Ref<Model> Model = Model::Create("Resources/Models/Cube.fbx");
+		AssetHandle Model;
+		Ref<MaterialTable> MaterialTable = CreateRef<Venus::MaterialTable>();
 
 		MeshRendererComponent() = default;
-		MeshRendererComponent(const MeshRendererComponent&) = default;
+		MeshRendererComponent(const MeshRendererComponent& other)
+			: Model(other.Model), MaterialTable(CreateRef<Venus::MaterialTable>(other.MaterialTable))
+		{
+		}
 	};
 
 	struct PointLightComponent
@@ -207,11 +220,11 @@ namespace Venus {
 		glm::vec3 Color = { 1.0f, 1.0f, 1.0f };
 		float Intensity = 1.0f;
 		float LightSize = 0.5f;
-		float MinRadius = 1.f;
+		float MinRadius = 1.0f;
 		float Radius = 10.f;
 		bool CastsShadows = true;
 		bool SoftShadows = true;
-		float Falloff = 1.f;
+		float Falloff = 1.0f;
 	};
 
 	struct DirectionalLightComponent
@@ -225,15 +238,13 @@ namespace Venus {
 
 	struct SkyLightComponent
 	{
-		std::string EnvironmentMapName = "None"; // Editor Only
-		std::string EnvironmentMapPath = std::string(); // Internal Only
+		AssetHandle Environment;
+
 		float Intensity = 1.0f;
 		float Lod = 0.0f;
 
 		bool DinamicSky = false;
 		glm::vec3 TurbidityAzimuthInclination = { 2.0f, 0.0f, 0.0f };
-
-		Ref<SceneEnvironment> EnvironmentMap = nullptr;
 		
 		SkyLightComponent() = default;
 		SkyLightComponent(const SkyLightComponent&) = default;

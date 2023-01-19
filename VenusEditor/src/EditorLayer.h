@@ -5,6 +5,7 @@
 #include "Panels/ObjectsPanel.h"
 #include "Panels/AssetBrowserPanel.h"
 #include "Panels/RendererStatsPanel.h"
+#include "Panels/MaterialEditorPanel.h"
 
 namespace Venus {
 
@@ -16,9 +17,9 @@ namespace Venus {
 
 			virtual void OnAttach() override;
 			virtual void OnDetach() override;
-			void OnUpdate(Timestep ts) override;
+			virtual void OnUpdate(Timestep ts) override;
 			virtual void OnImGuiRender() override;
-			void OnEvent(Event& e) override;
+			virtual void OnEvent(Event& e) override;
 
 		private:
 			void NewScene();
@@ -28,7 +29,11 @@ namespace Venus {
 			void SaveScene();
 
 			void OnScenePlay();
+			void OnSceneSimulate();
 			void OnSceneStop();
+			void OnOverlayRender();
+
+			void OnAssetOpen(AssetType type, const std::filesystem::path& path);
 
 			bool OnManualWindowResize();
 			bool OnTitleBarHit(WindowTitleBarHitTestEvent& e);
@@ -52,7 +57,8 @@ namespace Venus {
 			enum class SceneState
 			{
 				Edit = 0,
-				Play = 1
+				Play = 1,
+				Simulate = 2,
 			};
 
 			// Panels
@@ -60,14 +66,15 @@ namespace Venus {
 			AssetBrowserPanel m_AssetBrowserPanel;
 			RendererStatsPanel m_RendererStatsPanel;
 			ConsolePanel m_ConsolePanel;
+			MaterialEditorPanel m_MaterialEditorPanel;
 			
 			// Icons
 			Ref<Texture2D> m_VenusLogoIcon;
-			Ref<Texture2D> m_PlayIcon, m_StopIcon;
-			Ref<Texture2D> m_SceneCameraIcon;
-			Ref<Texture2D> m_EditorCameraIcon;
+			Ref<Texture2D> m_PlayIcon, m_SimulateIcon, m_StopIcon, m_PauseIcon, m_UnpauseIcon;
+			Ref<Texture2D> m_DPlayIcon, m_DSimulateIcon, m_DStopIcon;
+			Ref<Texture2D> m_SceneCameraIcon, m_PointLightIcon;
 			Ref<Texture2D> m_CreateIcon;
-			Ref<Texture2D> m_SaveIcon, m_UndoIcon, m_RedoIcon;
+			Ref<Texture2D> m_SaveIcon;
 			Ref<Texture2D> m_SettingsIcon;
 			Ref<Texture2D> m_MinimizeIcon, m_MaximizeIcon, m_RestoreIcon, m_CloseIcon;
 
@@ -81,7 +88,6 @@ namespace Venus {
 
 			EditorCamera m_EditorCamera;
 			Entity m_HoveredEntity;
-			bool m_CameraLocked = false;
 			std::string m_ScenePath = std::string();
 
 			// Gizmos
@@ -96,11 +102,16 @@ namespace Venus {
 			bool m_TitleBarHovered = false;
 
 			bool m_ShowAssetBrowserPanel = true;
+			bool m_ShowAssetsInspector = false;
 			bool m_ShowStatsPanel = false;
 			bool m_ShowConsolePanel = true;
-			bool m_ShowSceneSettingsPanel = true;
+			bool m_ShowSceneSettingsPanel = false;
 			bool m_ShowWelcomeMessage = false;
+			bool m_ShowMaterialEditor = false;
 			
-			bool m_ShowCameraIcon = true;
+			bool m_ShowIcons = true;
+			bool m_ShowColliders = true;
+			bool m_ShowLightRadius = true;
+			bool m_ShowOverlayInRuntime = false;
 	};
 }

@@ -1,114 +1,14 @@
 #include "pch.h"
 #include "SceneSerializer.h"
 
+#include "Assets/AssetManager.h"
 #include "Entity.h"
 #include "Components.h"
 
 #include "yaml-cpp/yaml.h"
-
-namespace YAML {
-
-	template<>
-	struct convert<glm::vec2>
-	{
-		static Node encode(const glm::vec2& rhs)
-		{
-			Node node;
-			node.push_back(rhs.x);
-			node.push_back(rhs.y);
-			node.SetStyle(EmitterStyle::Flow);
-			return node;
-		}
-
-		static bool decode(const Node& node, glm::vec2& rhs)
-		{
-			if (!node.IsSequence() || node.size() != 2)
-				return false;
-
-			rhs.x = node[0].as<float>();
-			rhs.y = node[1].as<float>();
-			return true;
-		}
-	};
-
-	template<>
-	struct convert<glm::vec3>
-	{
-		static Node encode(const glm::vec3& rhs)
-		{
-			Node node;
-			node.push_back(rhs.x);
-			node.push_back(rhs.y);
-			node.push_back(rhs.z);
-			node.SetStyle(EmitterStyle::Flow);
-			return node;
-		}
-
-		static bool decode(const Node& node, glm::vec3& rhs)
-		{
-			if (!node.IsSequence() || node.size() != 3)
-				return false;
-
-			rhs.x = node[0].as<float>();
-			rhs.y = node[1].as<float>();
-			rhs.z = node[2].as<float>();
-			return true;
-		}
-	};
-
-	template<>
-	struct convert<glm::vec4>
-	{
-		static Node encode(const glm::vec4& rhs)
-		{
-			Node node;
-			node.push_back(rhs.x);
-			node.push_back(rhs.y);
-			node.push_back(rhs.z);
-			node.push_back(rhs.w);
-			node.SetStyle(EmitterStyle::Flow);
-			return node;
-		}
-
-		static bool decode(const Node& node, glm::vec4& rhs)
-		{
-			if (!node.IsSequence() || node.size() != 4)
-				return false;
-
-			rhs.x = node[0].as<float>();
-			rhs.y = node[1].as<float>();
-			rhs.z = node[2].as<float>();
-			rhs.w = node[3].as<float>();
-			return true;
-		}
-	};
-
-}
+#include "Utils/SerializationUtils.h"
 
 namespace Venus {
-
-	// Overloads to YAML work with glm types
-	YAML::Emitter& operator<<(YAML::Emitter& out, const glm::vec2& v)
-	{
-		out << YAML::Flow;
-		out << YAML::BeginSeq << v.x << v.y << YAML::EndSeq;
-		return out;
-	}
-
-	YAML::Emitter& operator<<(YAML::Emitter& out, const glm::vec3& v)
-	{
-		out << YAML::Flow;
-		out << YAML::BeginSeq << v.x << v.y << v.z << YAML::EndSeq;
-		return out;
-	}
-
-	YAML::Emitter& operator<<(YAML::Emitter& out, const glm::vec4& v)
-	{
-		out << YAML::Flow;
-		out << YAML::BeginSeq << v.x << v.y << v.z << v.w << YAML::EndSeq;
-		return out;
-	}
-	// --------------------------------------------------------------------
 
 	SceneSerializer::SceneSerializer(const Ref<Scene>& scene)
 		:m_Scene(scene)
@@ -194,6 +94,20 @@ namespace Venus {
 			
 			out << YAML::Key << "Primary" << YAML::Value << cameraComponent.Primary;
 			out << YAML::Key << "FixedAspectRatio" << YAML::Value << cameraComponent.FixedAspectRatio;
+			out << YAML::Key << "BackgroundColor" << YAML::Value << cameraComponent.BackgroundColor;
+
+			out << YAML::Key << "PostEffectsSettings" << YAML::Value;
+			out << YAML::BeginMap; // Post Settings
+			out << YAML::Key << "UseRendererSettings" << YAML::Value << cameraComponent.UseRendererSettings;
+			out << YAML::Key << "Bloom" << YAML::Value << cameraComponent.Bloom;
+			out << YAML::Key << "BloomIntensity" << YAML::Value << cameraComponent.BloomIntensity;
+			out << YAML::Key << "BloomDirtMask" << YAML::Value << cameraComponent.BloomDirtMask;
+			out << YAML::Key << "BloomDirtMaskIntensity" << YAML::Value << cameraComponent.BloomDirtMaskIntensity;
+			out << YAML::Key << "Exposure" << YAML::Value << cameraComponent.Exposure;
+			out << YAML::Key << "ACESTone" << YAML::Value << cameraComponent.ACESTone;
+			out << YAML::Key << "GammaCorrection" << YAML::Value << cameraComponent.GammaCorrection;
+			out << YAML::Key << "Grayscale" << YAML::Value << cameraComponent.Grayscale;
+			out << YAML::EndMap; // Post Settings
 
 			out << YAML::EndMap;
 		}
@@ -205,10 +119,23 @@ namespace Venus {
 			out << YAML::BeginMap;
 
 			auto& spriteRendererComponent = entity.GetComponent<SpriteRendererComponent>();
+			out << YAML::Key << "Texture" << YAML::Value << spriteRendererComponent.Texture;
+			
+			out << YAML::Key << "TextureProps";
+			{
+				out << YAML::BeginMap;
+				// Serialize TextureProps
+				TextureProperties props = spriteRendererComponent.TextureProperties;
+				out << YAML::Key << "Filter" << YAML::Value << (int)props.Filter;
+				out << YAML::Key << "Wrap" << YAML::Value << (int)props.WrapMode;
+				out << YAML::Key << "FlipVertically" << YAML::Value << props.FlipVertically;
+				out << YAML::Key << "UseMipmap" << YAML::Value << props.UseMipmaps;
+			}
+			out << YAML::EndMap;
+
 			out << YAML::Key << "Color" << YAML::Value << spriteRendererComponent.Color;
-			out << YAML::Key << "TextureName" << YAML::Value << spriteRendererComponent.TextureName;
-			out << YAML::Key << "Texture" << YAML::Value << spriteRendererComponent.TexturePath;
 			out << YAML::Key << "TilingFactor" << YAML::Value << spriteRendererComponent.TilingFactor;
+
 
 			out << YAML::EndMap;
 		}
@@ -220,8 +147,16 @@ namespace Venus {
 			out << YAML::BeginMap;
 
 			auto& meshRendererComponent = entity.GetComponent<MeshRendererComponent>();
-			out << YAML::Key << "Name" << YAML::Value << meshRendererComponent.ModelName;
-			out << YAML::Key << "Path" << YAML::Value << meshRendererComponent.ModelPath;
+			out << YAML::Key << "Model" << YAML::Value << meshRendererComponent.Model;
+
+			out << YAML::Key << "Materials";
+			out << YAML::BeginMap;
+			out << YAML::Key << "Count" << YAML::Value << meshRendererComponent.MaterialTable->GetMaterialCount();
+			for (auto& [index, material] : meshRendererComponent.MaterialTable->GetMaterials())
+			{
+				out << YAML::Key << std::to_string(index) << YAML::Value << material->Handle;
+			}
+			out << YAML::EndMap;
 
 			out << YAML::EndMap;
 		}
@@ -325,24 +260,15 @@ namespace Venus {
 
 			auto& slComponent = entity.GetComponent<SkyLightComponent>();
 
-			if (!slComponent.EnvironmentMapPath.empty())
+			if (AssetManager::IsAssetHandleValid(slComponent.Environment))
 			{
-				out << YAML::Key << "EnvironmentMapName" << YAML::Value << slComponent.EnvironmentMapName;
-				out << YAML::Key << "EnvironmentMapPath" << YAML::Value << slComponent.EnvironmentMapPath;
+				out << YAML::Key << "Environment" << YAML::Value << slComponent.Environment;
 			}
 
-			if (slComponent.EnvironmentMap)
-			{
-				out << YAML::Key << "Intensity" << YAML::Value << slComponent.Intensity;
-				out << YAML::Key << "Lod" << YAML::Value << slComponent.Lod;
-			}
-			
-			if (slComponent.DinamicSky)
-			{
-				out << YAML::Key << "DinamicSky" << YAML::Value << slComponent.DinamicSky;
-				out << YAML::Key << "TurbidityAzimuthInclination" << YAML::Value << slComponent.TurbidityAzimuthInclination;
-			}
-
+			out << YAML::Key << "Intensity" << YAML::Value << slComponent.Intensity;
+			out << YAML::Key << "Lod" << YAML::Value << slComponent.Lod;
+			out << YAML::Key << "DinamicSky" << YAML::Value << slComponent.DinamicSky;
+			out << YAML::Key << "TurbidityAzimuthInclination" << YAML::Value << slComponent.TurbidityAzimuthInclination;
 
 			out << YAML::EndMap;
 		}
@@ -406,7 +332,16 @@ namespace Venus {
 			return false;
 
 		std::string sceneName = data["Scene"].as<std::string>();
-		m_Scene->m_SceneName = sceneName;
+
+		if (sceneName == "Untitled Scene")
+		{
+			std::filesystem::path scenePath = filepath;
+			m_Scene->m_SceneName = scenePath.stem().string();
+		}
+		else
+			m_Scene->m_SceneName = sceneName;
+
+
 		CORE_LOG_TRACE("Loading Scene: {0}", sceneName);
 		
 		auto entities = data["Entities"];
@@ -469,6 +404,7 @@ namespace Venus {
 				{
 					auto& cc = deserializedEntity.AddComponent<CameraComponent>();
 					auto& props = cameraComponent["Camera"];
+					auto& postSettings = cameraComponent["PostEffectsSettings"];
 
 					cc.Camera.SetProjectionType((SceneCamera::ProjectionType)props["ProjectionType"].as<int>());
 
@@ -482,6 +418,16 @@ namespace Venus {
 
 					cc.Primary = cameraComponent["Primary"].as<bool>();
 					cc.FixedAspectRatio = cameraComponent["FixedAspectRatio"].as<bool>();
+					cc.BackgroundColor = cameraComponent["BackgroundColor"].as<glm::vec4>();
+					cc.UseRendererSettings = postSettings["UseRendererSettings"].as<bool>();
+					cc.Bloom = postSettings["Bloom"].as<bool>();
+					cc.BloomIntensity = postSettings["BloomIntensity"].as<float>();
+					cc.BloomDirtMask = postSettings["BloomDirtMask"].as<uint64_t>();
+					cc.BloomDirtMaskIntensity = postSettings["BloomDirtMaskIntensity"].as<float>();
+					cc.Exposure = postSettings["Exposure"].as<float>();
+					cc.ACESTone = postSettings["ACESTone"].as<bool>();
+					cc.GammaCorrection = postSettings["GammaCorrection"].as<bool>();
+					cc.Grayscale = postSettings["Grayscale"].as<bool>();
 				}
 
 				// SpriteRendererComponent
@@ -489,16 +435,19 @@ namespace Venus {
 				if (srComponent)
 				{
 					auto& src = deserializedEntity.AddComponent<SpriteRendererComponent>();
-					src.Color = srComponent["Color"].as<glm::vec4>();
-					std::string texturePath = srComponent["Texture"].as<std::string>();
-					src.TilingFactor = srComponent["TilingFactor"].as<float>();
+					src.Texture = srComponent["Texture"].as<uint64_t>();
 
-					if (!texturePath.empty())
-					{
-						src.TextureName = srComponent["TextureName"].as<std::string>();
-						src.TexturePath = texturePath;
-						src.Texture = Texture2D::Create(texturePath);
-					}
+					// TextureProps
+					auto texProps = srComponent["TextureProps"];
+					TextureProperties props;
+					props.Filter = (TextureFilterMode)texProps["Filter"].as<int>();
+					props.WrapMode = (TextureWrapMode)texProps["Wrap"].as<int>();
+					props.FlipVertically = texProps["FlipVertically"].as<bool>();
+					props.UseMipmaps = texProps["UseMipmap"].as<bool>();
+					src.TextureProperties = props;
+
+					src.Color = srComponent["Color"].as<glm::vec4>();
+					src.TilingFactor = srComponent["TilingFactor"].as<float>();
 				}
 
 				// MeshRendererComponent
@@ -506,26 +455,23 @@ namespace Venus {
 				if (mRComponent)
 				{
 					auto& meshRenderer = deserializedEntity.AddComponent<MeshRendererComponent>();
-					meshRenderer.ModelName = mRComponent["Name"].as<std::string>();
-					std::string modelPath = mRComponent["Path"].as<std::string>();
+					meshRenderer.Model = mRComponent["Model"].as<uint64_t>();
 
-					if (!modelPath.empty())
+					auto materials = mRComponent["Materials"];
+					uint32_t count = materials["Count"].as<int>();
+					meshRenderer.MaterialTable = CreateRef<MaterialTable>(count);
+					for (uint32_t i = 0; i < count; i++)
 					{
-						meshRenderer.ModelPath = modelPath;
-						meshRenderer.Model = Model::Create(modelPath);
+						if (materials[std::to_string(i)])
+						{
+							AssetHandle handle = materials[std::to_string(i)].as<uint64_t>();
+							if (AssetManager::IsAssetHandleValid(handle))
+							{
+								Ref<MeshMaterial> material = AssetManager::GetAsset<MeshMaterial>(handle);
+								meshRenderer.MaterialTable->SetMaterial(i, material);
+							}
+						}
 					}
-					else if(meshRenderer.ModelName.compare("Sphere") == 0)
-						meshRenderer.Model = Model::Create("Resources/Models/Sphere.fbx");
-					else if (meshRenderer.ModelName.compare("Plane") == 0)
-						meshRenderer.Model = Model::Create("Resources/Models/Plane.fbx");
-					else if (meshRenderer.ModelName.compare("Capsule") == 0)
-						meshRenderer.Model = Model::Create("Resources/Models/Capsule.fbx");
-					else if (meshRenderer.ModelName.compare("Torus") == 0)
-						meshRenderer.Model = Model::Create("Resources/Models/Torus.fbx");
-					else if (meshRenderer.ModelName.compare("Cone") == 0)
-						meshRenderer.Model = Model::Create("Resources/Models/Cone.fbx");
-					else if (meshRenderer.ModelName.compare("Cylinder") == 0)
-						meshRenderer.Model = Model::Create("Resources/Models/Cylinder.fbx");
 				}
 
 				// CircleRendererComponent
@@ -605,26 +551,22 @@ namespace Venus {
 				if (slComponent)
 				{
 					auto& sl = deserializedEntity.AddComponent<SkyLightComponent>();
-					auto path = slComponent["EnvironmentMapPath"];
-					auto dinamic = slComponent["DinamicSky"];
 
-					if (path)
+					if (slComponent["Environment"])
 					{
-						sl.EnvironmentMapName = slComponent["EnvironmentMapName"].as<std::string>();
-						sl.EnvironmentMapPath = path.as<std::string>();
-						sl.Intensity = slComponent["Intensity"].as<float>();
-						sl.Lod = slComponent["Lod"].as<float>();
-						sl.EnvironmentMap = Renderer::CreateEnvironmentMap(sl.EnvironmentMapPath);
+						AssetHandle handle = slComponent["Environment"].as<uint64_t>();
+						if (AssetManager::IsAssetHandleValid(handle))
+						{
+							sl.Environment = handle;
+						}
 					}
-					else if (dinamic)
-					{
-						sl.DinamicSky = dinamic.as<bool>();
-						sl.TurbidityAzimuthInclination = slComponent["TurbidityAzimuthInclination"].as<glm::vec3>();
-						sl.Intensity = slComponent["Intensity"].as<float>();
-						sl.Lod = slComponent["Lod"].as<float>();
-						Ref<TextureCube> preethamSky = Renderer::CreatePreethamSky(sl.TurbidityAzimuthInclination);
-						sl.EnvironmentMap = SceneEnvironment::Create(preethamSky, preethamSky);
-					}
+
+					sl.Intensity = slComponent["Intensity"].as<float>();
+					sl.Lod = slComponent["Lod"].as<float>();
+					sl.DinamicSky = slComponent["DinamicSky"].as<bool>();
+					sl.TurbidityAzimuthInclination = slComponent["TurbidityAzimuthInclination"].as<glm::vec3>();
+					sl.Intensity = slComponent["Intensity"].as<float>();
+					sl.Lod = slComponent["Lod"].as<float>();
 				}
 				
 				// ScriptComponent

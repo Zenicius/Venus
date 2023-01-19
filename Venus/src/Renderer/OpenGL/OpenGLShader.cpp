@@ -642,7 +642,6 @@ namespace Venus {
 	{
 		GLint location = (GLint)GetUniformLocation(name);
 		glUniform1f(location, value);
-		//CORE_LOG_INFO("Location {0}, name {1}, value {2} in Shader {3}", location, name, value, m_FilePath);
 	}
 
 	void OpenGLShader::UploadUniformFloat2(const std::string& name, const glm::vec2& value)

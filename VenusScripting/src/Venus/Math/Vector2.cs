@@ -19,5 +19,10 @@ namespace Venus
             X = x;
             Y = y;
         }
+
+        public static Vector2 operator *(Vector2 vector, float scalar)
+        {
+            return new Vector2(vector.X * scalar, vector.Y * scalar);
+        }
     }
 }

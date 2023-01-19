@@ -82,7 +82,7 @@ namespace Venus {
 
 		Mesh mesh(vertices, indices, 0);
 		Ref<Model> cube = CreateRef<Model>();
-		cube->m_Materials[0] = material;
+		cube->GetMaterialTable()->SetMaterial(0, material);
 		cube->m_Meshes.push_back(mesh);
 		
 		return cube;
@@ -135,7 +135,7 @@ namespace Venus {
 
 		Mesh mesh(vertices, indices, 0);
 		Ref<Model> sphere = CreateRef<Model>();
-		sphere->m_Materials[0] = material;
+		sphere->GetMaterialTable()->SetMaterial(0, material);
 		sphere->m_Meshes.push_back(mesh);
 
 		return sphere;

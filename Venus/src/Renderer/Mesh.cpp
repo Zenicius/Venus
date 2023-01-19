@@ -3,7 +3,7 @@
 
 #include "Engine/Timer.h"
 
-#include "glad/glad.h"
+#include "Assets/AssetManager.h"
 
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
@@ -67,19 +67,36 @@ namespace Venus {
 		Timer timer;
 
 		Assimp::Importer importer;
-		const aiScene* scene = importer.ReadFile(m_Path, aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_FlipUVs | aiProcess_CalcTangentSpace);
+
+		const uint32_t meshImportFlags =
+			aiProcess_CalcTangentSpace |        // Create binormals/tangents just in case
+			aiProcess_Triangulate |             // Make sure we're triangles
+			aiProcess_SortByPType |             // Split meshes by primitive type
+			aiProcess_GenNormals |              // Make sure we have legit normals
+			aiProcess_GenUVCoords |             // Convert UVs if required 
+	//		aiProcess_OptimizeGraph |
+			aiProcess_OptimizeMeshes |          // Batch draws where possible
+			aiProcess_JoinIdenticalVertices |
+			aiProcess_GlobalScale |             // e.g. convert cm to m for fbx import (and other formats where cm is native)
+			aiProcess_ValidateDataStructure;    // Validation
+
+
+		const uint32_t oldImportFlags = aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_FlipUVs | aiProcess_CalcTangentSpace;
+
+		const aiScene* scene = importer.ReadFile(m_Path, oldImportFlags);
 
 		if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
 			CORE_LOG_ERROR("Failed to load model! : {0}", importer.GetErrorString());
 		else
 		{
+			uint32_t materialCount = scene->mNumMaterials;
+			m_Materials = CreateRef<MaterialTable>(materialCount);
+
 			CORE_LOG_TRACE("Loading Model: {0}", m_Path);
 			ProcessNode(scene->mRootNode, scene);
 		}
 
 		CORE_LOG_WARN("Model {0} loading took: {1} ms", m_Path, timer.ElapsedMillis());
-
-		//LogMeshStatistics(scene);
 	}
 
 	void Model::ProcessNode(aiNode* node, const aiScene* scene)
@@ -162,26 +179,31 @@ namespace Venus {
 		uint32_t materialIndex = mesh->mMaterialIndex;
 		aiMaterial* material = scene->mMaterials[materialIndex];
 
-		CORE_LOG_TRACE("---Material Used for this mesh: {0}", materialIndex);
-		
-		if (m_Materials.find(materialIndex) == m_Materials.end())
+		if (!m_Materials->HasMaterial(materialIndex))
 		{
-			Ref<MeshMaterial> meshMaterial = CreateRef<MeshMaterial>();
+			aiString materialName = material->GetName();
+			CORE_LOG_TRACE("Loading Default Material '{0}' at: {1}", materialName.C_Str(), materialIndex);
 
-			CORE_LOG_TRACE("Loading Material {0}", materialIndex);
+			Ref<MeshMaterial> meshMaterial = MeshMaterial::Create(materialName.C_Str());
 
-			// Albedo Color TODO: Emission
-			aiColor3D aiColor;
+			aiColor3D aiColor, aiEmission;
+			// Albedo Color
 			if (material->Get(AI_MATKEY_COLOR_DIFFUSE, aiColor) == AI_SUCCESS)
 			{
-				CORE_LOG_TRACE("Setting Albedo Color at Material {0} : {1},{2},{3} ", materialIndex, aiColor.r, aiColor.g, aiColor.b);
+				CORE_LOG_TRACE("	Setting Albedo Color : {0},{1},{2} ", aiColor.r, aiColor.g, aiColor.b);
 				meshMaterial->SetAlbedoColor( { aiColor.r, aiColor.g, aiColor.b } );
+			}
+			// Emission
+			if (material->Get(AI_MATKEY_COLOR_EMISSIVE, aiEmission) == AI_SUCCESS)
+			{
+				CORE_LOG_TRACE("	Setting Emission : {0}", aiEmission.r);
+				meshMaterial->SetEmission(aiEmission.r);
 			}
 			float metalness, shininess;
 			// Metalness
 			if (material->Get(AI_MATKEY_REFLECTIVITY, metalness) == AI_SUCCESS)
 			{
-				CORE_LOG_TRACE("Setting Metalness at Material {0}: {1}", materialIndex, metalness);
+				CORE_LOG_TRACE("	Setting Metalness : {0}", metalness);
 				meshMaterial->SetMetalness(metalness);
 			}
 			// Roughness
@@ -190,7 +212,7 @@ namespace Venus {
 				float roughness = 1.0f - glm::sqrt(shininess / 100.0f);
 				if (roughness < 0)
 					roughness = 0;
-				CORE_LOG_TRACE("Setting Roughness at Material {0}: {1}", materialIndex, roughness);
+				CORE_LOG_TRACE("	Setting Roughness : {0}", roughness);
 				meshMaterial->SetRoughtness(roughness);
 			}
 
@@ -199,48 +221,57 @@ namespace Venus {
 			bool hasAlbedoMap = material->GetTexture(aiTextureType_DIFFUSE, 0, &aiTexPath) == AI_SUCCESS;
 			if (hasAlbedoMap)
 			{
+				CORE_LOG_TRACE("	Loading Albedo Map : {0}", aiTexPath.C_Str());
+
 				std::filesystem::path modelPath = std::filesystem::path(m_Path).parent_path();
 				std::string finalTexPath = modelPath.string() + "/" + aiTexPath.C_Str();
 
-				//CORE_LOG_CRITICAL("LOADING ALBEDO {0}", finalTexPath);
-				TextureProperties props;
-				props.Format = TextureFormat::SRGB;
-				auto texture = Texture2D::Create(finalTexPath, props);
-				if (texture->IsLoaded())
+				Ref<Texture2D> texture = AssetManager::GetAsset<Texture2D>(finalTexPath);
+
+				if (texture && texture->IsLoaded())
+				{
+					TextureProperties props;
+					props.Format = TextureFormat::SRGB;
+					texture->SetProperties(props, true);
 					meshMaterial->SetAlbedoMap(texture);
+				}
 			}
-			// Normal Map
-			bool hasNormalMap = material->GetTexture(aiTextureType_NORMALS, 0, &aiTexPath) == AI_SUCCESS;
+			// Normal Map 
+			bool hasNormalMap = material->GetTexture(aiTextureType_NORMALS, 0, &aiTexPath) == AI_SUCCESS ||
+								material->GetTexture(aiTextureType_DISPLACEMENT, 0, &aiTexPath) == AI_SUCCESS ||
+								material->GetTexture(aiTextureType_HEIGHT, 0, &aiTexPath) == AI_SUCCESS;
 			if (hasNormalMap)
 			{
+				CORE_LOG_TRACE("	Loading Normal Map : {0}", aiTexPath.C_Str());
+
 				std::filesystem::path modelPath = std::filesystem::path(m_Path).parent_path();
 				std::string finalTexPath = modelPath.string() + "/" + aiTexPath.C_Str();
 
-				//CORE_LOG_CRITICAL("LOADING NORMAL {0}", finalTexPath);
-				auto texture = Texture2D::Create(finalTexPath);
-				if (texture->IsLoaded())
+				Ref<Texture2D> texture = AssetManager::GetAsset<Texture2D>(finalTexPath);
+				if (texture && texture->IsLoaded())
 					meshMaterial->SetNormalMap(texture);
 			}
 			// Roughness Map
 			bool hasRoughnessMap = material->GetTexture(aiTextureType_SHININESS, 0, &aiTexPath) == AI_SUCCESS;
 			if (hasRoughnessMap)
 			{
+				CORE_LOG_TRACE("	Loading Roughness Map : {0}", aiTexPath.C_Str());
+
 				std::filesystem::path modelPath = std::filesystem::path(m_Path).parent_path();
 				std::string finalTexPath = modelPath.string() + "/" + aiTexPath.C_Str();
 
-				//CORE_LOG_CRITICAL("LOADING ROUGHNESS {0}", finalTexPath);
-				auto texture = Texture2D::Create(finalTexPath);
-				if (texture->IsLoaded())
+				Ref<Texture2D> texture = AssetManager::GetAsset<Texture2D>(finalTexPath);
+				if (texture && texture->IsLoaded())
 					meshMaterial->SetRoughnessMap(texture);
 			}
-
-			m_Materials[materialIndex] = meshMaterial;
 			
 			//TODO: Metalness
+
+			m_Materials->SetMaterial(materialIndex, meshMaterial);
 		}
 		else
 		{
-			CORE_LOG_TRACE("Material already loaded {0}", materialIndex);
+			//CORE_LOG_TRACE("Default Material already loaded {0}", materialIndex);
 		}
 			
 		return Mesh(vertices, indices, materialIndex);

@@ -228,8 +228,6 @@ namespace Venus {
 
 	void Renderer::Shutdown()
 	{
-		VS_PROFILE_FUNCTION();
-
 		Renderer2D::Shutdown();
 	}
 
@@ -245,35 +243,32 @@ namespace Venus {
 
 	void Renderer::OnWindowResize(uint32_t width, uint32_t height)
 	{
-		VS_PROFILE_FUNCTION();
-
 		RenderCommand::SetViewport(0, 0, width, height);
 	}
 
 	void Renderer::BeginScene(const Camera& camera, const glm::mat4& transform)
 	{
-		VS_PROFILE_FUNCTION();
+		glm::mat4 viewMatrix = glm::inverse(transform);
+		glm::mat4 viewProjectionMatrix = camera.GetProjectionMatrix() * viewMatrix;
 		
-		s_Data.CameraBuffer.ViewMatrix = glm::inverse(transform);
+		s_Data.CameraBuffer.ViewMatrix = viewMatrix;
 		s_Data.CameraBuffer.ProjectionMatrix = camera.GetProjectionMatrix();
-		s_Data.CameraBuffer.ViewProjectionMatrix = camera.GetProjectionMatrix() * glm::inverse(transform);
-		s_Data.CameraBuffer.InverseViewProjectionMatrix = glm::inverse(camera.GetProjectionMatrix() * glm::inverse(transform));
+		s_Data.CameraBuffer.ViewProjectionMatrix = viewProjectionMatrix;
+		s_Data.CameraBuffer.InverseViewProjectionMatrix = glm::inverse(viewProjectionMatrix);
 		s_Data.CameraUniformBuffer->SetData(&s_Data.CameraBuffer, sizeof(RendererData::CameraData));
 
-		Renderer2D::BeginScene();
+		Renderer2D::BeginScene(viewProjectionMatrix, viewMatrix);
 	}
 
 	void Renderer::BeginScene(const EditorCamera& camera)
 	{
-		VS_PROFILE_FUNCTION();
-		
 		s_Data.CameraBuffer.ViewMatrix = camera.GetViewMatrix();
 		s_Data.CameraBuffer.ProjectionMatrix = camera.GetProjectionMatrix();
 		s_Data.CameraBuffer.ViewProjectionMatrix = camera.GetViewProjection();
 		s_Data.CameraBuffer.InverseViewProjectionMatrix = glm::inverse(camera.GetViewProjection());
 		s_Data.CameraUniformBuffer->SetData(&s_Data.CameraBuffer, sizeof(RendererData::CameraData));
 
-		Renderer2D::BeginScene();
+		Renderer2D::BeginScene(camera.GetViewProjection(), camera.GetViewMatrix());
 	}
 
 	void Renderer::EndScene()
@@ -283,8 +278,6 @@ namespace Venus {
 
 	void Renderer::Render(const Ref<Shader>& shader, const Ref<VertexArray>& vertexArray, const glm::mat4& transform)
 	{
-		VS_PROFILE_FUNCTION();
-
 		s_Data.ModelBuffer.Transform = transform;
 		s_Data.ModelBuffer.EntityID = -1;
 		s_Data.ModelDataBuffer->SetData(&s_Data.ModelBuffer, sizeof(RendererData::ModelData));
@@ -295,8 +288,6 @@ namespace Venus {
 
 	void Renderer::RenderQuad(const Ref<Pipeline>& pipeline, const glm::mat4& transform)
 	{
-		VS_PROFILE_FUNCTION();
-
 		pipeline->GetFramebuffer()->Bind();
 		pipeline->GetShader()->Bind();
 
@@ -315,8 +306,6 @@ namespace Venus {
 
 	void Renderer::RenderQuadWithMaterial(const Ref<Pipeline>& pipeline, const glm::mat4& transform, const Ref<Material>& material)
 	{
-		VS_PROFILE_FUNCTION();
-
 		pipeline->GetFramebuffer()->Bind();
 		pipeline->GetShader()->Bind();
 		material->Bind();
@@ -364,8 +353,6 @@ namespace Venus {
 
 	void Renderer::RenderModel(const Ref<Pipeline>& pipeline, const Ref<Model>& model, const glm::mat4& transform, int entityID)
 	{
-		VS_PROFILE_FUNCTION();
-
 		pipeline->GetFramebuffer()->Bind();
 		pipeline->GetShader()->Bind();
 
@@ -387,14 +374,12 @@ namespace Venus {
 		pipeline->GetFramebuffer()->Unbind();
 	}
 
-	void Renderer::RenderModelWithMaterial(const Ref<Pipeline>& pipeline, const Ref<Model>& model, const glm::mat4& transform, int entityID)
+	void Renderer::RenderModelWithMaterial(const Ref<Pipeline>& pipeline, const Ref<Model>& model, const Ref<MaterialTable>& materialTable, const glm::mat4& transform, int entityID)
 	{
-		VS_PROFILE_FUNCTION();
-
 		pipeline->GetFramebuffer()->Bind();
 		pipeline->GetShader()->Bind();
 
-		auto& materialTable = model->GetMaterials();
+		auto& defaultMaterialTable = model->GetMaterialTable();
 		auto& envMaterial = s_Data.EnvironmentMaterial;
 
 		s_Data.ModelBuffer.Transform = transform;
@@ -410,7 +395,10 @@ namespace Venus {
 			s_Data.Stats.Meshs++;
 			s_Data.Stats.DrawCalls++;
 
-			materialTable[mesh.m_MaterialIndex]->GetMaterial()->Bind();
+			if (materialTable->HasMaterial(mesh.m_MaterialIndex))
+				materialTable->GetMaterial(mesh.m_MaterialIndex)->Bind();
+			else
+				defaultMaterialTable->GetMaterial(mesh.m_MaterialIndex)->Bind();
 
 			RenderCommand::DrawIndexed(mesh.m_VertexArray);
 		}
@@ -421,7 +409,7 @@ namespace Venus {
 
 	void Renderer::RenderSelectedModel(const Ref<Pipeline>& pipeline, const Ref<Model>& model, const glm::mat4& transform, int entityID)
 	{
-		VS_PROFILE_FUNCTION();
+		VS_CORE_ASSERT(false, "Not implemented!");
 	}
 
 	Ref<SceneEnvironment> Renderer::CreateEmptyEnvironmentMap()
@@ -581,12 +569,11 @@ namespace Venus {
 	void Renderer::OnImGuiRender()
 	{
 		ImGui::Begin("Renderer Debug");
-		ImGui::DragFloat("Layer", &s_Data.DebugParam, 1.0f, 0.0f, 3.0f);
 		glm::vec2 viewportPanelSize = { ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y };
 		if (s_Data.DebugTexture > 0)
 		{
-			ImGui::Image(reinterpret_cast<void*>(s_Data.DebugTexture), ImVec2{ 512, 512 }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
-		}		
+			ImGui::Image(reinterpret_cast<void*>(s_Data.DebugTexture), ImVec2{ viewportPanelSize.x, viewportPanelSize.y }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
+		}
 		ImGui::End();
 	}
 

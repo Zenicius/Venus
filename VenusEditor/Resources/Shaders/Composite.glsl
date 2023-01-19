@@ -102,8 +102,6 @@ void main()
 		col += bloom * bloomMask;
 	}
 
-	float grayscale = 0.2126 * col.r + 0.7152 * col.g + 0.0722 * col.b;
-
 	col *= u_Settings.Exposure;
 
 	if(u_Settings.ACESTone == 1)
@@ -111,7 +109,8 @@ void main()
 
 	if(u_Settings.GammaCorrection == 1)
 		col = GammaCorrect(col, gamma);
-	
+
+	float grayscale = 0.2126 * col.r + 0.7152 * col.g + 0.0722 * col.b;	
 	if(u_Settings.Grayscale == 1)
 		col = vec3(grayscale);
 

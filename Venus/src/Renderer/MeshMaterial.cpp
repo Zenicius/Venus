@@ -2,6 +2,7 @@
 #include "MeshMaterial.h"
 
 #include "Renderer/Renderer.h"
+#include "Assets/AssetSerializer.h"
 
 namespace Venus {
 
@@ -22,7 +23,17 @@ namespace Venus {
 	static const uint32_t s_MetalnessMapBinding = 2;
 	static const uint32_t s_RoughnessMapBinding = 3;
 
-	MeshMaterial::MeshMaterial()
+	/////////////////////////////////////////////////////////////////////////////
+	// MESH MATERIAL ////////////////////////////////////////////////////////////
+	/////////////////////////////////////////////////////////////////////////////
+
+	Ref<MeshMaterial> MeshMaterial::Create(const std::string& name)
+	{
+		return CreateRef<MeshMaterial>(name);
+	}
+
+	MeshMaterial::MeshMaterial(const std::string& name)
+		: m_Name(name)
 	{
 		m_Material = Material::Create(Renderer::GetShaderLibrary()->Get("PBR"));
 
@@ -41,6 +52,11 @@ namespace Venus {
 
 	MeshMaterial::~MeshMaterial()
 	{
+	}
+
+	void MeshMaterial::Bind()
+	{
+		m_Material->Bind();
 	}
 
 	glm::vec3& MeshMaterial::GetAlbedoColor()
@@ -160,5 +176,37 @@ namespace Venus {
 	{
 		m_RoughnessMapTexture = Renderer::GetDefaultTexture();
 		m_Material->SetTexture(s_RoughnessMapUniform, s_RoughnessMapBinding, Renderer::GetDefaultTexture()->GetRendererID());
+	}
+
+	/////////////////////////////////////////////////////////////////////////////
+	// MATERIAL TABLE ///////////////////////////////////////////////////////////
+	/////////////////////////////////////////////////////////////////////////////
+
+	MaterialTable::MaterialTable(uint32_t count)
+		:m_MaterialCount(count)
+	{
+	}
+
+	MaterialTable::MaterialTable(Ref<MaterialTable> other)
+		:m_MaterialCount(other->m_MaterialCount)
+	{
+		const auto& materials = other->GetMaterials();
+		for (auto [index, material] : materials)
+			SetMaterial(index, material);
+	}
+
+	void MaterialTable::SetMaterial(uint32_t index, Ref<MeshMaterial> material)
+	{
+		m_Materials[index] = material;
+		if (index >= m_MaterialCount)
+			m_MaterialCount = index + 1;
+	}
+
+	void MaterialTable::ClearMaterial(uint32_t index)
+	{
+		VS_CORE_ASSERT(HasMaterial(index));
+		m_Materials.erase(index);
+		if (index >= m_MaterialCount)
+			m_MaterialCount = index + 1;
 	}
 }

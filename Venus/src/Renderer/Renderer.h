@@ -34,7 +34,7 @@ namespace Venus {
 			static void RenderFullscreenQuad(const Ref<Pipeline>& pipeline, const Ref<Material>& material);
 			static void RenderCube(const Ref<Pipeline>& pipeline, const Ref<Material>& material);
 			static void RenderModel(const Ref<Pipeline>& pipeline, const Ref<Model>& model, const glm::mat4& transform = glm::mat4(1.0f), int entityID = -1);
-			static void RenderModelWithMaterial(const Ref<Pipeline>& pipeline, const Ref<Model>& model, const glm::mat4& transform = glm::mat4(1.0f), int entityID = -1);
+			static void RenderModelWithMaterial(const Ref<Pipeline>& pipeline, const Ref<Model>& model, const Ref<MaterialTable>& materialTable, const glm::mat4& transform = glm::mat4(1.0f), int entityID = -1);
 			static void RenderSelectedModel(const Ref<Pipeline>& pipeline, const Ref<Model>& model, const glm::mat4& transform = glm::mat4(1.0f), int entityID = -1);
 			
 			static void SetEnvironment(Ref<SceneEnvironment> envMap, uint32_t shadowMap);

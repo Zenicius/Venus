@@ -12,9 +12,44 @@ namespace Venus {
 
 	struct DrawCmd
 	{
-		Ref<Model> Model;
 		glm::mat4 Transform;
+		Ref<Model> Model;
+		Ref<MaterialTable> MaterialTable;
 		int ID;
+	};
+
+	struct QuadDrawCmd
+	{
+		glm::mat4 Transform;
+		Ref<Texture2D> Texture;
+		float TilingFactor;
+		glm::vec4 TintColor;
+		int ID;
+	};
+
+	struct CircleDrawCmd
+	{
+		glm::mat4 Transform;
+		glm::vec4 Color;
+		float Thickness;
+		float Fade;
+		int ID;
+	};
+
+	struct RectDrawCmd
+	{
+		glm::mat4 Transform;
+		glm::vec4 Color;
+		int ID;
+	};
+
+	struct BillboardDrawCmd
+	{
+		glm::vec3 Position;
+		glm::vec2 Size;
+		Ref<Texture2D> Texture;
+		float TilingFactor;
+		glm::vec4 TintColor;
 	};
 
 	struct CameraInfo
@@ -28,6 +63,7 @@ namespace Venus {
 
 	struct SceneRendererOptions
 	{
+		// Geral
 		bool ShowGrid = true;
 
 		// Shadows
@@ -41,17 +77,23 @@ namespace Venus {
 		float BloomIntensity = 1.0f;
 		float BloomThreshold = 1.0f;
 		float BloomKnee = 0.1f;
-		Ref<Texture2D> BloomDirtMask = nullptr;
+		AssetHandle BloomDirtMask = 0;
 		float BloomDirtMaskIntensity = 1.0f;
 		int BloomDebugTex = 0;
 		int BloomDebugMip = 0;
 
-		// Post
-		bool FXAA = true;
+		// Color / Lightning
 		float Exposure = 1.0f;
 		bool Grayscale = false;
 		bool ACESTone = true;
 		bool GammaCorrection = true;
+
+		// Anti Aliasing
+		bool FXAA = true;
+		float FXAAThresholdMin = 32.0f;
+		float FXAAThresholdMax = 8.0f;
+		int FXAAIterations = 12;
+		float FXAASubPixelQuality = 0.75f;
 	};
 
 	class SceneRenderer
@@ -63,12 +105,16 @@ namespace Venus {
 			void SetScene(Ref<Scene> scene);
 			void SetViewportSize(uint32_t width, uint32_t height);
 
-			void BeginScene(SceneCamera& camera, const glm::mat4& transform);
+			void BeginScene(CameraComponent& cameraComponent, const glm::mat4& transform);
 			void BeginScene(EditorCamera& camera);
 			void EndScene();
 
-			void SubmitModel(Ref<Model> model, const glm::mat4& transform = glm::mat4(1.0f), int entityID = -1);
-			void SubmitSelectedModel(Ref<Model> model, const glm::mat4& transform = glm::mat4(1.0f), int entityID = -1);
+			void SubmitModel(const Ref<Model>& model, const Ref<MaterialTable>& materialTable, const glm::mat4& transform = glm::mat4(1.0f), int entityID = -1);
+			void SubmitSelectedModel(const Ref<Model>& model, const Ref<MaterialTable>& materialTable, const glm::mat4& transform = glm::mat4(1.0f), int entityID = -1);
+			void SubmitQuad(const glm::mat4& transform, const Ref<Texture2D>& texture = nullptr, float tilingFactor = 1.0f, const glm::vec4& tintColor = glm::vec4(1.0f), int entityID = -1);
+			void SubmitCircle(const glm::mat4& transform, const glm::vec4& color, float thickness = 1.0f, float fade = 0.005f, int entityID = -1);
+			void SubmitRect(const glm::mat4& transform, const glm::vec4 color, int entityID = -1);
+			void SubmitBillboard(const glm::vec3& position, const glm::vec2& size, const Ref<Texture2D>& texture, float tilingFactor = 1.0f, const glm::vec4& tintColor = glm::vec4(1.0f));
 
 			SceneRendererOptions& GetOptions() { return m_Options; }
 			void OnImGuiRender(bool& show);
@@ -85,6 +131,7 @@ namespace Venus {
 			void FXAAPass();
 			void BloomPass();
 			void CompositePass();
+			void Render2DPass();
 
 
 			//-- Shadows Cascade
@@ -101,12 +148,21 @@ namespace Venus {
 
 			SceneRendererOptions m_Options;
 
+			CameraComponent* m_RuntimeCamera = nullptr;
+
 			std::vector<DrawCmd> m_DrawList;
 			std::vector<DrawCmd> m_SelectedDrawList;
 			std::vector<DrawCmd> m_ShadowDrawList;
 
+			std::vector<QuadDrawCmd> m_QuadDrawList;
+			std::vector<CircleDrawCmd> m_CircleDrawList;
+			std::vector<RectDrawCmd> m_RectDrawList;
+			std::vector<BillboardDrawCmd> m_BillboardDrawList;
+
 			uint32_t m_ViewportWidth = 0, m_ViewportHeight = 0;
+			glm::vec4 m_EditorBackgroundColor = { 0.1f, 0.1f, 0.1f, 1.0f };
 			bool m_Rendering = false;
+			bool m_IsRuntime = false;
 			bool m_NeedsResize = false;
 
 
@@ -187,6 +243,7 @@ namespace Venus {
 
 			Ref<Pipeline> m_FXAAPipeline;
 			Ref<ComputePipeline> m_BloomPipeline;
+			Ref<Framebuffer> m_2DFramebuffer;
 			Ref<Pipeline> m_CompositePipeline;
 
 			Ref<Pipeline> m_TempPipeline;

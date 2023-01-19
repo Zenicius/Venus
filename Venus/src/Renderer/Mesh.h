@@ -7,8 +7,6 @@
 #include "Renderer/VertexArray.h"
 #include "Renderer/MeshMaterial.h"
 
-#include <map>
-
 struct aiNode;
 struct aiMesh;
 struct aiMaterial;
@@ -47,7 +45,7 @@ namespace Venus {
 			friend class Model;
 	};
 
-	class Model
+	class Model : public Asset
 	{
 		public:
 			static Ref<Model> Create(const std::string& path);
@@ -55,7 +53,11 @@ namespace Venus {
 			Model(const std::string& path);
 
 			void LogMeshStatistics(const aiScene* scene);
-			std::map<uint32_t, Ref<MeshMaterial>> GetMaterials() { return m_Materials; }
+			Ref<MaterialTable> GetMaterialTable() const { return m_Materials; }
+			const std::vector<Mesh>& GetMeshs() const { return m_Meshes; }
+
+			static AssetType GetStaticType() { return AssetType::Model; }
+			virtual AssetType GetAssetType() const override { return GetStaticType(); }
 
 		private:
 			void LoadModel();
@@ -64,7 +66,7 @@ namespace Venus {
 			Mesh ProcessMesh(aiMesh* mesh, const aiScene* scene);
 
 			std::vector<Mesh> m_Meshes;
-			std::map<uint32_t, Ref<MeshMaterial>> m_Materials; // TODO: MaterialTable
+			Ref<MaterialTable> m_Materials;
 			
 			std::string m_Path;
 

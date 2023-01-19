@@ -1,6 +1,8 @@
 # Cache files
 *.frag
 *.vert
+*.comp
+*.geo
 
 # User files
 *.sln
@@ -55,4 +57,4 @@ Venus/vendor/VulkanSDK
 
 VenusEditor/Resources/Cache
 VenusEditor/Resources/Scripting
-VenusEditor/assets/models
+VenusEditor/Assets

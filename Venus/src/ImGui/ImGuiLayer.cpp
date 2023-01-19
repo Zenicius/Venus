@@ -31,12 +31,13 @@ namespace Venus {
 
 		// Fonts
 		io.Fonts->AddFontFromFileTTF("Resources/Fonts/Roboto-Bold.ttf", 18.0f);
-		io.FontDefault = io.Fonts->AddFontFromFileTTF("Resources/Fonts/Roboto-Regular.ttf", 18.0f);
-
 		ImFontConfig config;
 		config.MergeMode = true;
 		config.GlyphMinAdvanceX = 13.0f; // Use if you want to make the icon monospaced
 		static const ImWchar icon_ranges[] = { 0xf000, 0xf2e0, 0 };
+		io.Fonts->AddFontFromFileTTF("Resources/Fonts/fontawesome-webfont.ttf", 13.0f, &config, icon_ranges);
+
+		io.FontDefault = io.Fonts->AddFontFromFileTTF("Resources/Fonts/Roboto-Regular.ttf", 18.0f);
 		io.Fonts->AddFontFromFileTTF("Resources/Fonts/fontawesome-webfont.ttf", 13.0f, &config, icon_ranges);
 
 		// Setup Dear ImGui style

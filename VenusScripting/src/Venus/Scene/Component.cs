@@ -195,4 +195,54 @@ namespace Venus
         [MethodImpl(MethodImplOptions.InternalCall)]
         internal static extern void SetIntensity_VenusEngine(ulong entityID, float intensity);
     }
+
+    // RigidBody 2D
+    public class RigidBody2DComponent : Component
+    {
+        public Vector2 Position
+        {
+            get
+            {
+                GetRb2DPosition_VenusEngine(Entity.ID, out Vector2 position);
+                return position;
+            }
+
+            set
+            {
+                SetRb2DPosition_VenusEngine(Entity.ID, ref value);
+            }
+        }
+
+        public Vector2 Velocity
+        {
+            get
+            {
+                GetRb2DVelocity_VenusEngine(Entity.ID, out Vector2 velocity);
+                return velocity;
+            }
+
+            set
+            {
+                SetRb2DVelocity_VenusEngine(Entity.ID, ref value);
+            }
+        }
+
+        public void ApplyLinearImpulse(Vector2 impulse, bool wake)
+        {
+            ApplyLinearImpulse_VenusEngine(Entity.ID, ref impulse, wake);    
+        }
+
+        [MethodImpl(MethodImplOptions.InternalCall)]
+        internal static extern void GetRb2DPosition_VenusEngine(ulong entityID, out Vector2 position);
+        [MethodImpl(MethodImplOptions.InternalCall)]
+        internal static extern void SetRb2DPosition_VenusEngine(ulong entityID, ref Vector2 position);
+
+        [MethodImpl(MethodImplOptions.InternalCall)]
+        internal static extern void GetRb2DVelocity_VenusEngine(ulong entityID, out Vector2 velocity);
+        [MethodImpl(MethodImplOptions.InternalCall)]
+        internal static extern void SetRb2DVelocity_VenusEngine(ulong entityID, ref Vector2 velocity);
+
+        [MethodImpl(MethodImplOptions.InternalCall)]
+        internal static extern void ApplyLinearImpulse_VenusEngine(ulong entityID, ref Vector2 impulse, bool wake);
+    }
 }

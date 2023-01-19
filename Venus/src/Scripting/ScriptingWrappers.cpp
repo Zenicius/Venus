@@ -8,6 +8,8 @@
 #include <mono/metadata/mono-gc.h>
 #include <mono/metadata/object.h>
 
+#include "box2d/b2_body.h"
+
 #include "Scripting/ScriptingEngine.h"
 #include "Scene/Entity.h"
 
@@ -170,6 +172,10 @@ namespace Venus::ScriptingWrapper {
 		tagComponent.Name = newName;
 	}
 
+	/////////////////////////////////////////////////////////////////////////////
+	// Transform ////////////////////////////////////////////////////////////////
+	/////////////////////////////////////////////////////////////////////////////
+
 	void GetTransform(uint64_t entityID, TransformComponent* transform)
 	{
 		Entity entity = ScriptingEngine::GetContext()->GetEntityWithUUID(entityID);
@@ -224,6 +230,10 @@ namespace Venus::ScriptingWrapper {
 		entity.GetComponent<TransformComponent>().Scale = *scale;
 	}
 
+	/////////////////////////////////////////////////////////////////////////////
+	// Camera ///////////////////////////////////////////////////////////////////
+	/////////////////////////////////////////////////////////////////////////////
+
 	bool GetIsPrimary(uint64_t entityID)
 	{
 		Entity entity = ScriptingEngine::GetContext()->GetEntityWithUUID(entityID);
@@ -235,6 +245,10 @@ namespace Venus::ScriptingWrapper {
 		Entity entity = ScriptingEngine::GetContext()->GetEntityWithUUID(entityID);
 		entity.GetComponent<CameraComponent>().Primary = value;
 	}
+
+	/////////////////////////////////////////////////////////////////////////////
+	// Point Light //////////////////////////////////////////////////////////////
+	/////////////////////////////////////////////////////////////////////////////
 
 	void GetColor(uint64_t entityID, glm::vec3* color)
 	{
@@ -258,5 +272,64 @@ namespace Venus::ScriptingWrapper {
 	{
 		Entity entity = ScriptingEngine::GetContext()->GetEntityWithUUID(entityID);
 		entity.GetComponent<PointLightComponent>().Intensity = intensity;
+	}
+
+	/////////////////////////////////////////////////////////////////////////////
+	// RigidBody2D //////////////////////////////////////////////////////////////
+	/////////////////////////////////////////////////////////////////////////////
+
+	void GetRb2DPosition(uint64_t entityID, glm::vec2* position)
+	{
+		Entity entity = ScriptingEngine::GetContext()->GetEntityWithUUID(entityID);
+		
+		auto& rb = entity.GetComponent<Rigidbody2DComponent>();
+		b2Body* body = (b2Body*)rb.RuntimeBody;
+
+		glm::vec2 rbPos = glm::vec2(body->GetPosition().x, body->GetPosition().y);
+
+		*position = rbPos;
+	}
+
+	void SetRb2DPosition(uint64_t entityID, glm::vec2* position)
+	{
+		Entity entity = ScriptingEngine::GetContext()->GetEntityWithUUID(entityID);
+
+		auto& rb = entity.GetComponent<Rigidbody2DComponent>();
+		b2Body* body = (b2Body*)rb.RuntimeBody;
+
+		body->SetTransform(b2Vec2(position->x, position->y), body->GetAngle());
+	}
+
+	void GetRb2DVelocity(uint64_t entityID, glm::vec2* velocity)
+	{
+		Entity entity = ScriptingEngine::GetContext()->GetEntityWithUUID(entityID);
+
+		auto& rb = entity.GetComponent<Rigidbody2DComponent>();
+		b2Body* body = (b2Body*)rb.RuntimeBody;
+
+		glm::vec2 rbVelocity = glm::vec2(body->GetLinearVelocity().x, body->GetLinearVelocity().y);
+		
+		*velocity = rbVelocity;
+	}
+
+	void SetRb2DVelocity(uint64_t entityID, glm::vec2* velocity)
+	{
+		Entity entity = ScriptingEngine::GetContext()->GetEntityWithUUID(entityID);
+
+		auto& rb = entity.GetComponent<Rigidbody2DComponent>();
+		b2Body* body = (b2Body*)rb.RuntimeBody;
+
+		body->SetLinearVelocity(b2Vec2(velocity->x, velocity->y));
+	}
+
+	void ApplyLinearImpulse(uint64_t entityID, glm::vec2* impulse, bool wake)
+	{
+		auto scene = ScriptingEngine::GetContext();
+		Entity entity = scene->GetEntityWithUUID(entityID);
+
+		auto& rb = entity.GetComponent<Rigidbody2DComponent>();
+		b2Body* body = (b2Body*)rb.RuntimeBody;
+
+		body->ApplyLinearImpulseToCenter(b2Vec2(impulse->x, impulse->y), wake);
 	}
 }

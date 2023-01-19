@@ -1,14 +1,19 @@
 #pragma once
 
 #include "Renderer/Material.h"
+#include <map>
 
 namespace Venus {
 
-	class MeshMaterial
+	class MeshMaterial : public Asset
 	{
 		public:
-			MeshMaterial();
+			static Ref<MeshMaterial> Create(const std::string& name = "Default Material");
+
+			MeshMaterial(const std::string& name = "Default Material");
 			~MeshMaterial();
+
+			void Bind();
 
 			// Params
 			glm::vec3& GetAlbedoColor();
@@ -46,13 +51,48 @@ namespace Venus {
 			// Plain Material
 			Ref<Material> GetMaterial() const { return m_Material; }
 
+			std::string GetName() { return m_Name; }
+
+			static AssetType GetStaticType() { return AssetType::Material; }
+			virtual AssetType GetAssetType() const override { return GetStaticType(); }
+
 		private:
 			Ref<Material> m_Material;
+			
+			std::string m_Name;
 
 			Ref<Texture2D> m_AlbedoMapTexture;
 			Ref<Texture2D> m_NormalMapTexture;
 			Ref<Texture2D> m_MetalnessMapTexture;
 			Ref<Texture2D> m_RoughnessMapTexture;
+	};
+
+	class MaterialTable
+	{
+		public:
+			MaterialTable(uint32_t count = 1);
+			MaterialTable(Ref<MaterialTable> other);
+			~MaterialTable() = default;
+
+			bool HasMaterial(uint32_t index) const { return m_Materials.find(index) != m_Materials.end(); }
+			void SetMaterial(uint32_t index, Ref<MeshMaterial> material);
+			void ClearMaterial(uint32_t index);
+
+			Ref<MeshMaterial> GetMaterial(uint32_t index) const
+			{
+				VS_CORE_ASSERT(HasMaterial(index), "Material not found!");
+				return m_Materials.at(index);
+			}
+
+			std::map<uint32_t, Ref<MeshMaterial>>& GetMaterials() { return m_Materials; }
+			const std::map<uint32_t, Ref<MeshMaterial>>& GetMaterials() const { return m_Materials; }
+
+			uint32_t GetMaterialCount() const { return m_MaterialCount; }
+			void SetMaterialCount(uint32_t count) { m_MaterialCount = count; }
+
+		private:
+			std::map<uint32_t, Ref<MeshMaterial>> m_Materials;
+			uint32_t m_MaterialCount;
 	};
 }
 

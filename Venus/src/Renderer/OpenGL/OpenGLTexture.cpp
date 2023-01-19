@@ -13,129 +13,146 @@ namespace Venus {
 	OpenGLTexture2D::OpenGLTexture2D(uint32_t width, uint32_t height, TextureProperties props)
 		: m_Width(width), m_Height(height), m_Properties(props)
 	{
-		m_InternalFormat = OpenGLTextureFormat(props.Format);
-		m_DataFormat = GL_RGBA;
-
-		uint32_t mipmapCount = props.GenerateMipmaps ? GetMipLevelCount() : 1;
-
-		glCreateTextures(GL_TEXTURE_2D, 1, &m_RendererID);
-		glTextureStorage2D(m_RendererID, mipmapCount, m_InternalFormat, m_Width, m_Height);
-
-		GLenum minFilter = OpenGLFilterMode(props.Filter);
-		if (props.UseMipmaps && minFilter == GL_LINEAR)
-			minFilter = GL_LINEAR_MIPMAP_LINEAR;
-		else if (props.UseMipmaps && minFilter == GL_NEAREST)
-			minFilter = GL_NEAREST_MIPMAP_NEAREST;
-		glTextureParameteri(m_RendererID, GL_TEXTURE_MIN_FILTER, minFilter);
-		glTextureParameteri(m_RendererID, GL_TEXTURE_MAG_FILTER, OpenGLFilterMode(props.Filter));
-
-		glTextureParameteri(m_RendererID, GL_TEXTURE_WRAP_S, OpenGLWrapMode(props.WrapMode));
-		glTextureParameteri(m_RendererID, GL_TEXTURE_WRAP_T, OpenGLWrapMode(props.WrapMode));
-
-		if(props.GenerateMipmaps)
-			GenerateMips();
+		Invalidate();
 	}
 
 	OpenGLTexture2D::OpenGLTexture2D(const std::string& path, TextureProperties props)
 		: m_Path(path), m_Properties(props)
 	{
-		int width, height, channels;
-
-		//-- HDR Image------------------------------------------------------------------------------
-		if (stbi_is_hdr(path.c_str()))
-		{
-			stbi_set_flip_vertically_on_load(m_Properties.FlipVertically);
-			float* data = nullptr;
-			data = stbi_loadf(path.c_str(), &width, &height, &channels, 4);
-
-			CORE_LOG_INFO("Texture is HDR!");
-
-			if (data)
-			{
-				m_IsLoaded = true;
-
-				m_Width = width;
-				m_Height = height;
-
-				props.Format = TextureFormat::RGBA32F;
-
-				uint32_t mipmapCount = props.GenerateMipmaps ? GetMipLevelCount() : 1;
-
-				m_InternalFormat = OpenGLTextureFormat(props.Format);
-				m_DataFormat = GL_RGBA;
-
-				glCreateTextures(GL_TEXTURE_2D, 1, &m_RendererID);
-				glTextureStorage2D(m_RendererID, mipmapCount, m_InternalFormat, m_Width, m_Height);
-
-				GLenum minFilter = OpenGLFilterMode(props.Filter);
-				if (props.UseMipmaps && minFilter == GL_LINEAR)
-					minFilter = GL_LINEAR_MIPMAP_LINEAR;
-				else if (props.UseMipmaps && minFilter == GL_NEAREST)
-					minFilter = GL_NEAREST_MIPMAP_NEAREST;
-				glTextureParameteri(m_RendererID, GL_TEXTURE_MIN_FILTER, minFilter);
-				glTextureParameteri(m_RendererID, GL_TEXTURE_MAG_FILTER, OpenGLFilterMode(props.Filter));
-
-				glTextureParameteri(m_RendererID, GL_TEXTURE_WRAP_S, OpenGLWrapMode(props.WrapMode));
-				glTextureParameteri(m_RendererID, GL_TEXTURE_WRAP_T, OpenGLWrapMode(props.WrapMode));
-
-				glTextureSubImage2D(m_RendererID, 0, 0, 0, m_Width, m_Height, m_DataFormat, GL_FLOAT, data);
-
-				if (props.GenerateMipmaps)
-					GenerateMips();
-
-				stbi_image_free(data);
-			}
-			else
-				CORE_LOG_ERROR("Could not find HDR texture: {0}", path);
-		}
-		//-- Normal Image---------------------------------------------------------------------------
-		else
-		{
-			stbi_set_flip_vertically_on_load(m_Properties.FlipVertically);
-			stbi_uc* data = nullptr;
-			data = stbi_load(path.c_str(), &width, &height, &channels, 4);
-
-			if (data)
-			{
-				m_IsLoaded = true;
-
-				m_Width = width;
-				m_Height = height;
-
-				m_InternalFormat = OpenGLTextureFormat(props.Format);
-				m_DataFormat = GL_RGBA;
-
-				uint32_t mipmapCount = props.GenerateMipmaps ? GetMipLevelCount() : 1;
-
-				glCreateTextures(GL_TEXTURE_2D, 1, &m_RendererID);
-				glTextureStorage2D(m_RendererID, mipmapCount, m_InternalFormat, m_Width, m_Height);
-
-				GLenum minFilter = OpenGLFilterMode(props.Filter);
-				if (props.UseMipmaps && minFilter == GL_LINEAR)
-					minFilter = GL_LINEAR_MIPMAP_LINEAR;
-				else if (props.UseMipmaps && minFilter == GL_NEAREST)
-					minFilter = GL_NEAREST_MIPMAP_NEAREST;
-				glTextureParameteri(m_RendererID, GL_TEXTURE_MIN_FILTER, minFilter);
-				glTextureParameteri(m_RendererID, GL_TEXTURE_MAG_FILTER, OpenGLFilterMode(props.Filter));
-
-				glTextureParameteri(m_RendererID, GL_TEXTURE_WRAP_S, OpenGLWrapMode(props.WrapMode));
-				glTextureParameteri(m_RendererID, GL_TEXTURE_WRAP_T, OpenGLWrapMode(props.WrapMode));
-
-				glTextureSubImage2D(m_RendererID, 0, 0, 0, m_Width, m_Height, m_DataFormat, GL_UNSIGNED_BYTE, data);
-
-				if (props.GenerateMipmaps)
-					GenerateMips();
-
-				stbi_image_free(data);
-			}
-			else
-				CORE_LOG_ERROR("Could not find texture: {0}", path);
-		}
+		Invalidate();
 	}
 
 	OpenGLTexture2D::~OpenGLTexture2D()
 	{
 		glDeleteTextures(1, &m_RendererID);
+	}
+
+	void OpenGLTexture2D::Invalidate()
+	{
+		//-- Create Texture and load Data---------------------------------------------------------------
+		if (!m_Path.empty())
+		{
+			int width, height, channels;
+
+			//-- HDR Image------------------------------------------------------------------------------
+			if (stbi_is_hdr(m_Path.c_str()))
+			{
+				stbi_set_flip_vertically_on_load(m_Properties.FlipVertically);
+				float* data = nullptr;
+				data = stbi_loadf(m_Path.c_str(), &width, &height, &channels, 4);
+
+				if (data)
+				{
+					m_IsLoaded = true;
+
+					m_Width = width;
+					m_Height = height;
+
+					m_Properties.Format = TextureFormat::RGBA32F;
+
+					uint32_t mipmapCount = m_Properties.GenerateMipmaps ? GetMipLevelCount() : 1;
+
+					m_InternalFormat = OpenGLTextureFormat(m_Properties.Format);
+					m_DataFormat = GL_RGBA;
+
+					glCreateTextures(GL_TEXTURE_2D, 1, &m_RendererID);
+					glTextureStorage2D(m_RendererID, mipmapCount, m_InternalFormat, m_Width, m_Height);
+
+					GLenum minFilter = OpenGLFilterMode(m_Properties.Filter);
+					if (m_Properties.UseMipmaps && minFilter == GL_LINEAR)
+						minFilter = GL_LINEAR_MIPMAP_LINEAR;
+					else if (m_Properties.UseMipmaps && minFilter == GL_NEAREST)
+						minFilter = GL_NEAREST_MIPMAP_NEAREST;
+
+					glTextureParameteri(m_RendererID, GL_TEXTURE_MIN_FILTER, minFilter);
+					glTextureParameteri(m_RendererID, GL_TEXTURE_MAG_FILTER, OpenGLFilterMode(m_Properties.Filter));
+					glTextureParameteri(m_RendererID, GL_TEXTURE_WRAP_S, OpenGLWrapMode(m_Properties.WrapMode));
+					glTextureParameteri(m_RendererID, GL_TEXTURE_WRAP_T, OpenGLWrapMode(m_Properties.WrapMode));
+
+					glTextureSubImage2D(m_RendererID, 0, 0, 0, m_Width, m_Height, m_DataFormat, GL_FLOAT, data);
+
+					if (m_Properties.GenerateMipmaps)
+						GenerateMips();
+
+					stbi_image_free(data);
+				}
+				else
+					CORE_LOG_ERROR("Could not load HDR texture: {0}", m_Path);
+			}
+			//-- Normal Image---------------------------------------------------------------------------
+			else
+			{
+				stbi_set_flip_vertically_on_load(m_Properties.FlipVertically);
+				stbi_uc* data = nullptr;
+				data = stbi_load(m_Path.c_str(), &width, &height, &channels, 4);
+
+				if (data)
+				{
+					m_IsLoaded = true;
+
+					m_Width = width;
+					m_Height = height;
+
+					m_InternalFormat = OpenGLTextureFormat(m_Properties.Format);
+					m_DataFormat = GL_RGBA;
+
+					uint32_t mipmapCount = m_Properties.GenerateMipmaps ? GetMipLevelCount() : 1;
+
+					glCreateTextures(GL_TEXTURE_2D, 1, &m_RendererID);
+					glTextureStorage2D(m_RendererID, mipmapCount, m_InternalFormat, m_Width, m_Height);
+
+					GLenum minFilter = OpenGLFilterMode(m_Properties.Filter);
+					if (m_Properties.UseMipmaps && minFilter == GL_LINEAR)
+						minFilter = GL_LINEAR_MIPMAP_LINEAR;
+					else if (m_Properties.UseMipmaps && minFilter == GL_NEAREST)
+						minFilter = GL_NEAREST_MIPMAP_NEAREST;
+
+					glTextureParameteri(m_RendererID, GL_TEXTURE_MIN_FILTER, minFilter);
+					glTextureParameteri(m_RendererID, GL_TEXTURE_MAG_FILTER, OpenGLFilterMode(m_Properties.Filter));
+					glTextureParameteri(m_RendererID, GL_TEXTURE_WRAP_S, OpenGLWrapMode(m_Properties.WrapMode));
+					glTextureParameteri(m_RendererID, GL_TEXTURE_WRAP_T, OpenGLWrapMode(m_Properties.WrapMode));
+
+					glTextureSubImage2D(m_RendererID, 0, 0, 0, m_Width, m_Height, m_DataFormat, GL_UNSIGNED_BYTE, data);
+
+					if (m_Properties.GenerateMipmaps)
+						GenerateMips();
+
+					stbi_image_free(data);
+				}
+				else
+					CORE_LOG_ERROR("Could not load texture: {0}", m_Path);
+			}
+		}
+		//-- Create Texture Storage Only----------------------------------------------------------------
+		else
+		{
+			m_InternalFormat = OpenGLTextureFormat(m_Properties.Format);
+			m_DataFormat = GL_RGBA;
+
+			uint32_t mipmapCount = m_Properties.GenerateMipmaps ? GetMipLevelCount() : 1;
+
+			glCreateTextures(GL_TEXTURE_2D, 1, &m_RendererID);
+			glTextureStorage2D(m_RendererID, mipmapCount, m_InternalFormat, m_Width, m_Height);
+
+			GLenum minFilter = OpenGLFilterMode(m_Properties.Filter);
+			if (m_Properties.UseMipmaps && minFilter == GL_LINEAR)
+				minFilter = GL_LINEAR_MIPMAP_LINEAR;
+			else if (m_Properties.UseMipmaps && minFilter == GL_NEAREST)
+				minFilter = GL_NEAREST_MIPMAP_NEAREST;
+
+			glTextureParameteri(m_RendererID, GL_TEXTURE_MIN_FILTER, minFilter);
+			glTextureParameteri(m_RendererID, GL_TEXTURE_MAG_FILTER, OpenGLFilterMode(m_Properties.Filter));
+			glTextureParameteri(m_RendererID, GL_TEXTURE_WRAP_S, OpenGLWrapMode(m_Properties.WrapMode));
+			glTextureParameteri(m_RendererID, GL_TEXTURE_WRAP_T, OpenGLWrapMode(m_Properties.WrapMode));
+
+			if (m_Properties.GenerateMipmaps)
+				GenerateMips();
+		}
+	}
+
+	void OpenGLTexture2D::Reload()
+	{
+		Invalidate();
 	}
 
 	void OpenGLTexture2D::SetData(void* data, uint32_t size, uint32_t mipLevel)
@@ -167,6 +184,13 @@ namespace Venus {
 	void OpenGLTexture2D::Bind(uint32_t slot) const
 	{
 		glBindTextureUnit(slot, m_RendererID);
+	}
+
+	void OpenGLTexture2D::SetProperties(TextureProperties props, bool reload)
+	{
+		m_Properties = props;
+		if (reload)
+			Reload();
 	}
 
 	uint32_t OpenGLTexture2D::GetMipLevelCount() const
@@ -271,6 +295,11 @@ namespace Venus {
 		glDeleteTextures(1, &m_RendererID);
 	}
 
+	void OpenGLTextureCube::Reload()
+	{
+		VS_CORE_ASSERT(false, "Not implemented");
+	}
+
 	void OpenGLTextureCube::SetData(void* data, uint32_t size, uint32_t mipLevel)
 	{
 		// TODO: Check if data is entire texture / SetData in mip levels...
@@ -291,6 +320,13 @@ namespace Venus {
 	void OpenGLTextureCube::Bind(uint32_t slot) const
 	{
 		glBindTextureUnit(slot, m_RendererID);
+	}
+
+	void OpenGLTextureCube::SetProperties(TextureProperties props, bool reload)
+	{
+		m_Properties = props;
+		if (reload)
+			Reload();
 	}
 
 	uint32_t OpenGLTextureCube::GetMipLevelCount() const

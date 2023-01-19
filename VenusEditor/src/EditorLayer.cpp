@@ -1,5 +1,8 @@
 #include "EditorLayer.h"
 
+#include "Assets/AssetManager.h"
+#include "Scripting/ScriptingEngine.h"
+
 #include "GLFW/glfw3.h"
 #include "ImGui/UI.h"
 #include <ImGuizmo/ImGuizmo.h>
@@ -8,7 +11,7 @@
 
 namespace Venus {
 
-	extern const std::filesystem::path g_AssetPath;
+	extern const std::filesystem::path g_AssetsPath;
 
 	EditorLayer::EditorLayer()
 		: Layer("EditorLayer")
@@ -17,8 +20,10 @@ namespace Venus {
 
 	void EditorLayer::OnAttach()
 	{
+		AssetManager::Init(); // Maybe init in other place?
+
 		// Scene
-		m_EditorScene = CreateRef<Scene>();		
+		m_EditorScene = CreateRef<Scene>();
 		m_ActiveScene = m_EditorScene;
 		m_EditorCamera = EditorCamera(glm::radians(45.0f), 1280.0f / 720.0f, 0.1f, 1000.0f);
 
@@ -27,29 +32,44 @@ namespace Venus {
 		// Panels
 		m_ObjectsPanel.SetContext(m_ActiveScene);
 		m_AssetBrowserPanel.SetContext(m_ActiveScene);
+		m_AssetBrowserPanel.SetAssetOpenCallback([this](AssetType type, const std::filesystem::path& path)
+			{ OnAssetOpen(type, path); });
 
 		// Icons 
-		TextureProperties props;
+		TextureProperties props, props2, props3;
 		props.FlipVertically = false;
+		props2.UseMipmaps = true;
+		props3.UseMipmaps = true;
+		props3.FlipVertically = false;
+
 		m_VenusLogoIcon = Texture2D::Create("Resources/Icons/venus.png");
-		m_PlayIcon = Texture2D::Create("Resources/Icons/Toolbar/play.png");
-		m_StopIcon = Texture2D::Create("Resources/Icons/Toolbar/stop.png");
-		m_EditorCameraIcon = Texture2D::Create("Resources/Icons/Toolbar/camera.png");
-		m_SceneCameraIcon = Texture2D::Create("Resources/Icons/Scene/camera.png");
+		m_PlayIcon = Texture2D::Create("Resources/Icons/Toolbar/play.png", props3);
+		m_StopIcon = Texture2D::Create("Resources/Icons/Toolbar/stop.png", props3);
+		m_SimulateIcon = Texture2D::Create("Resources/Icons/Toolbar/simulate.png", props3);
+		m_PauseIcon = Texture2D::Create("Resources/Icons/Toolbar/pause.png", props3);
+		m_UnpauseIcon = Texture2D::Create("Resources/Icons/Toolbar/unpause.png", props3);
+		m_DPlayIcon = Texture2D::Create("Resources/Icons/Toolbar/dplay.png", props3);
+		m_DStopIcon = Texture2D::Create("Resources/Icons/Toolbar/dstop.png", props3);
+		m_DSimulateIcon = Texture2D::Create("Resources/Icons/Toolbar/dsimulate.png", props3);
 		m_CreateIcon = Texture2D::Create("Resources/Icons/Toolbar/create.png", props);
 		m_SaveIcon = Texture2D::Create("Resources/Icons/Toolbar/save.png");
-		m_UndoIcon = Texture2D::Create("Resources/Icons/Toolbar/undo.png");
-		m_RedoIcon = Texture2D::Create("Resources/Icons/Toolbar/redo.png");
 		m_SettingsIcon = Texture2D::Create("Resources/Icons/Toolbar/settings.png");
+
 		m_MinimizeIcon = Texture2D::Create("Resources/Icons/Titlebar/minimize.png");
 		m_MaximizeIcon = Texture2D::Create("Resources/Icons/Titlebar/maximize.png");
 		m_RestoreIcon = Texture2D::Create("Resources/Icons/Titlebar/restore.png", props);
 		m_CloseIcon = Texture2D::Create("Resources/Icons/Titlebar/close.png");
 
+		m_SceneCameraIcon = Texture2D::Create("Resources/Icons/Scene/camera.png", props2);
+		m_PointLightIcon = Texture2D::Create("Resources/Icons/Scene/pointlight.png", props2);
+
 		UpdateWindowTitle(m_EditorScene->m_SceneName);
 	}
 
-	void EditorLayer::OnDetach() {}
+	void EditorLayer::OnDetach() 
+	{
+		AssetManager::Shutdown();
+	}
 
 	void EditorLayer::OnUpdate(Timestep ts)
 	{
@@ -68,9 +88,16 @@ namespace Venus {
 				m_ActiveScene->OnUpdateRuntime(m_SceneRenderer, ts);
 				break;
 			}
-		} 
+			case SceneState::Simulate:
+			{
+				m_EditorCamera.SetActive(m_ViewportHovered);
+				m_EditorCamera.OnUpdate(ts);
+				m_ActiveScene->OnUpdateSimulation(m_SceneRenderer, ts, m_EditorCamera);
+				break;
+			}
+		}
 
-		UpdateHoveredEntity();
+		OnOverlayRender();
 	}
 
 	void EditorLayer::OnImGuiRender()
@@ -114,7 +141,7 @@ namespace Venus {
 		//bool maximized = Application::Get().GetWindow().IsMaximized();
 		OnManualWindowResize();
 		//UI_WindowBorder();
-		
+
 
 		// Title bar
 		const float titlebarHeight = UI_TitleBar();
@@ -123,14 +150,14 @@ namespace Venus {
 		// DockSpace
 		ImGuiIO& io = ImGui::GetIO();
 		ImGuiStyle& style = ImGui::GetStyle();
-		style.WindowMinSize.x = 100.0f;
+		style.WindowMinSize.x = 410.0f;
 
 		if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable)
 		{
 			ImGuiID dockspace_id = ImGui::GetID("MyDockSpace");
 			ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags);
 		}
-		style.WindowMinSize.x = 64.0f;
+		style.WindowMinSize.x = 410.0f;
 
 		// UI
 		UI_ModalWelcome();
@@ -138,9 +165,7 @@ namespace Venus {
 		UI_Viewport();
 		UI_Settings();
 
-		//Renderer::OnImGuiRender();
-
-		if(m_ShowWelcomeMessage)
+		if (m_ShowWelcomeMessage)
 			ImGui::OpenPopup("Welcome");
 
 		// Panels
@@ -148,7 +173,10 @@ namespace Venus {
 		m_ConsolePanel.OnImGuiRender(m_ShowConsolePanel);
 		m_AssetBrowserPanel.OnImGuiRender(m_ShowAssetBrowserPanel);
 		m_RendererStatsPanel.OnImGuiRender(m_ShowStatsPanel);
+		m_MaterialEditorPanel.OnImGuiRender(m_ShowMaterialEditor);
 		m_SceneRenderer->OnImGuiRender(m_ShowSceneSettingsPanel);
+		AssetManager::OnImGuiRender(m_ShowAssetsInspector);
+		//Renderer::OnImGuiRender();
 
 		ImGui::End();
 	}
@@ -209,12 +237,11 @@ namespace Venus {
 		UI_MenuBar();
 		if (ImGui::IsItemHovered())
 			m_TitleBarHovered = false;
-		
+
 		// Scene Name
 		const std::string title = m_ActiveScene->m_SceneName;
 		const ImVec2 textSize = ImGui::CalcTextSize(title.c_str());
-		const float rightOffset = ImGui::GetWindowWidth() / 2.0f;
-		ImGui::SetCursorPosX(ImGui::GetWindowWidth() - rightOffset - textSize.x);
+		ImGui::SetCursorPosX((ImGui::GetWindowWidth() * 0.5) - textSize.x);
 		ImGui::SetCursorPosY(ImGui::GetCursorPosY() - 20.0f);
 		ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[0]); // Bold
 		ImGui::Text(title.c_str());
@@ -353,7 +380,7 @@ namespace Venus {
 		window->DC.NavLayerCurrent = ImGuiNavLayer_Menu;
 		window->DC.MenuBarAppending = true;
 		ImGui::AlignTextToFramePadding();
-		MenuBar =  true;
+		MenuBar = true;
 
 
 		ImGui::BeginGroup();
@@ -368,7 +395,7 @@ namespace Venus {
 
 				if (ImGui::MenuItem(ICON_FA_FILE  "  Open...", "Ctrl+O"))
 					OpenScene();;
-				
+
 				if (ImGui::MenuItem(ICON_FA_FLOPPY_O  "  Save", "Ctrl+S"))
 					SaveScene();
 
@@ -412,11 +439,14 @@ namespace Venus {
 				if (ImGui::MenuItem(ICON_FA_STAR " Asset Browser", nullptr, m_ShowAssetBrowserPanel))
 					m_ShowAssetBrowserPanel = !m_ShowAssetBrowserPanel;
 
-				if (ImGui::MenuItem(ICON_FA_COGS " Scene Properties", nullptr, m_ShowSceneSettingsPanel))
-					m_ShowSceneSettingsPanel = !m_ShowSceneSettingsPanel;
+				if (ImGui::MenuItem(ICON_FA_STAR_O " Assets Inspector", nullptr, m_ShowAssetsInspector))
+					m_ShowAssetsInspector = !m_ShowAssetsInspector;
 
 				if (ImGui::MenuItem(ICON_FA_TERMINAL " Console", nullptr, m_ShowConsolePanel))
 					m_ShowConsolePanel = !m_ShowConsolePanel;
+
+				if (ImGui::MenuItem(ICON_FA_SLIDERS " Renderer Properties", nullptr, m_ShowSceneSettingsPanel))
+					m_ShowSceneSettingsPanel = !m_ShowSceneSettingsPanel;
 
 				if (ImGui::MenuItem(ICON_FA_SIGNAL " Statistics", nullptr, m_ShowStatsPanel))
 					m_ShowStatsPanel = !m_ShowStatsPanel;
@@ -437,6 +467,11 @@ namespace Venus {
 					FileDialogs::Open(solutionPath.c_str());
 				}
 
+				if (ImGui::MenuItem(ICON_FA_REFRESH " Reload Assembly", nullptr))
+				{
+					ScriptingEngine::Reload();
+				}
+
 				if (ImGui::MenuItem(ICON_FA_SHARE " Reload Assembly on Play", nullptr, scene->m_ReloadAssembliesOnPlay))
 				{
 					scene->m_ReloadAssembliesOnPlay = !scene->m_ReloadAssembliesOnPlay;
@@ -453,7 +488,7 @@ namespace Venus {
 
 				ImGui::EndMenu();
 			}
-			
+
 			ImGuiWindow* window = ImGui::GetCurrentWindow();
 			if (window->SkipItems)
 				return;
@@ -498,117 +533,13 @@ namespace Venus {
 
 	void EditorLayer::UI_ToolBar()
 	{
-#if 0
-		// Toolbar settings
-		auto& colors = ImGui::GetStyle().Colors;
-
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(colors[ImGuiCol_Button].x, colors[ImGuiCol_Button].y, 
-							  colors[ImGuiCol_Button].z, 0.0f));
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(colors[ImGuiCol_ButtonHovered].x, colors[ImGuiCol_ButtonHovered].y,
-			colors[ImGuiCol_ButtonHovered].z, 0.3f));
-
-		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 5));
-		ImGui::PushStyleVar(ImGuiStyleVar_ItemInnerSpacing, ImVec2(0, 0));
-
-		ImGui::Begin("##Toolbar", nullptr, ImGuiWindowFlags_NoDecoration |
-		ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoTitleBar);
-
-		// Play // Stop
-		float size = ImGui::GetWindowHeight() - 10.0f;
-		ImGui::SetCursorPosX((ImGui::GetWindowContentRegionMax().x * 0.5f) - (size * 0.5f));
-		Ref<Texture2D> icon = m_SceneState == SceneState::Edit ? m_PlayIcon : m_StopIcon;
-		if (ImGui::ImageButton((ImTextureID)icon->GetRendererID(), ImVec2{ size, size }, ImVec2(0, 0), ImVec2(1, 1), 0))
-		{
-			if (m_SceneState == SceneState::Edit)
-				OnScenePlay();
-			else if (m_SceneState == SceneState::Play)
-				OnSceneStop();
-		}
-		ImGui::PopStyleColor(2);
-
-		float startPos = 0.13f;
-		ImVec4 selectedColor = { 0.85f, 0.8505f, 0.851f, 1.0f };
-		ImVec4 unselectedColor = { 0.0f, 0.0f, 0.0f, 0.0f };
-		ImVec4 color = { 0.0f, 0.0f, 0.0f, 0.0f };
-
-		// Gizmos Position TODO: Better way to handle button activation
-		ImGui::SameLine();
-
-		ImGui::SetCursorPosX((ImGui::GetWindowContentRegionMax().x * startPos));
-		if (m_GizmoType == ImGuizmo::OPERATION::TRANSLATE)
-			color = selectedColor;
-		else
-			color = unselectedColor;
-		if (ImGui::ImageButton((ImTextureID)m_GizmosPositionIcon->GetRendererID(), ImVec2{ size, size }, ImVec2(0, 0), ImVec2(1, 1), 0, color))
-		{
-			m_GizmoType = ImGuizmo::OPERATION::TRANSLATE;
-		}
-
-		// Gizmos Rotation
-		ImGui::SameLine();
-		if (m_GizmoType == ImGuizmo::OPERATION::ROTATE)
-			color = selectedColor;
-		else
-			color = unselectedColor;
-		ImGui::SetCursorPosX((ImGui::GetWindowContentRegionMax().x * startPos) + size * 1.5);
-		if (ImGui::ImageButton((ImTextureID)m_GizmosRotationIcon->GetRendererID(), ImVec2{ size, size }, ImVec2(0, 0), ImVec2(1, 1), 0, color))
-		{
-			m_GizmoType = ImGuizmo::OPERATION::ROTATE;
-		}
-
-		// Gizmos Scale
-		ImGui::SameLine();
-		if (m_GizmoType == ImGuizmo::OPERATION::SCALE)
-			color = selectedColor;
-		else
-			color = unselectedColor;
-		ImGui::SetCursorPosX((ImGui::GetWindowContentRegionMax().x * startPos) + (size * 1.5) * 2);
-		if (ImGui::ImageButton((ImTextureID)m_GizmosScaleIcon->GetRendererID(), ImVec2{ size, size }, ImVec2(0, 0), ImVec2(1, 1), 0, color))
-		{
-			m_GizmoType = ImGuizmo::OPERATION::SCALE;
-		}
-
-		// Grid 
-		ImGui::SameLine();
-		if (m_SceneRenderer->GetOptions().ShowGrid)
-			color = selectedColor;
-		else 
-			color = unselectedColor;
-		ImGui::SetCursorPosX((ImGui::GetWindowContentRegionMax().x * startPos) + (size * 1.5) * 3);
-		if (ImGui::ImageButton((ImTextureID)m_GridIcon->GetRendererID(), ImVec2{ size, size }, ImVec2(0, 0), ImVec2(1, 1), 0, color))
-		{
-			m_SceneRenderer->GetOptions().ShowGrid = !m_SceneRenderer->GetOptions().ShowGrid;
-		}
-
-		// Reset Camera
-		ImGui::SameLine();
-		ImGui::SetCursorPosX((ImGui::GetWindowContentRegionMax().x * startPos) + (size * 1.5) * 4);
-		if (ImGui::ImageButton((ImTextureID)m_EditorCameraIcon->GetRendererID(), ImVec2{ size, size }, ImVec2(0, 0), ImVec2(1, 1), 0, unselectedColor))
-		{
-			m_EditorCamera = EditorCamera(glm::radians(45.0f), 1280.0f / 720.0f, 0.1f, 1000.0f);
-		}
-
-		// Scene Name Temp
-		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(colors[ImGuiCol_Button].x, colors[ImGuiCol_Button].y,
-			colors[ImGuiCol_Button].z, 1.0f));
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(colors[ImGuiCol_Button].x, colors[ImGuiCol_Button].y,
-			colors[ImGuiCol_Button].z, 1.0f));
-		ImGui::SameLine();
-		ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x * 0.9);
-		ImGui::SetCursorPosY(0.0f);
-		ImGui::Button(m_ActiveScene->m_SceneName.c_str());
-		ImGui::PopStyleColor(2);
-
-		ImGui::PopStyleVar(2);
-		ImGui::End();
-#endif
 		auto& colors = ImGui::GetStyle().Colors;
 
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 5));
 		ImGui::PushStyleVar(ImGuiStyleVar_ItemInnerSpacing, ImVec2(0, 0));
 
 		ImGui::Begin("##Toolbar", nullptr, ImGuiWindowFlags_NoDecoration |
-		ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoTitleBar);
+			ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoTitleBar);
 
 		ImVec4 normalColor = { colors[ImGuiCol_Button].x, colors[ImGuiCol_Button].y, colors[ImGuiCol_Button].z, 0.0f };
 		ImGui::PushStyleColor(ImGuiCol_WindowBg, { 1.10f, 0.10f, 0.10f, 1.0f });
@@ -617,64 +548,36 @@ namespace Venus {
 		ImGui::PushStyleColor(ImGuiCol_Border, normalColor);
 		ImGui::PushStyleColor(ImGuiCol_BorderShadow, normalColor);
 
-		ImGui::Columns(5);
+		ImGui::Columns(4);
 
 		// SAVE BUTTON
 		{
-			ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 5.0f);
-
 			ImVec4 normalColor = { colors[ImGuiCol_Button].x, colors[ImGuiCol_Button].y, colors[ImGuiCol_Button].z, 0.0f };
 
-			ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 5.0f);
-			if (ImGui::ImageButton((ImTextureID)m_UndoIcon->GetRendererID(), ImVec2{ 20, 20 }, ImVec2(0, 0), ImVec2(1, 1), 0))
-			{
-
-			}
-
-			ImGui::SameLine();
-
-			if (ImGui::ImageButton((ImTextureID)m_RedoIcon->GetRendererID(), ImVec2{ 20, 20 }, ImVec2(0, 0), ImVec2(1, 1), 0))
-			{
-
-			}
-
-			ImGui::SameLine();
-			ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 30.0f);
+			UI::ShiftPos(25.0f, 5.0f);
 
 			bool clicked = false;
-			if (ImGui::ImageButton((ImTextureID)m_SaveIcon->GetRendererID(), ImVec2{ 23, 20 }, ImVec2(0, 0), ImVec2(1, 1), 0))
-			{
-				clicked = true;
-			}
-
-			ImGui::SameLine();
-			ImGui::SetCursorPosX(ImGui::GetCursorPosX() - 4.0f);
-
-			ImGui::Button("Save");
-			if (ImGui::IsItemClicked())
-				clicked = true;
-
-			if (clicked)
+			if (ImGui::ImageButton((ImTextureID)m_SaveIcon->GetRendererID(), ImVec2{ 25, 22 }, ImVec2(0, 0), ImVec2(1, 1), 0))
 			{
 				SaveScene();
 			}
+			UI::SetTooltip(" Save Current Scene ");
 		}
 
 		// Create
 		{
 			ImGui::SameLine();
 			ImGui::NextColumn();
-			ImGui::SetColumnOffset(ImGui::GetColumnIndex(), 190);
-			ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 20.0f);
-			ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 5.0f);
+			UI::OffsetColumn(85.0f);
+			UI::ShiftPos(20.0f, 5.0f);
 
 			if (ImGui::ImageButton((ImTextureID)m_CreateIcon->GetRendererID(), ImVec2{ 25, 25 }, ImVec2(0, 0), ImVec2(1, 1), 0))
 				ImGui::OpenPopup("CreateToolbar");
 
 			ImGui::SameLine();
-			ImGui::SetCursorPosX(ImGui::GetCursorPosX() - 4.0f);
+			UI::ShiftPosX(-4.0f);
 
-			if(ImGui::Button("Create  " ICON_FA_CARET_DOWN))
+			if (ImGui::Button("Create  " ICON_FA_CARET_DOWN))
 				ImGui::OpenPopup("CreateToolbar");
 
 			if (ImGui::BeginPopup("CreateToolbar"))
@@ -703,7 +606,10 @@ namespace Venus {
 					{
 						auto entity = m_ActiveScene->CreateEntity("Cube");
 						entity.GetComponent<TagComponent>().Icon = TagIcon::Model;
-						entity.AddComponent<MeshRendererComponent>(); // Default is cube
+
+						auto& component = entity.AddComponent<MeshRendererComponent>();
+						component.Model = AssetManager::GetHandle("Models/Default/Sphere.fbx");
+
 						m_ObjectsPanel.SetSelectedEntity(entity);
 						m_ActiveScene->SetEditorSelectedEntity(entity);
 					}
@@ -712,10 +618,9 @@ namespace Venus {
 					{
 						auto entity = m_ActiveScene->CreateEntity("Sphere");
 						entity.GetComponent<TagComponent>().Icon = TagIcon::Model;
-						auto& component = entity.AddComponent<MeshRendererComponent>();
 
-						component.Model = Model::Create("Resources/Models/Sphere.fbx");
-						component.ModelName = "Sphere";
+						auto& component = entity.AddComponent<MeshRendererComponent>();
+						component.Model = AssetManager::GetHandle("Models/Default/Sphere.fbx");
 
 						m_ObjectsPanel.SetSelectedEntity(entity);
 						m_ActiveScene->SetEditorSelectedEntity(entity);
@@ -725,10 +630,9 @@ namespace Venus {
 					{
 						auto entity = m_ActiveScene->CreateEntity("Plane");
 						entity.GetComponent<TagComponent>().Icon = TagIcon::Model;
+						
 						auto& component = entity.AddComponent<MeshRendererComponent>();
-
-						component.Model = Model::Create("Resources/Models/Plane.fbx");
-						component.ModelName = "Plane";
+						component.Model = AssetManager::GetHandle("Models/Default/Plane.fbx");
 
 						m_ObjectsPanel.SetSelectedEntity(entity);
 						m_ActiveScene->SetEditorSelectedEntity(entity);
@@ -738,10 +642,9 @@ namespace Venus {
 					{
 						auto entity = m_ActiveScene->CreateEntity("Capsule");
 						entity.GetComponent<TagComponent>().Icon = TagIcon::Model;
+						
 						auto& component = entity.AddComponent<MeshRendererComponent>();
-
-						component.Model = Model::Create("Resources/Models/Capsule.fbx");
-						component.ModelName = "Capsule";
+						component.Model = AssetManager::GetHandle("Models/Default/Capsule.fbx");
 
 						m_ObjectsPanel.SetSelectedEntity(entity);
 						m_ActiveScene->SetEditorSelectedEntity(entity);
@@ -751,10 +654,9 @@ namespace Venus {
 					{
 						auto entity = m_ActiveScene->CreateEntity("Torus");
 						entity.GetComponent<TagComponent>().Icon = TagIcon::Model;
+						
 						auto& component = entity.AddComponent<MeshRendererComponent>();
-
-						component.Model = Model::Create("Resources/Models/Torus.fbx");
-						component.ModelName = "Torus";
+						component.Model = AssetManager::GetHandle("Models/Default/Torus.fbx");
 
 						m_ObjectsPanel.SetSelectedEntity(entity);
 						m_ActiveScene->SetEditorSelectedEntity(entity);
@@ -764,10 +666,9 @@ namespace Venus {
 					{
 						auto entity = m_ActiveScene->CreateEntity("Cone");
 						entity.GetComponent<TagComponent>().Icon = TagIcon::Model;
+						
 						auto& component = entity.AddComponent<MeshRendererComponent>();
-
-						component.Model = Model::Create("Resources/Models/Cone.fbx");
-						component.ModelName = "Cone";
+						component.Model = AssetManager::GetHandle("Models/Default/Cone.fbx");
 
 						m_ObjectsPanel.SetSelectedEntity(entity);
 						m_ActiveScene->SetEditorSelectedEntity(entity);
@@ -777,10 +678,9 @@ namespace Venus {
 					{
 						auto entity = m_ActiveScene->CreateEntity("Cylinder");
 						entity.GetComponent<TagComponent>().Icon = TagIcon::Model;
+					
 						auto& component = entity.AddComponent<MeshRendererComponent>();
-
-						component.Model = Model::Create("Resources/Models/Cylinder.fbx");
-						component.ModelName = "Cylinder";
+						component.Model = AssetManager::GetHandle("Models/Default/Cylinder.fbx");
 
 						m_ObjectsPanel.SetSelectedEntity(entity);
 						m_ActiveScene->SetEditorSelectedEntity(entity);
@@ -852,57 +752,89 @@ namespace Venus {
 			}
 		}
 
-		// PLAY-STOP BUTTON
+		// PLAY-SIMULATE-STOP BUTTON
 		{
 			ImGui::SameLine();
 			ImGui::NextColumn();
-			ImGui::SetColumnOffset(ImGui::GetColumnIndex(), 340);
-			ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 20.0f);
-			ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 5.0f);
+			UI::OffsetColumn(235.0f);
+			UI::ShiftPos(30.0f, 5.0f);
 
-			bool clicked = false;
-
-			Ref<Texture2D> icon = m_SceneState == SceneState::Edit ? m_PlayIcon : m_StopIcon;
-			std::string text = m_SceneState == SceneState::Edit ? "Play" : "Stop";
-			if (ImGui::ImageButton((ImTextureID)icon->GetRendererID(), ImVec2{ 20, 20 }, ImVec2(0, 0), ImVec2(1, 1), 0))
+			// Background
 			{
-				clicked = true;
+				const ImU32 frame_col = ImGui::ColorConvertFloat4ToU32({ 0.2f, 0.2f, 0.2f, 0.54f });
+				ImGuiWindow* window = ImGui::GetCurrentWindow();
+				ImVec2 min = { window->DC.CursorPos.x - 7.0f, window->DC.CursorPos.y - 5.0f };
+				ImVec2 max = { min.x + 122, min.y + 38.0f };
+				ImGui::RenderFrame(min, max, frame_col, true, 5.0f);
+			}
+
+			// Play/Pause
+			Ref<Texture2D> playIcon = m_SceneState == SceneState::Play ? m_PauseIcon : m_PlayIcon;
+			if (m_SceneState == SceneState::Play && m_ActiveScene->IsPaused())
+				playIcon = m_UnpauseIcon;
+			if (ImGui::ImageButton((ImTextureID)playIcon->GetRendererID(), ImVec2{ 25, 25 }, ImVec2(0, 0), ImVec2(1, 1), 0))
+			{
+				if (m_SceneState != SceneState::Play)
+					OnScenePlay();
+				else
+				{
+					if (m_ActiveScene->IsPaused())
+						m_ActiveScene->PauseScene(false);
+					else
+						m_ActiveScene->PauseScene(true);
+				}
 			}
 
 			ImGui::SameLine();
-			ImGui::SetCursorPosX(ImGui::GetCursorPosX() - 4.0f);
+			UI::ShiftPosX(10.0f);
 
-			ImGui::Button(text.c_str());
-			if (ImGui::IsItemClicked())
-				clicked = true;
-
-			if (clicked)
+			// Simulate
+			Ref<Texture2D> simulateIcon = m_SceneState == SceneState::Simulate ? m_PauseIcon : m_SimulateIcon;
+			if (m_SceneState == SceneState::Simulate && m_ActiveScene->IsPaused())
+				simulateIcon = m_UnpauseIcon;
+			if (ImGui::ImageButton((ImTextureID)simulateIcon->GetRendererID(), ImVec2{ 25, 25 }, ImVec2(0, 0), ImVec2(1, 1), 0))
 			{
-				if (m_SceneState == SceneState::Edit)
-					OnScenePlay();
-				else if (m_SceneState == SceneState::Play)
+				if (m_SceneState != SceneState::Simulate)
+					OnSceneSimulate();
+				else
+				{
+					if (m_ActiveScene->IsPaused())
+						m_ActiveScene->PauseScene(false);
+					else
+						m_ActiveScene->PauseScene(true);
+				}
+			}
+
+			ImGui::SameLine();
+			UI::ShiftPosX(10.0f);
+
+			// Stop
+			Ref<Texture2D> stopIcon = m_SceneState == SceneState::Edit ? m_DStopIcon : m_StopIcon;
+			if (ImGui::ImageButton((ImTextureID)stopIcon->GetRendererID(), ImVec2{ 25, 25 }, ImVec2(0, 0), ImVec2(1, 1), 0))
+			{
+				if (m_SceneState != SceneState::Edit)
 					OnSceneStop();
 			}
 		}
-		
+
 		// Gizmos
 		{
 			ImGui::SameLine();
 			ImGui::NextColumn();
-			ImGui::SetColumnOffset(ImGui::GetColumnIndex(), 450);
-			ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 20.0f);
-			ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 5.0f);
+			UI::OffsetColumn(415.0f);
+			UI::ShiftPos(20.0f, 5.0f);
 			ImGui::PushStyleColor(ImGuiCol_Text, { 1.0, 1.0, 1.0, 0.5 });
 			ImGui::Button("Selection");
 			ImGui::PopStyleColor();
 
 			ImGui::SameLine();
-			ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 8.0f);
+			UI::ShiftPosX(8.0f);
 
 			std::string gizmosType[] = { ICON_FA_MOUSE_POINTER "   None", ICON_FA_ARROWS "   Translate",
 										 ICON_FA_HISTORY "   Rotate", ICON_FA_ANGLE_DOUBLE_UP "   Scale" };
 			std::string currentGyzmosType = gizmosType[m_GizmoType + 1];
 
+			ImGui::SetNextItemWidth(150.0f);
 			if (ImGui::BeginCombo("##GizmosType", currentGyzmosType.c_str(), ImGuiComboFlags_NoArrowButton))
 			{
 				for (int i = 0; i < 4; i++)
@@ -923,46 +855,11 @@ namespace Venus {
 
 		}
 
-		// Camera
-		{
-			ImGui::SameLine();
-			ImGui::NextColumn();
-			ImGui::SetColumnOffset(ImGui::GetColumnIndex(), 840);
-			ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 20.0f);
-			ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 5.0f);
-		
-			if (ImGui::ImageButton((ImTextureID)m_EditorCameraIcon->GetRendererID(), ImVec2{ 28, 28 }, ImVec2(0, 0), ImVec2(1, 1), 0))
-				ImGui::OpenPopup("CameraOptionsPopup");
-
-			ImGui::SameLine();
-			ImGui::SetCursorPosX(ImGui::GetCursorPosX() - 4.0f);
-
-			if (ImGui::Button("Editor Camera  " ICON_FA_CARET_DOWN))
-				ImGui::OpenPopup("CameraOptionsPopup");
-		
-
-			if (ImGui::BeginPopup("CameraOptionsPopup"))
-			{
-				if (ImGui::MenuItem("   Reset Camera"))
-				{
-					m_EditorCamera = EditorCamera(glm::radians(45.0f), 1280.0f / 720.0f, 0.1f, 1000.0f);
-				}
-
-				if (ImGui::MenuItem("   Focus on Selected", "F"))
-				{
-					if (m_ObjectsPanel.GetSelectedEntity())
-						m_EditorCamera.Focus(m_ObjectsPanel.GetSelectedEntity().GetComponent<TransformComponent>().Position);
-				}
-
-				ImGui::EndPopup();
-			}
-		}
-
 		// Settings
 		{
 			ImGui::SameLine();
-			ImGui::SetCursorPosX(ImGui::GetContentRegionMax().x - 120.0f);
-			ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 2.0f);
+			UI::SetPosX(ImGui::GetContentRegionMax().x - 120.0f);
+			//	UI::ShiftPosY(-3.0f);
 
 			SceneRendererOptions& options = m_SceneRenderer->GetOptions();
 
@@ -970,22 +867,27 @@ namespace Venus {
 				ImGui::OpenPopup("SettingsToolbarPopup");
 
 			ImGui::SameLine();
-			ImGui::SetCursorPosX(ImGui::GetCursorPosX() - 4.0f);
+			UI::ShiftPosX(-4.0f);
 
 			if (ImGui::Button("Settings  " ICON_FA_CARET_DOWN))
 				ImGui::OpenPopup("SettingsToolbarPopup");
 
 			if (ImGui::BeginPopup("SettingsToolbarPopup"))
 			{
-				ImGui::Text("   Main Viewport");
-				ImGui::Separator();
+				UI::Text("  " ICON_FA_EYE "  Visualization", true, true);
 				ImGui::Checkbox("  Show Grid", &options.ShowGrid);
-				ImGui::Checkbox("  Enable Bloom", &options.Bloom);
-				ImGui::Checkbox("  Enable FXAA", &options.FXAA);
-				ImGui::Checkbox("  Grayscale", &options.Grayscale);
-				ImGui::DragFloat("Exposure", &options.Exposure, 0.1f, 0.0f, 1000.0f);
-				ImGui::Checkbox("  ACES Tone Map", &options.ACESTone);
-				ImGui::Checkbox("  Gamma Correction", &options.GammaCorrection);
+				ImGui::Checkbox("  Show Colliders", &m_ShowColliders);
+				ImGui::Checkbox("  Show Icons", &m_ShowIcons);
+				ImGui::Checkbox("  Show Light Radius", &m_ShowLightRadius);
+				ImGui::Checkbox("  Show on Play", &m_ShowOverlayInRuntime);
+
+				UI::ShiftPosY(5.0f);
+				UI::Text("  " ICON_FA_VIDEO_CAMERA "  Editor Camera", true, true);
+				if (ImGui::Selectable("  Focus on Selected") && m_ObjectsPanel.GetSelectedEntity())
+					m_EditorCamera.Focus(m_ObjectsPanel.GetSelectedEntity().GetComponent<TransformComponent>().Position);
+				if (ImGui::Selectable("  Reset"))
+					m_EditorCamera = EditorCamera(glm::radians(45.0f), 1280.0f / 720.0f, 0.1f, 1000.0f);
+
 
 				ImGui::EndPopup();
 			}
@@ -1032,7 +934,7 @@ namespace Venus {
 			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_SCENE"))
 			{
 				const wchar_t* path = (const wchar_t*)payload->Data;
-				OpenScene(std::filesystem::path(g_AssetPath) / path);
+				OpenScene(std::filesystem::path(g_AssetsPath) / path);
 			}
 
 			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_TEXTURE"))
@@ -1043,10 +945,7 @@ namespace Venus {
 				entity.GetComponent<TagComponent>().Icon = TagIcon::Sprite;
 				auto& src = entity.AddComponent<SpriteRendererComponent>();
 
-				std::filesystem::path texturePath = std::filesystem::path(g_AssetPath) / path;
-				src.Texture = Texture2D::Create(texturePath.string());
-				src.TextureName = texturePath.stem().string();
-				src.TexturePath = texturePath.string();
+				src.Texture = AssetManager::GetHandle(path);
 
 				m_ObjectsPanel.SetSelectedEntity(entity);
 			}
@@ -1059,19 +958,28 @@ namespace Venus {
 				entity.GetComponent<TagComponent>().Icon = TagIcon::Model;
 				auto& meshRenderer = entity.AddComponent<MeshRendererComponent>();
 
-				std::filesystem::path modelPath = std::filesystem::path(g_AssetPath) / path;
-				meshRenderer.Model = Model::Create(modelPath.string());
-				meshRenderer.ModelName = modelPath.stem().string();
-				meshRenderer.ModelPath = modelPath.string();
+				meshRenderer.Model = AssetManager::GetHandle(path);
 
 				m_ObjectsPanel.SetSelectedEntity(entity);
 			}
 
+			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_ENVMAP"))
+			{
+				const wchar_t* path = (const wchar_t*)payload->Data;
+				std::string name = std::filesystem::path(path).stem().string();
+				Entity entity = m_ActiveScene->CreateEntity(name);
+				entity.GetComponent<TagComponent>().Icon = TagIcon::Light;
+				auto& skyLight = entity.AddComponent<SkyLightComponent>();
+
+				skyLight.Environment = AssetManager::GetHandle(path);
+
+				m_ObjectsPanel.SetSelectedEntity(entity);
+			}
 		}
 
 		// Gizmos
 		Entity selectedEntity = m_ObjectsPanel.GetSelectedEntity();
-		if (m_SceneState == SceneState::Edit && selectedEntity && m_GizmoType != -1)
+		if (m_SceneState != SceneState::Play && selectedEntity && m_GizmoType != -1)
 		{
 			ImGuizmo::SetOrthographic(false);
 			ImGuizmo::SetDrawlist();
@@ -1085,7 +993,6 @@ namespace Venus {
 
 			// Entity
 			auto& transformCompenent = selectedEntity.GetComponent<TransformComponent>();
-			//glm::mat4 transform = transformCompenent.GetTransform();
 			glm::mat4 transform = m_ActiveScene->GetWorldSpaceTransformMatrix(selectedEntity);
 
 			// Snapping 
@@ -1208,7 +1115,7 @@ namespace Venus {
 
 	void EditorLayer::OnEvent(Event& e)
 	{
-		if(m_SceneState == SceneState::Edit && m_ViewportHovered)
+		if (m_SceneState != SceneState::Play && m_ViewportHovered)
 			m_EditorCamera.OnEvent(e);
 
 		EventDispatcher dispatcher(e);
@@ -1219,7 +1126,7 @@ namespace Venus {
 
 	void EditorLayer::NewScene()
 	{
-		if (m_SceneState == SceneState::Play)
+		if (m_SceneState != SceneState::Edit)
 			OnSceneStop();
 
 		m_EditorScene = CreateRef<Scene>();
@@ -1233,7 +1140,7 @@ namespace Venus {
 		m_ScenePath = std::string();
 
 		m_ActiveScene = m_EditorScene;
-		
+
 		m_SceneRenderer->SetScene(m_ActiveScene);
 	}
 
@@ -1249,7 +1156,7 @@ namespace Venus {
 
 	void EditorLayer::OpenScene(const std::filesystem::path& path)
 	{
-		if (m_SceneState == SceneState::Play)
+		if (m_SceneState != SceneState::Edit)
 			OnSceneStop();
 
 		m_EditorScene = CreateRef<Scene>();
@@ -1272,19 +1179,21 @@ namespace Venus {
 
 	void EditorLayer::SaveSceneAs()
 	{
-		std::string filePath = FileDialogs::SaveFile("Venus Scene (*.venus)\0*.venus\0");
+		std::filesystem::path filePath = FileDialogs::SaveFile("Venus Scene (*.venus)\0*.venus\0");
 
 		if (!filePath.empty())
 		{
-			int nameStart = filePath.find_last_of("\\") + 1;
-			m_EditorScene->m_SceneName = filePath.substr(nameStart, filePath.size() - nameStart - 6);
+			m_EditorScene->m_SceneName = filePath.stem().string();
 
 			SceneSerializer serializer(m_EditorScene);
-			serializer.Serialize(filePath);
+			serializer.Serialize(filePath.string());
 
 			UpdateWindowTitle(m_EditorScene->m_SceneName);
 
-			m_ScenePath = filePath;
+			m_ScenePath = filePath.string();
+
+			// Register as Asset
+			AssetManager::ImportAsset(std::filesystem::relative(filePath, g_AssetsPath));
 		}
 	}
 
@@ -1301,6 +1210,9 @@ namespace Venus {
 
 	void EditorLayer::OnScenePlay()
 	{
+		if (m_SceneState == SceneState::Simulate)
+			OnSceneStop();
+
 		m_ConsolePanel.OnScenePlay();
 		m_RuntimeScene = Scene::Copy(m_EditorScene);
 		m_RuntimeScene->OnRuntimeStart();
@@ -1314,10 +1226,27 @@ namespace Venus {
 		m_SceneRenderer->SetScene(m_ActiveScene);
 	}
 
+	void EditorLayer::OnSceneSimulate()
+	{
+		if (m_SceneState == SceneState::Play)
+			OnSceneStop();
+
+		m_RuntimeScene = Scene::Copy(m_EditorScene);
+		m_RuntimeScene->OnSimulationStart();
+		m_ObjectsPanel.SetContext(m_RuntimeScene);
+		m_AssetBrowserPanel.SetContext(m_RuntimeScene);
+
+		m_ActiveScene = m_RuntimeScene;
+
+		m_SceneState = SceneState::Simulate;
+
+		m_SceneRenderer->SetScene(m_ActiveScene);
+	}
+
 	void EditorLayer::OnSceneStop()
 	{
 		m_RuntimeScene->OnRuntimeStop();
-		m_RuntimeScene = nullptr; 
+		m_RuntimeScene = nullptr;
 		m_ObjectsPanel.SetContext(m_EditorScene);
 		m_AssetBrowserPanel.SetContext(m_EditorScene);
 
@@ -1326,6 +1255,122 @@ namespace Venus {
 		m_SceneState = SceneState::Edit;
 
 		m_SceneRenderer->SetScene(m_ActiveScene);
+	}
+
+	void EditorLayer::OnOverlayRender()
+	{
+		if (m_SceneState == SceneState::Play && !m_ShowOverlayInRuntime)
+			return;
+
+		// Physics 2D Colliders
+		if (m_ShowColliders)
+		{
+			{
+				auto entities = m_ActiveScene->GetAllEntitiesWith<BoxCollider2DComponent>();
+				for (auto e : entities)
+				{
+					Entity entity = { e, m_ActiveScene.get() };
+					auto tc = m_ActiveScene->GetWorldSpaceTransform(entity);
+					const auto& bc = entity.GetComponent<BoxCollider2DComponent>();
+
+					glm::vec3 translation = tc.Position + glm::vec3(bc.Offset, 0.001f);
+					glm::vec3 scale = tc.Scale * glm::vec3(bc.Size * 2.0f, 1.0f);
+
+					glm::mat4 transform = glm::translate(glm::mat4(1.0f), translation)
+						* glm::rotate(glm::mat4(1.0f), tc.Rotation.z, glm::vec3(0.0f, 0.0f, 1.0f))
+						* glm::scale(glm::mat4(1.0f), scale);
+
+					m_SceneRenderer->SubmitRect(transform, { 0.0f, 1.0f, 0.0f, 1.0f });
+				}
+			}
+
+			{
+				float zIndex = 0.001f;
+				glm::vec3 cameraForwardDirection = m_EditorCamera.GetForwardDirection();
+				glm::vec3 projectionCollider = cameraForwardDirection * glm::vec3(zIndex);
+
+				auto entities = m_ActiveScene->GetAllEntitiesWith<CircleCollider2DComponent>();
+				for (auto e : entities)
+				{
+					Entity entity = { e, m_ActiveScene.get() };
+					auto transform = m_ActiveScene->GetWorldSpaceTransform(entity);
+					const auto& collider = entity.GetComponent<CircleCollider2DComponent>();
+
+					transform.Position = transform.Position + glm::vec3(collider.Offset, -projectionCollider.z);
+					transform.Scale = transform.Scale * glm::vec3(collider.Radius * 2.0f);
+
+					m_SceneRenderer->SubmitCircle(transform.GetTransform(), { 0.0f, 1.0f, 0.0f, 1.0f }, 0.05);
+				}
+			}
+		}
+
+		// Selected Light Radius
+		if (m_ShowLightRadius)
+		{
+			if (auto entity = m_ObjectsPanel.GetSelectedEntity())
+			{
+				if (entity.HasComponent<PointLightComponent>())
+				{
+					auto& light = entity.GetComponent<PointLightComponent>();
+
+					TransformComponent worldTransform = m_ActiveScene->GetWorldSpaceTransform(entity);
+					worldTransform.Rotation = { 0.0f, 0.0f, 0.0f };
+					worldTransform.Scale = { light.Radius * 2.0f, light.Radius * 2.0f, light.Radius * 2.0f };
+					m_SceneRenderer->SubmitCircle(worldTransform.GetTransform(), { light.Color, 1.0f }, 0.01f);
+
+					worldTransform.Rotation = { glm::radians(90.0f), 0.0f, 0.0f };
+					m_SceneRenderer->SubmitCircle(worldTransform.GetTransform(), { light.Color, 1.0f }, 0.01f);
+
+					worldTransform.Rotation = { 0.0f, glm::radians(90.0f), 0.0f };
+					m_SceneRenderer->SubmitCircle(worldTransform.GetTransform(), { light.Color, 1.0f }, 0.01f);
+				}
+			}
+		}
+
+		// Icons
+		if (m_ShowIcons)
+		{
+			{
+				auto entities = m_ActiveScene->GetAllEntitiesWith<PointLightComponent>();
+				for (auto e : entities)
+				{
+					Entity entity = { e, m_ActiveScene.get() };
+					TransformComponent worldTransform = m_ActiveScene->GetWorldSpaceTransform(entity);
+
+					m_SceneRenderer->SubmitBillboard(worldTransform.Position, { 1.0f, 1.0f }, m_PointLightIcon);
+				}
+			}
+
+			{
+				auto entities = m_ActiveScene->GetAllEntitiesWith<CameraComponent>();
+				for (auto e : entities)
+				{
+					Entity entity = { e, m_ActiveScene.get() };
+					TransformComponent worldTransform = m_ActiveScene->GetWorldSpaceTransform(entity);
+
+					m_SceneRenderer->SubmitBillboard(worldTransform.Position, { 1.0f, 1.0f }, m_SceneCameraIcon);
+				}
+			}
+		}
+	}
+
+	void EditorLayer::OnAssetOpen(AssetType type, const std::filesystem::path& path)
+	{
+		switch (type)
+		{
+			case AssetType::Material:
+			{
+				m_MaterialEditorPanel.SetEditingMaterial(path.string());
+				m_ShowMaterialEditor = true;
+				break;
+			}
+
+			case AssetType::Scene:
+			{
+				OpenScene(g_AssetsPath / path);
+				break;
+			}
+		}
 	}
 
 	void EditorLayer::UpdateWindowTitle(const std::string& sceneName)
@@ -1684,112 +1729,112 @@ namespace Venus {
 				switch (e.GetKeyCode())
 				{
 					// Gizmos
-					case Key::Q:
-						m_GizmoType = -1;
-						break;
+				case Key::Q:
+					m_GizmoType = -1;
+					break;
 
-					case Key::W:
-						m_GizmoType = ImGuizmo::OPERATION::TRANSLATE;
-						break;
+				case Key::W:
+					m_GizmoType = ImGuizmo::OPERATION::TRANSLATE;
+					break;
 
-					case Key::E:
-						m_GizmoType = ImGuizmo::OPERATION::ROTATE;
-						break;
+				case Key::E:
+					m_GizmoType = ImGuizmo::OPERATION::ROTATE;
+					break;
 
-					case Key::R:
-						m_GizmoType = ImGuizmo::OPERATION::SCALE;
-						break;
+				case Key::R:
+					m_GizmoType = ImGuizmo::OPERATION::SCALE;
+					break;
 
 					// Grid
-					case Key::G:
-						m_SceneRenderer->GetOptions().ShowGrid = !m_SceneRenderer->GetOptions().ShowGrid;
-						break;
+				case Key::G:
+					m_SceneRenderer->GetOptions().ShowGrid = !m_SceneRenderer->GetOptions().ShowGrid;
+					break;
 
 					// Focus Camera
-					case Key::F:
-					{
-						if (!m_ObjectsPanel.GetSelectedEntity())
-							break;
-
-						m_EditorCamera.Focus(m_ObjectsPanel.GetSelectedEntity().GetComponent<TransformComponent>().Position);
+				case Key::F:
+				{
+					if (!m_ObjectsPanel.GetSelectedEntity())
 						break;
-					}
+
+					m_EditorCamera.Focus(m_ObjectsPanel.GetSelectedEntity().GetComponent<TransformComponent>().Position);
+					break;
+				}
 				}
 			}
 
 			switch (e.GetKeyCode())
 			{
 				// Clear Selected Entity
-				case Key::Space:
+			case Key::Space:
+			{
+				m_ObjectsPanel.SetSelectedEntity(Entity());
+				m_ActiveScene->SetEditorSelectedEntity(Entity());
+				break;
+			}
+
+			// Destroy Entity
+			case Key::Delete:
+			{
+				if (m_ObjectsPanel.GetSelectedEntity())
 				{
+					m_ActiveScene->DestroyEntity(m_ObjectsPanel.GetSelectedEntity());
 					m_ObjectsPanel.SetSelectedEntity(Entity());
 					m_ActiveScene->SetEditorSelectedEntity(Entity());
 					break;
 				}
-				
-				// Destroy Entity
-				case Key::Delete:
-				{
-					if (m_ObjectsPanel.GetSelectedEntity())
-					{
-						m_ActiveScene->DestroyEntity(m_ObjectsPanel.GetSelectedEntity());
-						m_ObjectsPanel.SetSelectedEntity(Entity());
-						m_ActiveScene->SetEditorSelectedEntity(Entity());
-						break;
-					}
-				}
-			}	
+			}
+			}
 
 		}
 
 		switch (e.GetKeyCode())
 		{
 			// File Dialogs
-			case Key::N:
+		case Key::N:
+		{
+			if (control)
 			{
-				if (control)
-				{
-					NewScene();
-				}
+				NewScene();
+			}
 
+			break;
+		}
+
+		case Key::O:
+		{
+			if (control)
+			{
+				OpenScene();
+			}
+
+			break;
+		}
+
+		case Key::S:
+		{
+			if (control && shift)
+			{
+				SaveSceneAs();
+			}
+			else if (control)
+			{
+				SaveScene();
+			}
+
+			break;
+		}
+
+		// Entity 
+		case Key::D:
+		{
+			if (control && m_ObjectsPanel.GetSelectedEntity())
+			{
+				Entity duplicated = m_ActiveScene->DuplicateEntity(m_ObjectsPanel.GetSelectedEntity());
+				m_ObjectsPanel.SetSelectedEntity(duplicated);
+				m_ActiveScene->SetEditorSelectedEntity(duplicated);
 				break;
 			}
-
-			case Key::O:
-			{
-				if (control)
-				{
-					OpenScene();
-				}
-
-				break;
-			}
-
-			case Key::S :
-			{
-				if (control && shift)
-				{
-					SaveSceneAs();
-				}
-				else if (control)
-				{
-					SaveScene();
-				}
-
-				break;
-			}
-
-			// Entity 
-			case Key::D :
-			{
-				if (control && m_ObjectsPanel.GetSelectedEntity())
-				{
-					Entity duplicated = m_ActiveScene->DuplicateEntity(m_ObjectsPanel.GetSelectedEntity());
-					m_ObjectsPanel.SetSelectedEntity(duplicated);
-					m_ActiveScene->SetEditorSelectedEntity(duplicated);
-					break;
-				}
-			}
+		}
 		}
 	}
 
@@ -1797,10 +1842,11 @@ namespace Venus {
 	{
 		if (e.GetMouseButton() == Mouse::ButtonLeft)
 		{
-			if (m_SceneState == SceneState::Edit)
+			if (m_SceneState == SceneState::Edit || m_SceneState == SceneState::Simulate)
 			{
 				if (m_ViewportHovered && !ImGuizmo::IsOver() && !Input::IsKeyPressed(Key::LeftShift))
 				{
+					UpdateHoveredEntity();
 					m_ObjectsPanel.SetSelectedEntity(m_HoveredEntity);
 					m_ActiveScene->SetEditorSelectedEntity(m_HoveredEntity);
 				}

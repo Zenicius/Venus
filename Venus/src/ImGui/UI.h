@@ -44,6 +44,19 @@ namespace Venus::UI {
 		ImGui::SetCursorPosX((ImGui::GetWindowSize().x - textSizeX) * 0.5f);
 	}
 
+	static void SetTooltip(const std::string& text, float delay = 1.0f)
+	{
+		if (ImGui::IsItemHovered() && GImGui->HoveredIdTimer > delay)
+		{
+			ImGui::SetTooltip(text.c_str());
+		}
+	}
+
+	static void OffsetColumn(float offset, int columnIndex = -1)
+	{
+		columnIndex = columnIndex == -1 ? ImGui::GetColumnIndex() : columnIndex;
+		ImGui::SetColumnOffset(columnIndex, offset);
+	}
 
 	//- Widgets--------------------------------------------------------------------------------
 
@@ -61,6 +74,18 @@ namespace Venus::UI {
 		if (bold)
 			ImGui::PopFont();
 
+		if (separator)
+			ImGui::Separator();
+	}
+
+	static void TextWithLabel(const std::string& label, const std::string& text, bool separator = false)
+	{
+		ImGui::Columns(2);
+		ImGui::Text(label.c_str());
+		ImGui::SameLine();
+		ImGui::NextColumn();
+		ImGui::Text(text.c_str());
+		ImGui::Columns(1);
 		if (separator)
 			ImGui::Separator();
 	}

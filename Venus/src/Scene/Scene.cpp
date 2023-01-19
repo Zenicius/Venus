@@ -9,6 +9,7 @@
 #include "Renderer/Renderer.h"
 #include "Renderer/SceneRenderer.h"
 
+#include "Assets/AssetManager.h"
 #include "Scripting/ScriptingEngine.h"
 
 #include "box2d/b2_world.h"
@@ -126,6 +127,7 @@ namespace Venus {
 				auto& transform = entity.GetComponent<TransformComponent>();
 				auto& rb = entity.GetComponent<Rigidbody2DComponent>();
 
+				//TODO: Fix Bug  child entities colliders in wrong positions
 				b2BodyDef bodyDef;
 				bodyDef.type = Venus2DBodyTypeToBox2DType(rb.Type);
 				bodyDef.position.Set(transform.Position.x, transform.Position.y);
@@ -141,7 +143,8 @@ namespace Venus {
 					auto& bc = entity.GetComponent<BoxCollider2DComponent>();
 
 					b2PolygonShape shape;
-					shape.SetAsBox(bc.Size.x * transform.Scale.x, bc.Size.y * transform.Scale.y);
+					shape.SetAsBox(bc.Size.x * transform.Scale.x, bc.Size.y * transform.Scale.y,
+						b2Vec2(bc.Offset.x, bc.Offset.y), transform.Rotation.z);
 
 					b2FixtureDef fixture;
 					fixture.shape = &shape;
@@ -191,6 +194,69 @@ namespace Venus {
 				{
 					ScriptingEngine::Instantiate(entity);
 					ScriptingEngine::OnCreate(entity);
+				}
+			}
+		}
+	}
+
+	void Scene::OnSimulationStart()
+	{
+		// Physics
+		{
+			m_PhysicsWorld = new b2World({ 0.0f, -9.8f });
+
+			auto view = m_Registry.view<Rigidbody2DComponent>();
+			for (auto e : view)
+			{
+				Entity entity = { e, this };
+
+				auto& transform = entity.GetComponent<TransformComponent>();
+				auto& rb = entity.GetComponent<Rigidbody2DComponent>();
+
+				b2BodyDef bodyDef;
+				bodyDef.type = Venus2DBodyTypeToBox2DType(rb.Type);
+				bodyDef.position.Set(transform.Position.x, transform.Position.y);
+				bodyDef.angle = transform.Rotation.z;
+
+				b2Body* body = m_PhysicsWorld->CreateBody(&bodyDef);;
+				body->SetFixedRotation(rb.FixedRotation);
+
+				rb.RuntimeBody = body;
+
+				if (entity.HasComponent<BoxCollider2DComponent>())
+				{
+					auto& bc = entity.GetComponent<BoxCollider2DComponent>();
+
+					b2PolygonShape shape;
+					shape.SetAsBox(bc.Size.x * transform.Scale.x, bc.Size.y * transform.Scale.y,
+						b2Vec2(bc.Offset.x, bc.Offset.y), transform.Rotation.z);
+
+					b2FixtureDef fixture;
+					fixture.shape = &shape;
+					fixture.density = bc.Density;
+					fixture.friction = bc.Friction;
+					fixture.restitution = bc.Restitution;
+					fixture.restitutionThreshold = bc.RestitutionThreshold;
+
+					body->CreateFixture(&fixture);
+				}
+
+				else if (entity.HasComponent<CircleCollider2DComponent>())
+				{
+					auto& cc2d = entity.GetComponent<CircleCollider2DComponent>();
+
+					b2CircleShape circleShape;
+					circleShape.m_p.Set(cc2d.Offset.x, cc2d.Offset.y);
+					circleShape.m_radius = transform.Scale.x * cc2d.Radius;
+
+					b2FixtureDef fixture;
+					fixture.shape = &circleShape;
+					fixture.density = cc2d.Density;
+					fixture.friction = cc2d.Friction;
+					fixture.restitution = cc2d.Restitution;
+					fixture.restitutionThreshold = cc2d.RestitutionThreshold;
+
+					body->CreateFixture(&fixture);
 				}
 			}
 		}
@@ -407,10 +473,10 @@ namespace Venus {
 				for (auto entity : pointLights)
 				{
 					auto [transformComponent, lightComponent] = pointLights.get<TransformComponent, PointLightComponent>(entity);
-					auto position = GetWorldSpacePosition(Entity(entity, this));
+					auto transform = GetWorldSpaceTransform(Entity(entity, this));
 					m_LightEnvironment.PointLights[index++] =
 					{
-						position,
+						transform.Position,
 						lightComponent.Intensity,
 						lightComponent.Color,
 						lightComponent.MinRadius,
@@ -427,9 +493,18 @@ namespace Venus {
 				auto skyLights = m_Registry.view<SkyLightComponent>();
 				for (auto entity : skyLights)
 				{
-					auto lightComponent = skyLights.get<SkyLightComponent>(entity);
+					auto& lightComponent = skyLights.get<SkyLightComponent>(entity);
 
-					m_LightEnvironment.SkyLight.EnvironmentMap = lightComponent.EnvironmentMap;
+					if (!AssetManager::IsAssetHandleValid(lightComponent.Environment))
+					{
+						if (lightComponent.DinamicSky)
+						{
+							Ref<TextureCube> preethamSky = Renderer::CreatePreethamSky(lightComponent.TurbidityAzimuthInclination);
+							lightComponent.Environment = AssetManager::CreateMemoryOnlyAsset<SceneEnvironment>(preethamSky, preethamSky);
+						}
+					}
+					
+					m_LightEnvironment.SkyLight.EnvironmentMap = AssetManager::GetAsset<SceneEnvironment>(lightComponent.Environment);
 					m_LightEnvironment.SkyLight.Intensity = lightComponent.Intensity;
 					m_LightEnvironment.SkyLight.Lod = lightComponent.Lod;
 				}
@@ -447,14 +522,25 @@ namespace Venus {
 			auto view = m_Registry.view<TransformComponent, MeshRendererComponent>();
 			for (auto entity : view)
 			{
-				auto [transform, model] = view.get<TransformComponent, MeshRendererComponent>(entity);
+				auto& meshComponent = view.get<MeshRendererComponent>(entity);
+				auto& materialTable = meshComponent.MaterialTable;
 
 				glm::mat4 worldSpaceTransform = GetWorldSpaceTransformMatrix({ entity, this });
 
-				if (m_EditorSelectedEntity == (uint32_t)entity)
-					renderer->SubmitSelectedModel(model.Model, worldSpaceTransform, (int)entity);
-				else
-					renderer->SubmitModel(model.Model, worldSpaceTransform, (int)entity);
+				if (AssetManager::IsAssetHandleValid(meshComponent.Model))
+				{
+					auto model = AssetManager::GetAsset<Model>(meshComponent.Model);
+					if (!model->IsFlagSet(AssetFlag::Missing))
+					{
+						if (materialTable->GetMaterialCount() != model->GetMaterialTable()->GetMaterialCount())
+							materialTable->SetMaterialCount(model->GetMaterialTable()->GetMaterialCount());
+
+						if (m_EditorSelectedEntity == (uint32_t)entity)
+							renderer->SubmitSelectedModel(model, materialTable, worldSpaceTransform, (int)entity);
+						else
+							renderer->SubmitModel(model, materialTable, worldSpaceTransform, (int)entity);
+					}
+				}
 			}
 		}
 		
@@ -464,11 +550,25 @@ namespace Venus {
 
 		// Quads
 		{
-			auto group = m_Registry.group<TransformComponent>(entt::get<SpriteRendererComponent>);
-			for (auto entity : group)
+			auto view = m_Registry.view<TransformComponent, SpriteRendererComponent>();
+			for (auto entity : view)
 			{
-				auto [transform, sprite] = group.get<TransformComponent, SpriteRendererComponent>(entity);
-				Renderer2D::DrawSprite(transform.GetTransform(), sprite, (int)entity);
+				auto sprite = view.get<SpriteRendererComponent>(entity);
+				auto transform = GetWorldSpaceTransformMatrix({ entity, this });
+
+				Ref<Texture2D> texture = nullptr;
+				AssetMetadata texMetadata = AssetManager::GetMetadata(sprite.Texture);
+				if (texMetadata.IsValid())
+				{
+					texture = AssetManager::GetAsset<Texture2D>(sprite.Texture);
+
+					if (texture->IsFlagSet(AssetFlag::Invalid))
+						texture = nullptr;
+					else if (sprite.TextureProperties != texture->GetProperties())
+						texture->SetProperties(sprite.TextureProperties, true);
+				}
+
+				renderer->SubmitQuad(transform, texture, sprite.TilingFactor, sprite.Color, (int)entity);
 			}
 		}
 
@@ -477,13 +577,12 @@ namespace Venus {
 			auto view = m_Registry.view<TransformComponent, CircleRendererComponent>();
 			for (auto entity : view)
 			{
-				auto [transform, circle] = view.get<TransformComponent, CircleRendererComponent>(entity);
-				Renderer2D::DrawCircle(transform.GetTransform(), circle.Color, circle.Thickness, circle.Fade, (int)entity);
+				auto circle = view.get<CircleRendererComponent>(entity);
+				auto transform = GetWorldSpaceTransformMatrix({ entity, this });
+
+				renderer->SubmitCircle(transform, circle.Color, circle.Thickness, circle.Fade, (int)entity);
 			}
 		}
-
-		// Overlay
-		//OnOverlayRender(camera);
 
 		renderer->EndScene();
 	}
@@ -493,29 +592,33 @@ namespace Venus {
 		/////////////////////////////////////////////////////////////////////////////
 		// 2D PHYSICS ///////////////////////////////////////////////////////////////
 		/////////////////////////////////////////////////////////////////////////////
-
-		m_PhysicsWorld->Step(ts, m_VelocityIterations, m_PositionIterations);
-
-		auto view = m_Registry.view<Rigidbody2DComponent>();
-		for (auto e : view)
+		
+		if (!m_IsPaused)
 		{
-			Entity entity = { e, this };
+			m_PhysicsWorld->Step(ts, m_VelocityIterations, m_PositionIterations);
 
-			auto& transform = entity.GetComponent<TransformComponent>();
-			auto& rb = entity.GetComponent<Rigidbody2DComponent>();
+			auto view = m_Registry.view<Rigidbody2DComponent>();
+			for (auto e : view)
+			{
+				Entity entity = { e, this };
 
-			b2Body* body = (b2Body*)rb.RuntimeBody;
-			const auto& position = body->GetPosition();
+				auto& transform = entity.GetComponent<TransformComponent>();
+				auto& rb = entity.GetComponent<Rigidbody2DComponent>();
 
-			transform.Position.x = position.x;
-			transform.Position.y = position.y;
-			transform.Rotation.z = body->GetAngle();
+				b2Body* body = (b2Body*)rb.RuntimeBody;
+				const auto& position = body->GetPosition();
+
+				transform.Position.x = position.x;
+				transform.Position.y = position.y;
+				transform.Rotation.z = body->GetAngle();
+			}
 		}
 
 		/////////////////////////////////////////////////////////////////////////////
 		// SCRIPTING ////////////////////////////////////////////////////////////////
 		/////////////////////////////////////////////////////////////////////////////
 
+		if (!m_IsPaused) 
 		{
 			auto view = m_Registry.view<ScriptComponent>();
 			for (auto e : view)
@@ -571,10 +674,10 @@ namespace Venus {
 				for (auto entity : pointLights)
 				{
 					auto [transformComponent, lightComponent] = pointLights.get<TransformComponent, PointLightComponent>(entity);
-					auto position = GetWorldSpacePosition(Entity(entity, this));
+					auto transform = GetWorldSpaceTransform(Entity(entity, this));
 					m_LightEnvironment.PointLights[index++] =
 					{
-						position,
+						transform.Position,
 						lightComponent.Intensity,
 						lightComponent.Color,
 						lightComponent.MinRadius,
@@ -591,9 +694,18 @@ namespace Venus {
 				auto skyLights = m_Registry.view<SkyLightComponent>();
 				for (auto entity : skyLights)
 				{
-					auto lightComponent = skyLights.get<SkyLightComponent>(entity);
+					auto& lightComponent = skyLights.get<SkyLightComponent>(entity);
 
-					m_LightEnvironment.SkyLight.EnvironmentMap = lightComponent.EnvironmentMap;
+					if (!AssetManager::IsAssetHandleValid(lightComponent.Environment))
+					{
+						if (lightComponent.DinamicSky)
+						{
+							Ref<TextureCube> preethamSky = Renderer::CreatePreethamSky(lightComponent.TurbidityAzimuthInclination);
+							lightComponent.Environment = AssetManager::CreateMemoryOnlyAsset<SceneEnvironment>(preethamSky, preethamSky);
+						}
+					}
+
+					m_LightEnvironment.SkyLight.EnvironmentMap = AssetManager::GetAsset<SceneEnvironment>(lightComponent.Environment);
 					m_LightEnvironment.SkyLight.Intensity = lightComponent.Intensity;
 					m_LightEnvironment.SkyLight.Lod = lightComponent.Lod;
 				}
@@ -601,7 +713,7 @@ namespace Venus {
 		}
 
 		// Render ----------------------------------------------------------------------------------------------
-		SceneCamera* mainCamera = nullptr;
+		CameraComponent* mainCamera = nullptr;
 		glm::mat4 cameraTransform;
 		{
 			auto view = m_Registry.view<TransformComponent, CameraComponent>();
@@ -611,7 +723,7 @@ namespace Venus {
 
 				if (camera.Primary)
 				{
-					mainCamera = &camera.Camera;
+					mainCamera = &camera;
 					cameraTransform = transform.GetTransform();
 					break;
 				}
@@ -630,11 +742,22 @@ namespace Venus {
 				auto view = m_Registry.view<TransformComponent, MeshRendererComponent>();
 				for (auto entity : view)
 				{
-					auto [transform, model] = view.get<TransformComponent, MeshRendererComponent>(entity);
+					auto& meshComponent = view.get<MeshRendererComponent>(entity);
+					auto& materialTable = meshComponent.MaterialTable;
 
 					glm::mat4 worldSpaceTransform = GetWorldSpaceTransformMatrix({ entity, this });
-						
-					renderer->SubmitModel(model.Model, worldSpaceTransform, (int)entity);
+
+					if (AssetManager::IsAssetHandleValid(meshComponent.Model))
+					{
+						auto model = AssetManager::GetAsset<Model>(meshComponent.Model);
+						if (!model->IsFlagSet(AssetFlag::Missing))
+						{
+							if (materialTable->GetMaterialCount() != model->GetMaterialTable()->GetMaterialCount())
+								materialTable->SetMaterialCount(model->GetMaterialTable()->GetMaterialCount());
+
+							renderer->SubmitModel(model, materialTable, worldSpaceTransform, (int)entity);
+						}
+					}
 				}
 			}
 			
@@ -644,11 +767,25 @@ namespace Venus {
 
 			// Quads
 			{
-				auto group = m_Registry.group<TransformComponent>(entt::get<SpriteRendererComponent>);
-				for (auto entity : group)
+				auto view = m_Registry.view<TransformComponent, SpriteRendererComponent>();
+				for (auto entity : view)
 				{
-					auto [transform, sprite] = group.get<TransformComponent, SpriteRendererComponent>(entity);
-					Renderer2D::DrawSprite(transform.GetTransform(), sprite, (int)entity);
+					auto sprite = view.get<SpriteRendererComponent>(entity);
+					auto transform = GetWorldSpaceTransformMatrix({ entity, this });
+
+					Ref<Texture2D> texture = nullptr;
+					AssetMetadata texMetadata = AssetManager::GetMetadata(sprite.Texture);
+					if (texMetadata.IsValid())
+					{
+						texture = AssetManager::GetAsset<Texture2D>(sprite.Texture);
+
+						if (texture->IsFlagSet(AssetFlag::Invalid))
+							texture = nullptr;
+						else if (sprite.TextureProperties != texture->GetProperties())
+							texture->SetProperties(sprite.TextureProperties, true);
+					}
+
+					renderer->SubmitQuad(transform, texture, sprite.TilingFactor, sprite.Color, (int)entity);
 				}
 			}
 
@@ -657,8 +794,10 @@ namespace Venus {
 				auto view = m_Registry.view<TransformComponent, CircleRendererComponent>();
 				for (auto entity : view)
 				{
-					auto [transform, circle] = view.get<TransformComponent, CircleRendererComponent>(entity);
-					Renderer2D::DrawCircle(transform.GetTransform(), circle.Color, circle.Thickness, circle.Fade, (int)entity);
+					auto circle = view.get<CircleRendererComponent>(entity);
+					auto transform = GetWorldSpaceTransformMatrix({ entity, this });
+
+					renderer->SubmitCircle(transform, circle.Color, circle.Thickness, circle.Fade, (int)entity);
 				}
 			}
 
@@ -666,88 +805,34 @@ namespace Venus {
 		}
 	}
 
-	void Scene::OnOverlayRender(EditorCamera& editorCamera)
+	void Scene::OnUpdateSimulation(Ref<SceneRenderer> renderer, Timestep ts, EditorCamera& camera)
 	{
-		// Selected Entity
-		Entity entity = { (entt::entity)m_EditorSelectedEntity, this };
-		if (entity)
+		/////////////////////////////////////////////////////////////////////////////
+		// 2D PHYSICS ///////////////////////////////////////////////////////////////
+		/////////////////////////////////////////////////////////////////////////////
+
+		if (!m_IsPaused)
 		{
-			// Entity Outline
-			if (entity.HasComponent<MeshRendererComponent>())
+			m_PhysicsWorld->Step(ts, m_VelocityIterations, m_PositionIterations);
+
+			auto view = m_Registry.view<Rigidbody2DComponent>();
+			for (auto e : view)
 			{
-				const auto& meshRendererComponent = entity.GetComponent<MeshRendererComponent>();
-				const auto& transformComponent = entity.GetComponent<TransformComponent>();
+				Entity entity = { e, this };
 
-				//Renderer::RenderSelectedModel(meshRendererComponent.Model, transformComponent.GetTransform());
-			}
-			else if (entity.HasComponent<SpriteRendererComponent>())
-			{
-				const auto& tc = entity.GetComponent<TransformComponent>();
+				auto& transform = entity.GetComponent<TransformComponent>();
+				auto& rb = entity.GetComponent<Rigidbody2DComponent>();
 
-				glm::vec3 translation = tc.Position;
-				glm::vec3 scale = { tc.Scale.x + 0.05f, tc.Scale.y + 0.05f, tc.Scale.z };
+				b2Body* body = (b2Body*)rb.RuntimeBody;
+				const auto& position = body->GetPosition();
 
-				glm::mat4 transform = glm::translate(glm::mat4(1.0f), translation)
-					* glm::toMat4(glm::quat(tc.Rotation))
-					* glm::scale(glm::mat4(1.0f), scale);
-
-				Renderer2D::DrawRect(transform, { 0.75f, 0.18f, 0.22f, 1.0f });
-			}
-			else if (entity.HasComponent<CircleRendererComponent>())
-			{
-				const auto& tc = entity.GetComponent<TransformComponent>();
-
-				glm::vec3 translation = tc.Position;
-				glm::vec3 scale = { tc.Scale.x + 0.05f, tc.Scale.y + 0.05f, tc.Scale.z };
-
-				glm::mat4 transform = glm::translate(glm::mat4(1.0f), translation)
-					* glm::toMat4(glm::quat(tc.Rotation))
-					* glm::scale(glm::mat4(1.0f), scale);
-
-				Renderer2D::DrawCircle(transform, { 0.75f, 0.18f, 0.22f, 1.0f }, 0.05);
-			}
-
-			// Colliders Area
-			if (entity.HasComponent<BoxCollider2DComponent>())
-			{
-				const auto& bc = entity.GetComponent<BoxCollider2DComponent>();
-				if (bc.ShowArea)
-				{
-					const auto& tc = entity.GetComponent<TransformComponent>();
-
-					glm::vec3 translation = tc.Position + glm::vec3(bc.Offset, 0.001f);
-					glm::vec3 scale = tc.Scale * glm::vec3(bc.Size * 2.0f, 1.0f);
-
-					glm::mat4 transform = glm::translate(glm::mat4(1.0f), translation)
-						* glm::rotate(glm::mat4(1.0f), tc.Rotation.z, glm::vec3(0.0f, 0.0f, 1.0f))
-						* glm::scale(glm::mat4(1.0f), scale);
-
-					Renderer2D::DrawRect(transform, { 0.0f, 1.0f, 0.0f, 1.0f });
-				}
-			}
-
-			if (entity.HasComponent<CircleCollider2DComponent>())
-			{
-				const auto& cc = entity.GetComponent<CircleCollider2DComponent>();
-				if (cc.ShowArea)
-				{
-					float zIndex = 0.001f;
-					glm::vec3 cameraForwardDirection = editorCamera.GetForwardDirection();
-					glm::vec3 projectionCollider = cameraForwardDirection * glm::vec3(zIndex);
-
-					const auto& tc = entity.GetComponent<TransformComponent>();
-					
-					glm::vec3 translation = tc.Position + glm::vec3(cc.Offset, -projectionCollider.z);
-					glm::vec3 scale = tc.Scale * glm::vec3(cc.Radius * 2.0f);
-
-					glm::mat4 transform = glm::translate(glm::mat4(1.0f), translation)
-						* glm::scale(glm::mat4(1.0f), scale);
-
-					Renderer2D::DrawCircle(transform, { 0.0f, 1.0f, 0.0f, 1.0f }, 0.05f);
-				}
+				transform.Position.x = position.x;
+				transform.Position.y = position.y;
+				transform.Rotation.z = body->GetAngle();
 			}
 		}
-		
+
+		OnUpdateEditor(renderer, ts, camera);
 	}
 
 	void Scene::OnViewportResize(uint32_t width, uint32_t height)

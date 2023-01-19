@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Assets/Asset.h"
 #include "Scene/Components.h"
 #include "Scene/SceneEnvironment.h"
 #include "Engine/UUID.h"
@@ -53,7 +54,7 @@ namespace Venus {
 		bool CastsShadows = true;
 	};
 
-	class Scene 
+	class Scene : public Asset
 	{
 		public:
 			Scene();
@@ -62,13 +63,16 @@ namespace Venus {
 			static Ref<Scene> Copy(Ref<Scene> other);
 
 			void OnRuntimeStart();
+			void OnSimulationStart();
 			void OnRuntimeStop();
 
 			void OnUpdateEditor(Ref<SceneRenderer> renderer, Timestep ts, EditorCamera& camera);
 			void OnUpdateRuntime(Ref<SceneRenderer> renderer, Timestep ts);
-
-			void OnOverlayRender(EditorCamera& camera);
+			void OnUpdateSimulation(Ref<SceneRenderer> renderer, Timestep ts, EditorCamera& camera);
 			void OnViewportResize(uint32_t width, uint32_t height);
+
+			void PauseScene(bool value) { m_IsPaused = value; }
+			bool IsPaused() { return m_IsPaused; }
 
 			//--- Entity Managament--------------------------------------------------------------
 			Entity CreateEntity(const std::string& name = std::string());
@@ -102,6 +106,10 @@ namespace Venus {
 			void ConvertToLocalSpace(Entity entity);
 			void ConvertToWorldSpace(Entity entity);
 
+			//---
+			static AssetType GetStaticType() { return AssetType::Scene; }
+			virtual AssetType GetAssetType() const override { return GetStaticType(); }
+
 		private:
 			// TODO Better way to handle this
 			template<typename T>
@@ -117,6 +125,7 @@ namespace Venus {
 		private:
 			std::string m_SceneName = "Untitled Scene";
 			uint32_t m_ViewportWidth = 0, m_ViewportHeight = 0;
+			bool m_IsPaused = false;
 
 			// Entities
 			entt::registry m_Registry;

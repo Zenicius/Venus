@@ -10,6 +10,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#include "glad/glad.h"
+
 namespace Venus {
 
 	struct QuadVertex
@@ -51,6 +53,13 @@ namespace Venus {
 		static const uint32_t MaxVertices = MaxQuads * 4;
 		static const uint32_t MaxIndices = MaxQuads * 6;
 		static const uint32_t MaxTextureSlots = 32; // TODO: RenderCaps
+
+		// Camera Info
+		glm::mat4 ViewProj;
+		glm::mat4 View;
+
+		// Render Target
+		Ref<Framebuffer> RenderTarget;
 
 		// Quads 
 		Ref<VertexArray> QuadVertexArray;
@@ -96,6 +105,9 @@ namespace Venus {
 	void Renderer2D::Init()
 	{
 		VS_PROFILE_FUNCTION();
+
+		s_2DData.View = glm::mat4(1.0f);
+		s_2DData.ViewProj = glm::mat4(1.0f);
 
 		// Quads
 		s_2DData.QuadVertexArray = VertexArray::Create();
@@ -186,22 +198,19 @@ namespace Venus {
 
 	void Renderer2D::Shutdown()
 	{
-		VS_PROFILE_FUNCTION();
-
 		delete[] s_2DData.QuadVertexBufferBase;
 	}
 
-	void Renderer2D::BeginScene()
+	void Renderer2D::BeginScene(const glm::mat4& viewProj, const glm::mat4& view)
 	{
-		VS_PROFILE_FUNCTION();
+		s_2DData.ViewProj = viewProj;
+		s_2DData.View = view;
 
 		StartBatch();
 	}
 
 	void Renderer2D::EndScene()
 	{
-		VS_PROFILE_FUNCTION();
-
 		Flush();
 	}
 
@@ -221,6 +230,10 @@ namespace Venus {
 
 	void Renderer2D::Flush()
 	{
+		VS_CORE_ASSERT(s_2DData.RenderTarget, "There's no target for 2D rendering");
+
+		s_2DData.RenderTarget->Bind();
+
 		if (s_2DData.QuadIndexCount)
 		{
 			uint32_t dataSize = (uint32_t)((uint8_t*)s_2DData.QuadVertexBufferPtr - (uint8_t*)s_2DData.QuadVertexBufferBase);
@@ -255,6 +268,13 @@ namespace Venus {
 			RenderCommand::DrawLines(s_2DData.LineVertexArray, s_2DData.LineVertexCount);
 			s_2DData.Stats.DrawCalls++;
 		}
+
+		s_2DData.RenderTarget->Unbind();
+	}
+
+	void Renderer2D::SetRenderTarget(Ref<Framebuffer> target)
+	{
+		s_2DData.RenderTarget = target;
 	}
 
 	void Renderer2D::NextBatch()
@@ -270,8 +290,6 @@ namespace Venus {
 
 	void Renderer2D::DrawQuad(const glm::vec3& position, const glm::vec2& size, const glm::vec4& color)
 	{
-		VS_PROFILE_FUNCTION();
-
 		glm::mat4 transform = glm::translate(glm::mat4(1.0f), position)
 			* glm::scale(glm::mat4(1.0f), { size.x, size.y, 1.0f });
 		
@@ -285,8 +303,6 @@ namespace Venus {
 
 	void Renderer2D::DrawQuad(const glm::vec3& position, const glm::vec2& size, const Ref<Texture2D>& texture, float tilingFactor, const glm::vec4& tintColor)
 	{
-		VS_PROFILE_FUNCTION();
-
 		glm::mat4 transform = glm::translate(glm::mat4(1.0f), position)
 			* glm::scale(glm::mat4(1.0f), { size.x, size.y, 1.0f });
 
@@ -295,8 +311,6 @@ namespace Venus {
 
 	void Renderer2D::DrawQuad(const glm::mat4& transform, const glm::vec4& color, int entityID)
 	{
-		VS_PROFILE_FUNCTION();
-
 		constexpr size_t quadVertexCount = 4;
 		const float textureIndex = 0.0f; // White Texture
 		constexpr glm::vec2 textureCoords[] = { { 0.0f, 0.0f }, { 1.0f, 0.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f } };
@@ -323,8 +337,6 @@ namespace Venus {
 
 	void Renderer2D::DrawQuad(const glm::mat4& transform, const Ref<Texture2D>& texture, float tilingFactor, const glm::vec4& tintColor, int entityID)
 	{
-		VS_PROFILE_FUNCTION();
-
 		constexpr size_t quadVertexCount = 4;
 		constexpr glm::vec2 textureCoords[] = { { 0.0f, 0.0f }, { 1.0f, 0.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f } };
 
@@ -367,6 +379,53 @@ namespace Venus {
 		s_2DData.Stats.QuadCount++;
 	}
 
+	void Renderer2D::DrawQuadBillboard(const glm::vec3& position, const glm::vec2& size, const Ref<Texture2D>& texture, float tilingFactor, const glm::vec4& tintColor)
+	{
+		constexpr size_t quadVertexCount = 4;
+		constexpr glm::vec2 textureCoords[] = { { 0.0f, 0.0f }, { 1.0f, 0.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f } };
+
+		if (s_2DData.QuadIndexCount >= Renderer2DData::MaxIndices)
+			NextBatch();
+
+		float textureIndex = 0.0f;
+		for (uint32_t i = 1; i < s_2DData.TextureSlotIndex; i++)
+		{
+			if (*s_2DData.TextureSlots[i] == *texture)
+			{
+				textureIndex = (float)i;
+				break;
+			}
+		}
+
+		if (textureIndex == 0.0f)
+		{
+			if (s_2DData.TextureSlotIndex >= Renderer2DData::MaxTextureSlots)
+				NextBatch();
+
+			textureIndex = (float)s_2DData.TextureSlotIndex;
+			s_2DData.TextureSlots[s_2DData.TextureSlotIndex] = texture;
+			s_2DData.TextureSlotIndex++;
+		}
+
+		glm::vec3 camRightWS = { s_2DData.View[0][0], s_2DData.View[1][0], s_2DData.View[2][0] };
+		glm::vec3 camUpWS = { s_2DData.View[0][1], s_2DData.View[1][1], s_2DData.View[2][1] };
+
+		for (size_t i = 0; i < quadVertexCount; i++)
+		{
+			s_2DData.QuadVertexBufferPtr->Position = position + camRightWS * (s_2DData.QuadVertexPositions[i].x) * size.x + camUpWS * s_2DData.QuadVertexPositions[i].y * size.y;
+			s_2DData.QuadVertexBufferPtr->Color = tintColor;
+			s_2DData.QuadVertexBufferPtr->TexCoord = textureCoords[i];
+			s_2DData.QuadVertexBufferPtr->TexIndex = textureIndex;
+			s_2DData.QuadVertexBufferPtr->TilingFactor = tilingFactor;
+			s_2DData.QuadVertexBufferPtr->EntityID = -1;
+			s_2DData.QuadVertexBufferPtr++;
+		}
+
+		s_2DData.QuadIndexCount += 6;
+
+		s_2DData.Stats.QuadCount++;
+	}
+
 	void Renderer2D::DrawRotatedQuad(const glm::vec2& position, const glm::vec2& size, float rotation, const glm::vec4& color)
 	{
 		DrawRotatedQuad({ position.x, position.y, 0.0f }, size, rotation, color);
@@ -374,8 +433,6 @@ namespace Venus {
 
 	void Renderer2D::DrawRotatedQuad(const glm::vec3& position, const glm::vec2& size, float rotation, const glm::vec4& color)
 	{
-		VS_PROFILE_FUNCTION();
-
 		glm::mat4 transform = glm::translate(glm::mat4(1.0f), position)
 			* glm::rotate(glm::mat4(1.0f), glm::radians(rotation), { 0.0f, 0.0f, 1.0f })
 			* glm::scale(glm::mat4(1.0f), { size.x, size.y, 1.0f });
@@ -390,8 +447,6 @@ namespace Venus {
 
 	void Renderer2D::DrawRotatedQuad(const glm::vec3& position, const glm::vec2& size, float rotation, const Ref<Texture2D>& texture, float tilingFactor, const glm::vec4& tintColor)
 	{
-		VS_PROFILE_FUNCTION();
-
 		glm::mat4 transform = glm::translate(glm::mat4(1.0f), position)
 			* glm::rotate(glm::mat4(1.0f), glm::radians(rotation), { 0.0f, 0.0f, 1.0f })
 			* glm::scale(glm::mat4(1.0f), { size.x, size.y, 1.0f });
@@ -399,10 +454,8 @@ namespace Venus {
 		DrawQuad(transform, texture, tilingFactor, tintColor);
 	}
 
-	void Renderer2D::DrawCircle(const glm::mat4& transform, const glm::vec4 color, float thickness, float fade, int entityID)
+	void Renderer2D::DrawCircle(const glm::mat4& transform, const glm::vec4& color, float thickness, float fade, int entityID)
 	{
-		VS_PROFILE_FUNCTION();
-
 		for (size_t i = 0; i < 4; i++)
 		{
 			s_2DData.CircleVertexBufferPtr->WorldPosition = transform * s_2DData.QuadVertexPositions[i];
@@ -421,8 +474,6 @@ namespace Venus {
 
 	void Renderer2D::DrawCircle(const glm::vec2& position, const glm::vec2& scale, const glm::vec4 color, float thickness, float fade, int entityID)
 	{
-		VS_PROFILE_FUNCTION();
-
 		glm::mat4 transform = glm::translate(glm::mat4(1.0f), { position, 0.0f })
 			* glm::scale(glm::mat4(1.0f), { scale.x, scale.y, 1.0f });
 
@@ -444,8 +495,6 @@ namespace Venus {
 
 	void Renderer2D::DrawLine(const glm::vec3& p0, const glm::vec3& p1, const glm::vec4& color, int entityID)
 	{
-		VS_PROFILE_FUNCTION();
-
 		s_2DData.LineVertexBufferPtr->Position = p0;
 		s_2DData.LineVertexBufferPtr->Color = color;
 		s_2DData.LineVertexBufferPtr->EntityID = entityID;
@@ -461,8 +510,6 @@ namespace Venus {
 
 	void Renderer2D::DrawRect(const glm::vec3& position, const glm::vec2& size, const glm::vec4 color, int entityID)
 	{
-		VS_PROFILE_FUNCTION();
-
 		glm::vec3 p0 = glm::vec3(position.x - size.x * 0.5f, position.y - size.y * 0.5f, position.z);
 		glm::vec3 p1 = glm::vec3(position.x + size.x * 0.5f, position.y - size.y * 0.5f, position.z);
 		glm::vec3 p2 = glm::vec3(position.x + size.x * 0.5f, position.y + size.y * 0.5f, position.z);
@@ -476,8 +523,6 @@ namespace Venus {
 
 	void Renderer2D::DrawRect(const glm::mat4& transform, const glm::vec4 color, int entityID)
 	{
-		VS_PROFILE_FUNCTION();
-
 		glm::vec3 lineVertices[4];
 		
 		for (size_t i = 0; i < 4; i++)
@@ -501,10 +546,13 @@ namespace Venus {
 
 	void Renderer2D::DrawSprite(const glm::mat4& transform, SpriteRendererComponent& src, int entityID)
 	{
+		VS_CORE_ASSERT(false);
+		/*
 		if (src.Texture)
 			DrawQuad(transform, src.Texture, src.TilingFactor, src.Color, entityID);
 		else
 			DrawQuad(transform, src.Color, entityID);
+		*/
 	}
 
 	void Renderer2D::ResetStats()
